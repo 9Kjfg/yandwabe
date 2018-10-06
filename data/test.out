@@ -46,8 +46,7 @@ RenderWeirdGradient(game_offscreen_buffer *Buffer, int XOffset, int YOffset)
 }
 
 internal void
-GameUpdateAndRender(game_memory *Memory ,game_input *Input, game_offscreen_buffer *Buffer,
-					game_sound_output_buffer *SoundBuffer)
+GameUpdateAndRender(game_memory *Memory ,game_input *Input, game_offscreen_buffer *Buffer)
 {
 	Assert((&Input->Controllers[0].Terminator - &Input->Controllers[0].Buttons[0]) == 
 		ArrayCount(Input->Controllers[0].Buttons));
@@ -99,7 +98,13 @@ GameUpdateAndRender(game_memory *Memory ,game_input *Input, game_offscreen_buffe
 			GameState->GreenOffset += 1;
 		}
 	}
-	// TODO: Allow samle offset here for more robust platform option
-    GameOutputSound(SoundBuffer, GameState->ToneHz);
+
     RenderWeirdGradient(Buffer, GameState->BlueOffset, GameState->GreenOffset);
+}
+
+internal void
+GameGetSoundSamples(game_memory *Memory, game_sound_output_buffer *SoundBuffer)
+{
+	game_state *GameState = (game_state *)Memory->PermanentStorage;
+	GameOutputSound(SoundBuffer, GameState->ToneHz);
 }
