@@ -15,33 +15,7 @@
 	- Hardware acceleration (OpenGl or Direct3D or BOTH)
 	- GetKeyboardLayout (for French keyboards, internation WASD support)
 */
-
-// TODO:implement sine ourselves
-#include <math.h>
-#include <stdint.h>
-
-#define internal static
-#define local_persist static
-#define global_variable static
-
-#define Pi32 3.14159265359f
-
-typedef int8_t int8;
-typedef int16_t int16;
-typedef int32_t int32;
-typedef int64_t int64;
-typedef int32_t bool32;
-
-typedef uint8_t uint8;
-typedef uint16_t uint16;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
-
-typedef float real32;
-typedef double real64;
-
 #include "handmade.h"
-#include "handmade.cpp"
 
 #include <windows.h>
 #include <stdio.h>
@@ -79,8 +53,15 @@ global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
 #define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPGUID lpGuid, LPDIRECTSOUND * ppDS, LPUNKNOWN  pUnkOuter )
 typedef DIRECT_SOUND_CREATE(direct_sound_create);
 
-internal debug_read_file_result
-DEBUGPlatformReadEntireFile(char *Filename)
+DEBUG_PLATFORM_FREE_FILE_MEMORY(DEBUGPlatformFreeFileMemory)
+{
+	if (Memory)
+	{
+		VirtualFree(Memory, 0, MEM_RELEASE);
+	}
+}
+
+DEBUG_PLATFORM_READ_ENTIRE_FILE(DEBUGPlatformReadEntireFile)
 {
 	debug_read_file_result Result = {};
 
@@ -127,17 +108,7 @@ DEBUGPlatformReadEntireFile(char *Filename)
 	return(Result);
 }
 
-internal void 
-DEBUGPlatformFreeFileMemory(void *Memory)
-{
-	if (Memory)
-	{
-		VirtualFree(Memory, 0, MEM_RELEASE);
-	}
-}
-
-internal bool32
-DEBUGPlatformWriteEntireFile(char *Filename, uint32 MemorySize, void *Memory)
+DEBUG_PLATFORM_WRITE_ENTIRE_FILE(DEBUGPlatformWriteEntireFile)
 {
 	bool32 Result = false;
 
@@ -165,6 +136,58 @@ DEBUGPlatformWriteEntireFile(char *Filename, uint32 MemorySize, void *Memory)
 	return(Result);
 }
 
+struct win32_game_code
+{
+	HMODULE GameCodeDLL;
+	game_update_and_render *UpdateAndRender;
+	game_get_sound_samples *GetSoundSamples;
+
+	bool32 IsValid;
+};
+
+internal win32_game_code
+Win32LoadGameCode(void)
+{
+	win32_game_code Result = {};
+
+	// TODO: Need to get the proper path here!
+	// TODO: Automatic determination of when updates are necessary
+
+	CopyFile("handmade.dll", "handmade_tmp.dll", FALSE);
+	Result.GameCodeDLL = LoadLibraryA("handmade_tmp.dll");
+	if (Result.GameCodeDLL)
+	{
+		Result.UpdateAndRender = (game_update_and_render *)
+			GetProcAddress(Result.GameCodeDLL, "GameUpdateAndRender");
+
+		Result.GetSoundSamples = (game_get_sound_samples *)
+			GetProcAddress(Result.GameCodeDLL, "GameGetSoundSamples");
+
+		Result.IsValid = (Result.UpdateAndRender && Result.GetSoundSamples);
+	}
+
+	if (!Result.IsValid)
+	{
+		Result.UpdateAndRender = GameUpdateAndRenderStub;
+		Result.GetSoundSamples = GameGetSoundSamplesStub;
+	}
+
+	return(Result);
+}
+
+internal void
+Win32UnloadGameCode(win32_game_code *GameCode)
+{
+	if (GameCode->GameCodeDLL)
+	{
+		FreeLibrary(GameCode->GameCodeDLL);
+		GameCode->GameCodeDLL = 0;
+	}
+
+	GameCode->IsValid = false;
+	GameCode->UpdateAndRender = GameUpdateAndRenderStub;
+	GameCode->GetSoundSamples = GameGetSoundSamplesStub;
+}
 
 internal void
 Win32LoadXInput(void)
@@ -722,6 +745,8 @@ WinMain(
 	LPSTR commandLine,
 	int ShowCode)
 {
+	
+
 	LARGE_INTEGER PerCountFrequencyResult;
 	QueryPerformanceFrequency(&PerCountFrequencyResult);
 	GlobalPerCountFrequency = PerCountFrequencyResult.QuadPart;
@@ -802,6 +827,9 @@ WinMain(
 			game_memory GameMemory = {};
 			GameMemory.PermanentStorageSize = Megabytes(64);
 			GameMemory.TransientStorageSize = Megabytes(64);
+			GameMemory.DEBUGPlatformFreeFileMemory = DEBUGPlatformFreeFileMemory;
+			GameMemory.DEBUGPlatformReadEntireFile = DEBUGPlatformReadEntireFile;
+			GameMemory.DEBUGPlatformWriteEntireFile = DEBUGPlatformWriteEntireFile;
 
 			// TODO: Handle memory footprints
 			uint64 TotalSize = GameMemory.PermanentStorageSize + GameMemory.TransientStorageSize;
@@ -825,9 +853,19 @@ WinMain(
 				DWORD AudioLatencyBytes = 0;	
 				real32 AudioLatencySeconds = 0;
 
+				win32_game_code Game = Win32LoadGameCode();
+				uint32 LoadCounter = 0;
+
 				int64 LastCycleCount = __rdtsc();
 				while (GLobalRunning)
 				{
+					if (LoadCounter++ > 120)
+					{
+						Win32UnloadGameCode(&Game);
+						Game = Win32LoadGameCode();
+						LoadCounter++;
+					}
+
 					// TODO: Zeroing macro
 					// TODO: We can't zero everuthing because the up/down state will
 					// be wrong!!!
@@ -966,7 +1004,7 @@ WinMain(
 						Buffer.Height = GlobalBackBaffer.Height;
 						Buffer.Width = GlobalBackBaffer.Width;
 						Buffer.Pitch = GlobalBackBaffer.Pitch;
-						GameUpdateAndRender(&GameMemory, NewInput, &Buffer);
+						Game.UpdateAndRender(&GameMemory, NewInput, &Buffer);
 
 						LARGE_INTEGER AudioWallClock = Win32GetWallClock();
 						real32 FromBeginToAudioSeconds = Win32GetSecondsElapsed(FlipWallClock, AudioWallClock);
@@ -1053,7 +1091,7 @@ WinMain(
 							SoundBuffer.SamplesPerSecond = SoundOutput.SamplesPerSecond;
 							SoundBuffer.SampleCount = BytesToWrite / SoundOutput.BytesPerSample;
 							SoundBuffer.Samples = Samples;
-							GameGetSoundSamples(&GameMemory, &SoundBuffer);
+							Game.GetSoundSamples(&GameMemory, &SoundBuffer);
 #if HANDMADE_INTERNAL
 							win32_debug_time_marker *Marker = &DebugTimeMarkers[DebugTimeMarketIntex];
 							Marker->OutputPlayCursor = PlayCursor;
