@@ -156,7 +156,8 @@ struct game_input
 	game_button_state MouseButton[5];
 	int32 MouseX, MouseY, MouseZ;
 
-	real32 SecondsToAdvanceOverUpdate;
+	real32 dtForFrame;
+
 	game_controller_input Controllers[5];
 };
 
@@ -198,7 +199,8 @@ typedef GAME_GET_SOUND_SAMPLES(game_get_sound_samples);
 
 struct game_state
 {
-
+	real32 PlayerX;
+	real32 PlayerY;
 };
 
 #define HANDMADE_H

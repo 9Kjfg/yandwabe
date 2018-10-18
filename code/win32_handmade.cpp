@@ -1092,7 +1092,6 @@ WinMain(
 				game_input Input[2] = {};
 				game_input *NewInput = &Input[0];
 				game_input *OldInput = &Input[1];
-				NewInput->SecondsToAdvanceOverUpdate = TargetSecondPerFrame;
 
 				LARGE_INTEGER LastCounter = Win32GetWallClock();
 				LARGE_INTEGER FlipWallClock = Win32GetWallClock();
@@ -1109,6 +1108,8 @@ WinMain(
 				int64 LastCycleCount = __rdtsc();
 				while (GLobalRunning)
 				{
+					NewInput->dtForFrame = TargetSecondPerFrame;
+					
 					FILETIME NewDLLWriteTime = Win32GetLastWriteTime(SourceGameCodeDLLFullPath);
 					if (CompareFileTime(&NewDLLWriteTime, &Game.DLLLastWriteTime))
 					{
@@ -1132,6 +1133,7 @@ WinMain(
 					}
 
 					Win32ProcessPendingMessages(&Win32State, NewKeyboardController);
+					
 					if (!GLobalPause)
 					{
 						POINT MouseP;
@@ -1482,7 +1484,7 @@ WinMain(
 						game_input *Temp = NewInput;
 						NewInput = OldInput;
 						OldInput = Temp;
-#if 0
+#if 1
 						uint64 EndCycleCount = __rdtsc();
 						uint64 CycleElapsed = EndCycleCount - LastCycleCount;
 						LastCycleCount = EndCycleCount;
