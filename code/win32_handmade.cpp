@@ -602,6 +602,7 @@ Win32GetInputFileLocation(win32_state *State, bool32 InputStream, int SlotIndex,
 internal win32_replay_buffer *
 Win32GetReplayBuffer(win32_state *State, int unsigned Index)
 {
+	Assert(Index > 0);
 	Assert(Index < ArrayCount(State->ReplayBuffers));
 	win32_replay_buffer *Result = &State->ReplayBuffers[Index];
 	return(Result);
@@ -1054,8 +1055,13 @@ WinMain(
 			GameMemory.DEBUGPlatformWriteEntireFile = DEBUGPlatformWriteEntireFile;
 
 			// TODO: Handle memory footprints (USING SYSTEM METRICS)
+			//
 			// TODO: Use MEM_LARGE_PAGES and call adjust token
 			// privileges when not on Windows Xp
+			//
+			// TODO: TransientStorage needs to be broken up 
+			// into game transient and cache transient, and only
+			// the former need be saved for state playback
 			Win32State.TotalSize = GameMemory.PermanentStorageSize + GameMemory.TransientStorageSize;							
 			Win32State.GameMemoryBlock = VirtualAlloc(
 				0, (size_t)Win32State.TotalSize,
@@ -1063,7 +1069,7 @@ WinMain(
 			GameMemory.PermanentStorage = Win32State.GameMemoryBlock;
 			GameMemory.TransientStorage = ((uint8 *)GameMemory.PermanentStorage + GameMemory.PermanentStorageSize);
 
-			for (int ReplayIndex = 0;
+			for (int ReplayIndex = 1;
 				ReplayIndex < ArrayCount(Win32State.ReplayBuffers);
 				++ReplayIndex)
 			{

@@ -66,30 +66,20 @@ struct canonical_position
 
 		(NOTE we can eliminate the need for floor!)
 	*/
+#if 1
 	int32 TileMapX;
 	int32 TileMapY;
 
 	int32 TileX;
 	int32 TileY;
-	
-	/* TODO:
-		Convert these to math-friendly resolustion independent representation of 
-		world units relative to a tile
-	*/
-	// NOTE: This is tile-relative X and Y
+#else
+	uin32 _TileX;
+	uin32 _TileY;
+#endif
+
+	// TODO: Y should go up
 	real32 TileRelX;
 	real32 TileRelY;
-};
-
-// TODO: Is this ever necessary
-struct raw_position
-{
-	int32 TileMapX;
-	int32 TileMapY;
-
-	// NOTE: Tile-map relative X and Y
-	real32 X;
-	real32 Y;
 };
 
 struct tile_map
@@ -101,6 +91,7 @@ struct world
 {
 	real32 TileSideInMeters;
 	int32 TileSideInPixels;
+	real32 MetersToPixels;
 
 	int32 CountX;
 	int32 CountY;
@@ -108,7 +99,7 @@ struct world
 	real32 UpperLeftX;
 	real32 UpperLeftY;
 
-	// TODO: BEginer;s sparseness
+	// TODO: Beginer's sparseness
 	int32 TileMapCountX;
 	int32 TileMapCountY;
 
@@ -117,12 +108,8 @@ struct world
 
 struct game_state
 {
+	canonical_position PlayerP;
 	// TODO: Player state should be canonical position
-	int32 PlayerTileMapX;
-	int32 PlayerTileMapY;
-
-	real32 PlayerX;
-	real32 PlayerY;
 };
 
 #define HANDMADE_H
