@@ -54,7 +54,16 @@ inline game_controller_input *GetController(game_input *Input, int ControllerInd
 //
 //
 
-struct canonical_position
+struct tile_chunk_position
+{
+	uint32 TileChunkX;
+	uint32 TileChunkY;
+
+	uint32 RelTileX;
+	uint32 RelTileY;
+};
+
+struct world_position
 {
 	/* TODO:
 		Take the tile map x and y
@@ -66,49 +75,41 @@ struct canonical_position
 
 		(NOTE we can eliminate the need for floor!)
 	*/
-#if 1
-	int32 TileMapX;
-	int32 TileMapY;
 
-	int32 TileX;
-	int32 TileY;
-#else
-	uin32 _TileX;
-	uin32 _TileY;
-#endif
+	uint32 AbsTileX;
+	uint32 AbsTileY;
 
-	// TODO: Y should go up
+	// TODO: should these be from the center of a tile
+	// TODO: rename to offset X and Y
 	real32 TileRelX;
 	real32 TileRelY;
 };
 
-struct tile_map
+struct tile_chunk
 {
 	uint32 *Tiles;
 };
 
 struct world
 {
+	uint32 ChunkShift;
+	uint32 ChunkMask;
+	uint32 ChunkDim;
+
 	real32 TileSideInMeters;
 	int32 TileSideInPixels;
 	real32 MetersToPixels;
 
-	int32 CountX;
-	int32 CountY;
-
-	real32 UpperLeftX;
-	real32 UpperLeftY;
-
 	// TODO: Beginer's sparseness
-	int32 TileMapCountX;
-	int32 TileMapCountY;
+	int32 TileChunkCountX;
+	int32 TileChunkCountY;
 
-	tile_map *TileMaps;
+	tile_chunk *TileChunks;
 };
 
 struct game_state
 {
-	canonical_position PlayerP;
+	world_position PlayerP;
 	// TODO: Player state should be canonical position
 };
 
