@@ -974,6 +974,7 @@ WinMain(
 	Win32LoadXInput();
 	WNDCLASSA WindowClass = {};
 
+	// NOTE: 1080p display mode is  1920x1080 -> Half of that is 960x540
 	Win32ResizeDIBSection(&GlobalBackBaffer, 960, 540);
 	
 	WindowClass.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;

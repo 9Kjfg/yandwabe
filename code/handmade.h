@@ -95,6 +95,7 @@ struct game_state
 	world *World;
 
 	tile_map_position PlayerP;
+	uint32 *PixelPointer;
 	// TODO: Player state should be canonical position
 };
 
