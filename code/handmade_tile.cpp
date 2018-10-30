@@ -9,7 +9,7 @@ GetTileChunk(tile_map *TileMap, uint32 TileChunkX, uint32 TileChunkY, uint32 Til
 		(TileChunkZ >= 0) && (TileChunkZ < TileMap->TileChunkCountZ))
 	{
 		TileChunk = &TileMap->TileChunks[
-			TileChunkZ*TileMap->TileChunkCountY*TileChunkY*TileMap->TileChunkCountX + 
+			TileChunkZ*TileMap->TileChunkCountY*TileMap->TileChunkCountX + 
 			TileChunkY*TileMap->TileChunkCountX + 
 			TileChunkX];	
 	}
@@ -171,6 +171,24 @@ AreOnSameTile(tile_map_position *A, tile_map_position *B)
 		((A->AbsTileX == B->AbsTileX) &&
 		(A->AbsTileY == B->AbsTileY) &&
 		(A->AbsTileZ == B->AbsTileZ));
+
+	return(Result);
+}
+
+tile_map_difference
+SubtractInReal32(tile_map *TileMap, tile_map_position *A, tile_map_position *B)
+{
+	tile_map_difference Result;
+
+	real32 dTileX =(real32)A->AbsTileX - (real32)B->AbsTileX;
+	real32 dTileY =(real32)A->AbsTileY - (real32)B->AbsTileY;
+	real32 dTileZ =(real32)A->AbsTileZ - (real32)B->AbsTileZ;
+
+	Result.dX = TileMap->TileSideInMeters*dTileX + (A->OffsetX - B->OffsetX);
+	Result.dY = TileMap->TileSideInMeters*dTileY + (A->OffsetY - B->OffsetY);
+	
+	// TODO: Think about what we want to do about Z
+	Result.dZ = TileMap->TileSideInMeters*dTileZ;
 
 	return(Result);
 }

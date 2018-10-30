@@ -161,7 +161,7 @@ typedef struct game_memory
 	bool32 IsInitialized;
 
 	uint64 PermanentStorageSize;
-	void *PermanentStorage; // NOTE: REQUIRED to ve cleared ro zero at startup
+	void *PermanentStorage; // NOTE: REQUIRED to be cleared ro zero at startup
 
 	uint64 TransientStorageSize;
 	void *TransientStorage;
