@@ -1,21 +1,20 @@
 
 /*
+	- Make the right calls so Windows doesn't think we're "still loading" for a bit after we actuallly start
 	- Save game locations
-	- Getting a handle to out own executable file
+	- Getting a handle to our own executable file
 	- Assert loading path
 	- Threading (launch a thread)
 	- Raw Iput (support for multiple keyboards)
-	- Sleep/timeBeginPeriod
 	- ClipCursor (for mutimonitor support)
-	- FullScreen Support
-	- WM_SETCURSOR (control cursor visibility)
 	- QuerryCancelAutoplay
 	- WM_ACTIVATEAPP (for when we are not the active application)
 	- Blit speed improvements (BitBlt)
 	- Hardware acceleration (OpenGl or Direct3D or BOTH)
 	- GetKeyboardLayout (for French keyboards, internation WASD support)
+	- ChngeDisplaySetting option if we detect slow fullscreen blit
 */
-#include "handmade.h"
+#include "handmade_platform.h"
 
 #include <windows.h>
 #include <stdio.h>
@@ -29,6 +28,8 @@ global_variable bool GLobalPause;
 global_variable win32_offscreen_buffer GlobalBackBaffer;
 global_variable LPDIRECTSOUNDBUFFER GlobalSecondaryBuffer;
 global_variable int64 GlobalPerCountFrequency;
+global_variable bool32 DEBUGGlobalShowCursor;
+global_variable WINDOWPLACEMENT GlobalWindowPosition = {sizeof(GlobalWindowPosition)};
 
 //NOTE: XInputGetStae
 #define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
@@ -344,28 +345,42 @@ Win32ResizeDIBSection(win32_offscreen_buffer *Buffer, int Width, int Height)
 	Buffer->Pitch = Width*BytesPerPixel;
 }
 
-
 internal void
 Win32DisplayBufferInWindow(
 	win32_offscreen_buffer *Buffer,
 	HDC DeviceContext, int WindowWidth, int WindowHeight)
 {
-	int OffsetX = 10;
-	int OffsetY = 10;
+	// TODO: Centering / black bars?
+	if (
+		(WindowWidth >= (Buffer->Width*2)) &&
+		(WindowHeight >= (Buffer->Height*2)))
+	{
+		StretchDIBits(
+			DeviceContext,
+			0, 0, 2*Buffer->Width, 2*Buffer->Height,
+			0, 0, Buffer->Width, Buffer->Height,
+			Buffer->Memory, 
+			&Buffer->Info,
+			DIB_RGB_COLORS, SRCCOPY);
+	}
+	else
+	{
+		int OffsetX = 10;
+		int OffsetY = 10;
 
-	PatBlt(DeviceContext, 0, 0, WindowWidth, OffsetY, BLACKNESS);
-	PatBlt(DeviceContext, 0, OffsetY + Buffer->Height, WindowWidth, WindowHeight, BLACKNESS);
-	PatBlt(DeviceContext, 0, 0, OffsetX, WindowHeight, BLACKNESS);
-	PatBlt(DeviceContext, OffsetX + Buffer->Width, 0, WindowWidth, WindowHeight, BLACKNESS);
-	
-	StretchDIBits(
-		DeviceContext,
-		OffsetX, OffsetY, Buffer->Width, Buffer->Height,
-		0, 0, Buffer->Width, Buffer->Height,
-		Buffer->Memory, 
-		&Buffer->Info,
-		DIB_RGB_COLORS, SRCCOPY
-	);
+		PatBlt(DeviceContext, 0, 0, WindowWidth, OffsetY, BLACKNESS);
+		PatBlt(DeviceContext, 0, OffsetY + Buffer->Height, WindowWidth, WindowHeight, BLACKNESS);
+		PatBlt(DeviceContext, 0, 0, OffsetX, WindowHeight, BLACKNESS);
+		PatBlt(DeviceContext, OffsetX + Buffer->Width, 0, WindowWidth, WindowHeight, BLACKNESS);
+		
+		StretchDIBits(
+			DeviceContext,
+			OffsetX, OffsetY, Buffer->Width, Buffer->Height,
+			0, 0, Buffer->Width, Buffer->Height,
+			Buffer->Memory, 
+			&Buffer->Info,
+			DIB_RGB_COLORS, SRCCOPY);
+	}
 }
 
 LRESULT CALLBACK 
@@ -385,6 +400,17 @@ Win32MainWindowCallback(
 		case WM_CLOSE:
 		{
 			GLobalRunning = false;
+		} break;
+		case WM_SETCURSOR:
+		{
+			if (DEBUGGlobalShowCursor)
+			{
+				Result = DefWindowProc(Window, Message, WParam, LParam);
+			}
+			else
+			{
+				SetCursor(0);
+			}	
 		} break;
 		case WM_ACTIVATEAPP:
 		{
@@ -414,13 +440,7 @@ Win32MainWindowCallback(
 		{
 			PAINTSTRUCT Paint = {};
 			HDC DeviceContext = BeginPaint(Window, &Paint);
-			int X = Paint.rcPaint.left;
-			int Y = Paint.rcPaint.top;
-			int Height = Paint.rcPaint.bottom - Y;
-			int Width = Paint.rcPaint.right - X;
-
 			win32_window_dimension Dimension = Win32GetWindowDimension(Window);
-
 			Win32DisplayBufferInWindow(
 				&GlobalBackBaffer, DeviceContext,
 				Dimension.Width, Dimension.Height);
@@ -688,6 +708,37 @@ Win32PlayBackInput(win32_state *State, game_input *NewInput)
 	}
 }
 
+void
+ToggleFullscreen(HWND Window)
+{
+	// NOTE: This foloow Raymond Chan's prescription
+	// for fullscreen toggling, see:
+	// https://blogs.msdn.microsoft.com/oldnewthing/20100412-00/?p=14353/
+
+	DWORD Style = GetWindowLong(Window, GWL_STYLE);
+	if (Style & WS_OVERLAPPEDWINDOW) {
+		MONITORINFO MonitorInfo = {sizeof(MonitorInfo)};
+		if (GetWindowPlacement(Window, &GlobalWindowPosition) &&
+			GetMonitorInfo(MonitorFromWindow(Window, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo))
+		{
+			SetWindowLong(Window, GWL_STYLE, Style & ~WS_OVERLAPPEDWINDOW);
+			SetWindowPos(Window, HWND_TOP,
+				MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
+				MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
+				MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
+				SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+		}
+	}
+	else
+	{
+		SetWindowLong(Window, GWL_STYLE, Style | WS_OVERLAPPEDWINDOW);
+		SetWindowPlacement(Window, &GlobalWindowPosition);
+		SetWindowPos(Window, NULL, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+			SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+	}
+}
+
 internal void
 Win32ProcessPendingMessages(win32_state *State, game_controller_input *KeyboardController)
 {
@@ -793,10 +844,20 @@ Win32ProcessPendingMessages(win32_state *State, game_controller_input *KeyboardC
 #endif
 				}
 
-				bool32 AltKeyWasDown = (Message.lParam & (1 << 29));
-				if ((VKCode == VK_F4) && AltKeyWasDown)
+				if (IsDown)
 				{
-					GLobalRunning = false;
+					bool32 AltKeyWasDown = (Message.lParam & (1 << 29));
+					if ((VKCode == VK_F4) && AltKeyWasDown)
+					{
+						GLobalRunning = false;
+					}
+					if ((VKCode == VK_RETURN) && AltKeyWasDown)
+					{
+						if (Message.hwnd)
+						{
+							ToggleFullscreen(Message.hwnd);
+						}
+					}
 				}
 			} break;
 			default:
@@ -976,12 +1037,14 @@ WinMain(
 		&Win32State, "lock.temp",
 		sizeof(GameCodeLockFullPath), GameCodeLockFullPath);
 
-	LockFullPath
-
 	UINT DesiredShedulerMS = 1;
 	bool32 SleepIsGranular = (timeBeginPeriod(DesiredShedulerMS) == TIMERR_NOERROR);
 
 	Win32LoadXInput();
+
+#if 1
+	DEBUGGlobalShowCursor = true;
+#endif
 	WNDCLASSA WindowClass = {};
 
 	// NOTE: 1080p display mode is  1920x1080 -> Half of that is 960x540
@@ -990,6 +1053,7 @@ WinMain(
 	WindowClass.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;
 	WindowClass.lpfnWndProc = Win32MainWindowCallback;
 	WindowClass.hInstance = Instance;
+	WindowClass.hCursor = LoadCursor(0, IDC_ARROW);
 	WindowClass.lpszClassName = "HandMadeHeroWindow";
 
 	if (RegisterClass(&WindowClass))

@@ -23,7 +23,7 @@ struct win32_sound_output
 	int BytesPerSample;
 	DWORD SecondaryByfferSize;
 	DWORD SafetyBytes;
-	real32 tSine;
+	
 	// TODO: Should running sample index be in bytes as well?
 	// TODO: Math gets simpler if we add a "betes per second field"
 };
