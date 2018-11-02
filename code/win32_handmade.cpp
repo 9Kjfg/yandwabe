@@ -352,8 +352,8 @@ Win32DisplayBufferInWindow(
 {
 	// TODO: Centering / black bars?
 	if (
-		(WindowWidth >= (Buffer->Width*2)) &&
-		(WindowHeight >= (Buffer->Height*2)))
+		(WindowWidth >= Buffer->Width*2) &&
+		(WindowHeight >= Buffer->Height*2))
 	{
 		StretchDIBits(
 			DeviceContext,
