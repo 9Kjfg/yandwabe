@@ -87,5 +87,13 @@ operator-(v2 A, v2 B)
     return(Result);
 }
 
+inline real32
+Square(real32 A)
+{
+    real32 Result = A * A;
+
+    return(Result);
+}
+
 #define HANDMADE_MATH_H
 #endif
