@@ -307,9 +307,11 @@ internal void
 MovePlayer(game_state *GameState, entity *Entity, real32 dt, v2 ddP)
 {
 	tile_map *TileMap = GameState->World->TileMap;
-	if ((ddP.X != 0.0f) && (ddP.Y != 0.0f))
+
+	real32 ddPLength = LengthSq(ddP);
+	if (ddPLength > 1.0f)
 	{
-		ddP *= 0.707106781187f;
+		ddP *= (1.0f / SquareRoot(ddPLength));
 	}
 
 	real32 PlayerSpeed = 50.0f; // m/s ^ 2
@@ -382,13 +384,13 @@ MovePlayer(game_state *GameState, entity *Entity, real32 dt, v2 ddP)
 		Entity->P= NewPlayerP;
 	}
 #else
-	uint32 MinTileX = 0;
-	uint32 MinTileY = 0;
-	uint32 OnePastMaxTileX = 0;
-	uint32 OnePastMaxTileY = 0;
+	uint32 MinTileX = Minimum(OldPlayerP.AbsTileX, NewPlayerP.AbsTileX);
+	uint32 MinTileY = Minimum(OldPlayerP.AbsTileY, NewPlayerP.AbsTileY);
+	uint32 OnePastMaxTileX = Maximum(OldPlayerP.AbsTileX, NewPlayerP.AbsTileX) + 1;
+	uint32 OnePastMaxTileY = Maximum(OldPlayerP.AbsTileY, NewPlayerP.AbsTileY) + 1;
+
 	uint32 AbsTileZ = GameState->PlayerP.AbsTileZ;
-	tile_map_position BestPlayerP = GameState->PlayerP;
-	real32 BestDistance2 = Length2(PlayerDelta);
+	real32 tMin = 1.0f;
 	for (uint32 AbsTileY = MinTileY;
 		AbsTileY != OnePastMaxTileY;
 		++AbsTileY)
@@ -399,20 +401,19 @@ MovePlayer(game_state *GameState, entity *Entity, real32 dt, v2 ddP)
 		{
 			tile_map_position TestTileP = CenteredTilePoint(AbsTileX, AbsTileY, AbsTileZ);
 			uint32 TileValue = GetTileValue(TileMap, TestTileP);
-			if (IsTileMapEmpty(TileValue))
+			if (!IsTileMapEmpty(TileValue))
 			{
 				v2 MinCorner = -0.5f*{TileMap->TileSideInMeters, TileMap->TileSideInMeters};
 				v2 MaxCorner = 0.5f*{TileMap->TileSideInMeters, TileMap->TileSideInMeters};
 
 				tile_map_difference RelNewPlayerP = SubtractInReal32(TileMap,
 					&TestTileP, &NewPlayerP);
-				v2 TestP = ClosesPointInRectangle(MinCorner, MaxCorner);
-				TestDistanceSq = ;
-				if (BestDistanceSq > TestDistanceSq)
-				{
-					BestPlayerP = ;
-					BestDistanceSq = ;
-				}
+				v2 Rel = RelNewPlayerP.dXY;
+				PlayerDelta;
+				
+				// TODO: Test all four walls and take the minimum Z
+				tResult = (WallX - RelNewPlayerP.x) / PlayerDelta.X;
+				TestWall(MinCorner.X, MinCorner.Y, MaxCorner.Y, RelNewPlayerP.X);
 			}
 		}
 	}
