@@ -57,11 +57,17 @@ RoundReal32ToUInt32(real32 Real32)
 	return(Result); 
 }
 
-// TODO: HOW TO IMPLEMENT THESE MATH FUNCTION??
 inline int32
 FloorReal32ToInt32(real32 Real32)
 {
 	int Result = (int32)floorf(Real32);
+	return(Result); 
+}
+
+inline int32
+CeilReal32ToInt32(real32 Real32)
+{
+	int Result = (int32)ceilf(Real32);
 	return(Result); 
 }
 
