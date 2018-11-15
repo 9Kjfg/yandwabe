@@ -65,6 +65,8 @@ struct high_entity
 {
 	v2 P; // NOTE: Relative to the camera
 	v2 dP;
+	real32 Z;
+	real32 dZ;
 	uint32 AbsTileZ;
 	uint32 FacingDirection;
 };
@@ -74,8 +76,18 @@ struct low_entity
 	tile_map_position P;
 };
 
+enum entity_type
+{
+	EntityType_Null,
+
+	EntityType_Hero,
+	EntityType_Wall
+};
+
 struct dormant_entity
 {
+	entity_type Type;
+
 	tile_map_position P;
 	real32 Width, Height;
 
@@ -92,8 +104,10 @@ enum entity_residence
 	EntityResidence_High,
 };
 
+
 struct entity
 {
+
 	uint32 Residence;
 	low_entity *Low;
 	dormant_entity *Dormant;
@@ -117,8 +131,8 @@ struct game_state
 	dormant_entity DormantEntities[256];
 
 	loaded_bitmap Backdrop;
+	loaded_bitmap Shadow;
 	hero_bitmaps HeroBitmaps[4];
-	// TODO: Player state should be canonical position
 };
 
 #define HANDMADE_H
