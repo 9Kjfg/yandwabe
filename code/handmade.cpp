@@ -297,7 +297,7 @@ MakeEntityHighFrequency(game_state *GameState, uint32 LowIndex)
 			
 			EntityHigh->P = Diff.dXY;
 			EntityHigh->dP = V2(0, 0);
-			EntityHigh->AbsTileZ = EntityLow->P.AbsTileZ;
+			EntityHigh->ChunkZ = EntityLow->P.ChunkZ;
 			EntityHigh->FacingDirection = 0;
 			EntityHigh->LowEntityIndex = LowIndex;
 
@@ -390,10 +390,8 @@ AddWall(game_state *GameState, uint32 AbsTileX, uint32 AbsTileY, uint32 AbsTileZ
 {
 	uint32 EntityIndex = AddLowEntity(GameState, EntityType_Wall);
 	low_entity *EntityLow = GetLowEntity(GameState, EntityIndex);
-	
-	EntityLow->P.AbsTileX = AbsTileX;
-	EntityLow->P.AbsTileY = AbsTileY;
-	EntityLow->P.AbsTileZ = AbsTileZ;
+
+	EntityLow->P = ChunkPositionFromTilePosition(GameState->World, AbsTileX, AbsTileY, AbsTileZ);
 	EntityLow->Height = GameState->World->TileSideInMeters;//1.4f;
 	EntityLow->Width = EntityLow->Height;
 	EntityLow->Collides = true;
@@ -554,7 +552,8 @@ MovePlayer(game_state *GameState, entity Entity, real32 dt, v2 ddP)
 
 			high_entity *HitHigh = GameState->HighEntities_ + HitHighEntityIndex;
 			low_entity *HitLow = GameState->LowEntities + HitHigh->LowEntityIndex;
-			Entity.High->AbsTileZ += HitLow->dAbsTileZ;
+			// TODO: Stairs
+			//Entity.High->AbsTileZ += HitLow->dAbsTileZ;
 		}
 		else
 		{
@@ -612,7 +611,8 @@ SetCamera(game_state *GameState, world_position NewCameraP)
 	v2 EntityOffsetForFrame = -dCameraP.dXY;
 	OffsetAndCheckFrequencyByArea(GameState, EntityOffsetForFrame, CameraBounds);
 
-	// TODO: This needs to be accelerated
+	// TODO: Do this in terms of tile chunks
+#if 0
 	int32 MinTileX = NewCameraP.AbsTileX - TileSpanX/2;
 	int32 MaxTileX = NewCameraP.AbsTileX + TileSpanX/2;
 	int32 MinTileY = NewCameraP.AbsTileY - TileSpanY/2;
@@ -634,6 +634,7 @@ SetCamera(game_state *GameState, world_position NewCameraP)
 			}
 		}
 	}
+#endif
 }
 
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
@@ -837,9 +838,11 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		}
 
 		world_position NewCameraP = {};
-		NewCameraP.AbsTileX = ScreenBaseX*TilesPerWidth + 17/2;
-		NewCameraP.AbsTileY = ScreenBaseY*TilesPerHeight + 9/2;
-		NewCameraP.AbsTileZ = ScreenBaseZ;
+		NewCameraP = ChunkPositionFromTilePosition(World,
+			ScreenBaseX*TilesPerWidth + 17/2,
+			ScreenBaseY*TilesPerHeight + 9/2,
+			ScreenBaseZ);
+
 		SetCamera(GameState, NewCameraP);
 
 		Memory->IsInitialized = true;
@@ -912,8 +915,9 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	{
 		world_position NewCameraP = GameState->CameraP;
 		
-		NewCameraP.AbsTileZ = CameraFollowingEntity.Low->P.AbsTileZ;
+		NewCameraP.ChunkZ = CameraFollowingEntity.Low->P.ChunkZ;
 
+#if 0
 		if (CameraFollowingEntity.High->P.X > (9.0f*World->TileSideInMeters))
 		{
 			NewCameraP.AbsTileX += 17;
@@ -930,7 +934,9 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		{
 			NewCameraP.AbsTileY -= 9;
 		}
-
+#else
+		NewCameraP = CameraFollowingEntity.Low->P;
+#endif
 		// TODO: Map new entities in and old entities out!!!
 		// TOOD: Mapping tiles and stairs into the entity set!
 
