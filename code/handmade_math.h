@@ -117,6 +117,27 @@ struct rectangle2
     v2 Max;
 };
 
+inline v2
+GetMinCorner(rectangle2 Rect)
+{
+    v2 Result = Rect.Min;
+    return(Result);
+}
+
+inline v2
+GetMaxCorner(rectangle2 Rect)
+{
+    v2 Result = Rect.Max;
+    return(Result);
+}
+
+inline v2
+GetCenter(rectangle2 Rect)
+{
+    v2 Result = 0.5 * (Rect.Min + Rect.Max);
+    return(Result);
+}
+
 inline rectangle2
 RectMinMax(v2 Min, v2 Max)
 {
