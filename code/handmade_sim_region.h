@@ -58,7 +58,7 @@ struct sim_entity
 	uint32 HitPointMax;
 	hit_point HitPoint[16];
 
-	entity_reference SwordLowIndex;
+	entity_reference Sword;
 	real32 DistanceRemaining;
 };
 
@@ -80,11 +80,11 @@ struct sim_region
 
     uint32 MaxEntityCount;
     uint32 EntityCount;
-    entity *Entities;
+    sim_entity *Entities;
 
     // NOTE: Must be a power of two
     sim_entity_hash Hash[4096];
 };
 
-#define HANDMADE__H
+#define HANDMADE_SIMULATION_REGION_H
 #endif
