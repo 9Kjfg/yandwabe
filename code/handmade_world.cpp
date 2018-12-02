@@ -26,8 +26,8 @@ IsCannonical(world *World, real32 TileRel)
 	// TODO: Fix floating point math  so this can be exact <
 	real32 Epsilon = 0.0001f;
 	bool32 Result = (
-		(TileRel >= -0.5f*World->ChunkSideInMeters + Epsilon) &&
-		(TileRel <= 0.5f*World->ChunkSideInMeters + Epsilon));
+		(TileRel >= -(0.5f*World->ChunkSideInMeters + Epsilon)) &&
+		(TileRel <= (0.5f*World->ChunkSideInMeters + Epsilon)));
 
 	return(Result);
 }
@@ -107,8 +107,8 @@ GetWorldChunk(world *World, int32 ChunkX, int32 ChunkY, int32 ChunkZ,
 internal void
 InitializeWorld(world *World, real32 TileSideInMeters)
 {
-	World->TileSideInMeters = 1.4f;
-	World->ChunkSideInMeters = TILES_PER_CHUNK*World->TileSideInMeters;
+	World->TileSideInMeters = TileSideInMeters;
+	World->ChunkSideInMeters = (real32)TILES_PER_CHUNK*World->TileSideInMeters;
 	World->FirstFree = 0;
 
 	for (uint32 ChunkIndex = 0;
@@ -301,16 +301,30 @@ ChangeEntityLocationRaw(memory_arena *Arena, world *World, uint32 LowEntityIndex
 
 internal void
 ChangeEntityLocation(memory_arena *Arena, world *World, uint32 LowEntityIndex,
-	low_entity *LowEntity, world_position *OldP, world_position *NewP)
+	low_entity *LowEntity, world_position NewPInit)
 {
-	ChangeEntityLocationRaw(Arena, World, LowEntityIndex, OldP, NewP);
+	world_position *OldP = 0;
+	world_position *NewP = 0;
 
+	if (!IsSet(&LowEntity->Sim, EntityFlag_Nonspatial) && IsValid(LowEntity->P))
+	{
+		OldP = &LowEntity->P;
+	}
+
+	if (IsValid(NewPInit))
+	{
+		NewP = &NewPInit;
+	}
+
+	ChangeEntityLocationRaw(Arena, World, LowEntityIndex, OldP, NewP);
 	if (NewP)
 	{
 		LowEntity->P = *NewP;
+		ClearFlag(&LowEntity->Sim, EntityFlag_Nonspatial);
 	}
 	else
 	{
 		LowEntity->P = NullPosition();
+		AddFlag(&LowEntity->Sim, EntityFlag_Nonspatial);
 	}
 }
