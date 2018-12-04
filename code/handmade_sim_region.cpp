@@ -280,6 +280,17 @@ TestWall(
 }
 
 internal void
+HandleCollision(sim_entity *A, sim_entity *B)
+{
+	if ((A->Type == EntityType_Monster) &&
+		(B->Type == EntityType_Sword))
+	{
+		--A->HitPointMax;
+		MakeEntityNonSpatial(B);
+	}
+}
+
+internal void
 MoveEntity(sim_region *SimRegion, sim_entity *Entity, real32 dt, move_spec *MoveSpec, v2 ddP)
 {
 	Assert(!IsSet(Entity, EntityFlag_Nonspatial));
@@ -313,85 +324,127 @@ MoveEntity(sim_region *SimRegion, sim_entity *Entity, real32 dt, move_spec *Move
 	{
 		Entity->Z = 0;
 	}
-	
+
+	real32 DistanceRemaining = Entity->DistanceLimit;
+	if (DistanceRemaining == 0.0f)
+	{
+		// TODO: Do we want formalize this number
+		DistanceRemaining = 10000.0f;
+	}
+
 	for (uint32 Iteration = 0;
 		Iteration < 4;
 		++Iteration)
 	{
 		real32 tMin = 1.0f;
-		v2 WallNormal = {};
-		sim_entity *HitEntity = 0;
-
-		v2 DesiredPosition = Entity->P + PlayerDelta;
-
-		if (IsSet(Entity, EntityFlag_Collides) &&
-			!IsSet(Entity, EntityFlag_Nonspatial))
+	
+		real32 PlayerDeltaLength = Length(PlayerDelta);
+		// TODO: What do we whant to do for epsilon here ?
+		if (PlayerDeltaLength > 0.0f)
 		{
-			for (uint32 TestHighEntityIndex = 0;
-				TestHighEntityIndex < SimRegion->EntityCount;
-				++TestHighEntityIndex)
+			if (PlayerDeltaLength > DistanceRemaining)
 			{
-                sim_entity *TestEntity = SimRegion->Entities + TestHighEntityIndex;
-				if (Entity != TestEntity)
-				{
-					if (IsSet(TestEntity, EntityFlag_Collides) &&
-						!IsSet(Entity, EntityFlag_Nonspatial))
-					{
-						real32 DiameterW = TestEntity->Width + Entity->Width;
-						real32 DiameterH = TestEntity->Height + Entity->Height;
-
-						v2 MinCorner = -0.5f*v2{DiameterW, DiameterH};
-						v2 MaxCorner = 0.5f*v2{DiameterW, DiameterH};
-
-						v2 Rel = Entity->P - TestEntity->P;
-
-						if (TestWall(MinCorner.X, Rel.X, Rel.Y, PlayerDelta.X, PlayerDelta.Y,
-							&tMin, MinCorner.Y, MaxCorner.Y))
-						{
-							WallNormal = V2(-1.0f, 0.0f);
-							HitEntity = TestEntity;
-						}
-						if (TestWall(MaxCorner.X, Rel.X, Rel.Y, PlayerDelta.X, PlayerDelta.Y,
-							&tMin, MinCorner.Y, MaxCorner.Y))
-						{
-							WallNormal = V2(1.0f, 0.0f);
-							HitEntity = TestEntity;
-						}
-						if (TestWall(MinCorner.Y, Rel.Y, Rel.X, PlayerDelta.Y, PlayerDelta.X,
-							&tMin, MinCorner.X, MaxCorner.X))
-						{
-							WallNormal = V2(0.0f, -1.0f);
-							HitEntity = TestEntity;
-						}
-						if (TestWall(MaxCorner.Y, Rel.Y, Rel.X, PlayerDelta.Y, PlayerDelta.X,
-							&tMin, MinCorner.X, MaxCorner.X))
-						{
-							WallNormal = V2(0.0f, 1.0f);
-							HitEntity = TestEntity;
-						}
-					}
-				}	
+				tMin = (DistanceRemaining / PlayerDeltaLength);
 			}
-		}
 
-		Entity->P += tMin*PlayerDelta;
-		if (HitEntity)
-		{
-			Entity->dP = Entity->dP - 1.0f*Inner(Entity->dP, WallNormal) * WallNormal;
-			PlayerDelta = DesiredPosition - Entity->P;
-			PlayerDelta = PlayerDelta - 1.0f*Inner(PlayerDelta, WallNormal) * WallNormal;
+			v2 WallNormal = {};
+			sim_entity *HitEntity = 0;
 
-			// TODO: Stairs
-			//Entity->AbsTileZ += HitLow->Sim.dAbsTileZ;
+			v2 DesiredPosition = Entity->P + PlayerDelta;
+
+			bool32 StopsOnCollision = IsSet(Entity, EntityFlag_Collides);
+
+			if (!IsSet(Entity, EntityFlag_Nonspatial))
+			{
+				for (uint32 TestHighEntityIndex = 0;
+					TestHighEntityIndex < SimRegion->EntityCount;
+					++TestHighEntityIndex)
+				{
+					sim_entity *TestEntity = SimRegion->Entities + TestHighEntityIndex;
+					if (Entity != TestEntity)
+					{
+						if (IsSet(TestEntity, EntityFlag_Collides) &&
+							!IsSet(TestEntity, EntityFlag_Nonspatial))
+						{
+							real32 DiameterW = TestEntity->Width + Entity->Width;
+							real32 DiameterH = TestEntity->Height + Entity->Height;
+
+							v2 MinCorner = -0.5f*v2{DiameterW, DiameterH};
+							v2 MaxCorner = 0.5f*v2{DiameterW, DiameterH};
+
+							v2 Rel = Entity->P - TestEntity->P;
+
+							if (TestWall(MinCorner.X, Rel.X, Rel.Y, PlayerDelta.X, PlayerDelta.Y,
+								&tMin, MinCorner.Y, MaxCorner.Y))
+							{
+								WallNormal = V2(-1.0f, 0.0f);
+								HitEntity = TestEntity;
+							}
+							if (TestWall(MaxCorner.X, Rel.X, Rel.Y, PlayerDelta.X, PlayerDelta.Y,
+								&tMin, MinCorner.Y, MaxCorner.Y))
+							{
+								WallNormal = V2(1.0f, 0.0f);
+								HitEntity = TestEntity;
+							}
+							if (TestWall(MinCorner.Y, Rel.Y, Rel.X, PlayerDelta.Y, PlayerDelta.X,
+								&tMin, MinCorner.X, MaxCorner.X))
+							{
+								WallNormal = V2(0.0f, -1.0f);
+								HitEntity = TestEntity;
+							}
+							if (TestWall(MaxCorner.Y, Rel.Y, Rel.X, PlayerDelta.Y, PlayerDelta.X,
+								&tMin, MinCorner.X, MaxCorner.X))
+							{
+								WallNormal = V2(0.0f, 1.0f);
+								HitEntity = TestEntity;
+							}
+						}
+					}	
+				}
+			}
+		
+
+			Entity->P += tMin*PlayerDelta;
+			DistanceRemaining -= tMin*PlayerDeltaLength;
+			if (HitEntity)
+			{
+				PlayerDelta = DesiredPosition - Entity->P;
+				if (StopsOnCollision)
+				{
+					Entity->dP = Entity->dP - 1.0f*Inner(Entity->dP, WallNormal) * WallNormal;
+					PlayerDelta = PlayerDelta - 1.0f*Inner(PlayerDelta, WallNormal) * WallNormal;
+				}
+				// TODO: Need our collision table here!
+
+				sim_entity *A = Entity;
+				sim_entity *B = HitEntity;
+				if (A->Type > B->Type)
+				{
+					sim_entity *Temp = A;
+					A = B;
+					B = Temp;
+				}
+				HandleCollision(A, B);
+
+				// TODO: Stairs
+				// Entity->AbsTileZ += HitLow->Sim.dAbsTileZ;
+			}
+			else
+			{
+				break;
+			}
 		}
 		else
 		{
 			break;
 		}
 	}
-	//
-	// NOTE: Update camera/player Z based on last movement
-	//
+	
+	if (Entity->DistanceLimit != 0.0f)
+	{
+		// TODO: Do we want formalize this number
+		Entity->DistanceLimit = DistanceRemaining;
+	}
 
 	// TODO: Change to using accelaration vector
 	if ((Entity->dP.X == 0.0f) && (Entity->dP.Y == 0.0f))
