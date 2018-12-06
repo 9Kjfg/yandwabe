@@ -106,6 +106,15 @@ struct controlled_hero
 	real32 dZ;
 };
 
+struct pairwise_collision_rule
+{
+	bool32 ShouldCollide;
+	uint32 StorageIndexA;
+	uint32 StorageIndexB;
+
+	pairwise_collision_rule *NextInHash;
+};
+
 struct game_state
 {
 	memory_arena WorldArena;
@@ -128,6 +137,10 @@ struct game_state
 	loaded_bitmap Tree;
 	loaded_bitmap Sword;
 	real32 MetersToPixels;
+
+	// TODOL Must be power of to
+	pairwise_collision_rule *CollisionRuleHash[256];
+	pairwise_collision_rule *FirstFreeCollisionRule;
 };
 
 // TODO: This is dumb, this should gust be just be part of
@@ -152,6 +165,12 @@ GetLowEntity(game_state *GameState, uint32 Index)
 
 	return(Result);	
 }
+
+internal void
+ClearCollisionRulesFor(game_state *GameState, uint32 StorageIndex);
+
+internal void
+AddCollisionRule(game_state *GameState, uint32 StorageIndexA, uint32 StorageIndexB, bool32 ShouldCollide);
 
 #define HANDMADE_H
 #endif
