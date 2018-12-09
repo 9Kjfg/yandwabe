@@ -71,9 +71,11 @@ struct hero_bitmaps
 
 struct low_entity
 {
-	// TODO: It's kind of busted that P's can be invalid here,
-	// AND we store whether they would be invalid in the flags field
-	// Can we do something better here ?
+	// TODO: It seems like we have to store ChunkX/Y/Z with each
+	// entity because even though the sim region gather doesn't need it 
+	// at first, and we could get by without it, entity references pull
+	// in etities WITHOUT going through their world_chunk, and thus
+	// still need to know the ChunkX/Y/Z
 	world_position P;
 	sim_entity Sim;
 };
