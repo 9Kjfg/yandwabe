@@ -72,6 +72,10 @@ struct sim_entity
 	hit_point HitPoint[16];
 
 	entity_reference Sword;
+
+	// TODO: Only for stairwells
+	real32 WalkableHeight;
+
 };
 
 struct sim_entity_hash
@@ -97,7 +101,6 @@ struct sim_region
     uint32 EntityCount;
     sim_entity *Entities;
 
-	//real32 GroundZBase;
 
     // NOTE: Must be a power of two
     sim_entity_hash Hash[4096];
