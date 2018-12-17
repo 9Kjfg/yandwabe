@@ -116,10 +116,10 @@ struct pairwise_collision_rule
 
 	pairwise_collision_rule *NextInHash;
 };
+
 struct game_state;
 internal void AddCollisionRule(game_state *GameState, uint32 StorageIndexA, uint32 StorageIndexB, bool32 ShouldCollide);
 internal void ClearCollisionRulesFor(game_state *GameState, uint32 StorageIndex);
-
 
 struct game_state
 {
@@ -148,6 +148,14 @@ struct game_state
 	// TODOL Must be power of to
 	pairwise_collision_rule *CollisionRuleHash[256];
 	pairwise_collision_rule *FirstFreeCollisionRule;
+
+	sim_entity_collision_volume_group *NullCollision;
+	sim_entity_collision_volume_group *SwordCollision;
+	sim_entity_collision_volume_group *StairCollision;
+	sim_entity_collision_volume_group *PlayerCollision;
+	sim_entity_collision_volume_group *MonsterCollision;
+	sim_entity_collision_volume_group *FamiliarCollision;
+	sim_entity_collision_volume_group *WallCollision;
 };
 
 // TODO: This is dumb, this should gust be just be part of

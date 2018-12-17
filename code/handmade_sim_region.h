@@ -44,6 +44,24 @@ enum sim_entity_flags
 	EntityFlag_Simming = (1 << 30)
 };
 
+struct sim_entity_collision_volume 
+{
+	v3 OffsetP;
+	v3 Dim;
+};
+
+struct sim_entity_collision_volume_group
+{
+	sim_entity_collision_volume TotalVolume;
+
+	// TODO: Volume is always expected to be greated than 0 if the entity
+	// has any volume... in the future, this could be compressed of necessary to say
+	// that the VolumeCount can be 0 if the TotalVolume should be used as the only
+	// collision volume for the entity
+	uint32 VolumeCount;
+	sim_entity_collision_volume *Volumes;
+};
+
 struct sim_entity
 {
 	// NOTE: These are only for the sim region
@@ -60,7 +78,7 @@ struct sim_entity
 
 	real32 DistanceLimit;
 
-	v3 Dim;
+	sim_entity_collision_volume_group *Collision;
 
 	uint32 FacingDirection;
 	real32 tBob;
@@ -74,8 +92,8 @@ struct sim_entity
 	entity_reference Sword;
 
 	// TODO: Only for stairwells
+	v2 WalkableDim;
 	real32 WalkableHeight;
-
 };
 
 struct sim_entity_hash
@@ -100,7 +118,6 @@ struct sim_region
     uint32 MaxEntityCount;
     uint32 EntityCount;
     sim_entity *Entities;
-
 
     // NOTE: Must be a power of two
     sim_entity_hash Hash[4096];

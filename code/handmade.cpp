@@ -279,6 +279,7 @@ AddLowEntity(game_state *GameState, entity_type Type, world_position P)
 	low_entity *EntityLow = GameState->LowEntities + EntityIndex;
 	*EntityLow = {};
 	EntityLow->Sim.Type = Type;
+	EntityLow->Sim.Collision = GameState->NullCollision;
 	EntityLow->P = NullPosition();
 
 	ChangeEntityLocation(&GameState->WorldArena, GameState->World, EntityIndex, EntityLow, P);
@@ -295,23 +296,19 @@ AddLowEntity(game_state *GameState, entity_type Type, world_position P)
 }
 
 internal add_low_entity_result
-AddGroundedEntity(game_state *GameState, entity_type Type, world_position P, v3 Dim)
+AddGroundedEntity(game_state *GameState, entity_type Type, world_position P,
+	sim_entity_collision_volume_group *Collision)
 {
-	world_position OffsetP = MapIntoChunkSpace(GameState->World, P, V3(0.0f, 0.0f, 0.5f*Dim.Z));
-	add_low_entity_result Entity = AddLowEntity(GameState, Type, OffsetP);
-	Entity.Low->Sim.Dim = Dim;
-
+	add_low_entity_result Entity = AddLowEntity(GameState, Type, P);
+	Entity.Low->Sim.Collision = Collision;
 	return(Entity);
 }
 
 internal add_low_entity_result
 AddWall(game_state *GameState, uint32 AbsTileX, uint32 AbsTileY, uint32 AbsTileZ)
 {
-	v3 Dim = {GameState->World->TileSideInMeters,
-		GameState->World->TileSideInMeters,
-		GameState->World->TileDepthInMeters};
 	world_position P = ChunkPositionFromTilePosition(GameState->World, AbsTileX, AbsTileY, AbsTileZ);
-	add_low_entity_result Entity = AddGroundedEntity(GameState, EntityType_Wall, P, Dim);
+	add_low_entity_result Entity = AddGroundedEntity(GameState, EntityType_Wall, P, GameState->WallCollision);
 	AddFlags(&Entity.Low->Sim, EntityFlag_Collides);
 
 	return(Entity);
@@ -320,12 +317,11 @@ AddWall(game_state *GameState, uint32 AbsTileX, uint32 AbsTileY, uint32 AbsTileZ
 internal add_low_entity_result
 AddStair(game_state *GameState, uint32 AbsTileX, uint32 AbsTileY, uint32 AbsTileZ)
 {
-	v3 Dim = {GameState->World->TileSideInMeters,
-		2.0f*GameState->World->TileSideInMeters,
-		1.1f*GameState->World->TileDepthInMeters};
 	world_position P = ChunkPositionFromTilePosition(GameState->World, AbsTileX, AbsTileY, AbsTileZ);
-	add_low_entity_result Entity = AddGroundedEntity(GameState, EntityType_Stairwell, P, Dim);
+	add_low_entity_result Entity = AddGroundedEntity(GameState, EntityType_Stairwell, P, GameState->StairCollision);
+	
 	AddFlags(&Entity.Low->Sim, EntityFlag_Collides);
+	Entity.Low->Sim.WalkableDim = Entity.Low->Sim.Collision->TotalVolume.Dim.XY;
 	Entity.Low->Sim.WalkableHeight = GameState->World->TileDepthInMeters;
 
 	return(Entity);
@@ -351,9 +347,7 @@ AddSword(game_state *GameState)
 {
 	add_low_entity_result Entity = AddLowEntity(GameState, EntityType_Sword, NullPosition());
 
-	Entity.Low->Sim.Dim.Y = 0.5f;
-	Entity.Low->Sim.Dim.X = 1.0f;
-	Entity.Low->Sim.Dim.Z = 0.1f;
+	Entity.Low->Sim.Collision = GameState->SwordCollision;
 	AddFlags(&Entity.Low->Sim, EntityFlag_Moveable);
 
 	return(Entity);
@@ -362,9 +356,9 @@ AddSword(game_state *GameState)
 internal add_low_entity_result
 AddPlayer(game_state *GameState)
 {
-	v3 Dim = {1.0f, 0.5f, 1.2f};
 	world_position P = GameState->CameraP;
-	add_low_entity_result Entity = AddGroundedEntity(GameState, EntityType_Hero, P, Dim);
+	add_low_entity_result Entity = AddGroundedEntity(GameState, EntityType_Hero, P,
+		GameState->PlayerCollision);
 	AddFlags(&Entity.Low->Sim, EntityFlag_Collides|EntityFlag_Moveable);
 
 	InitHitPoints(Entity.Low, 3);
@@ -383,9 +377,9 @@ AddPlayer(game_state *GameState)
 internal add_low_entity_result
 AddMonster(game_state *GameState, uint32 AbsTileX, uint32 AbsTileY, uint32 AbsTileZ)
 {
-	v3 Dim = {1.0f, 0.5f, 0.5f};
 	world_position P = ChunkPositionFromTilePosition(GameState->World, AbsTileX, AbsTileY, AbsTileZ);
-	add_low_entity_result Entity = AddGroundedEntity(GameState, EntityType_Monster, P, Dim);
+	add_low_entity_result Entity = AddGroundedEntity(GameState, EntityType_Monster, P,
+		GameState->MonsterCollision);
 	AddFlags(&Entity.Low->Sim, EntityFlag_Collides|EntityFlag_Moveable);
 
 	InitHitPoints(Entity.Low, 3);
@@ -397,9 +391,9 @@ AddMonster(game_state *GameState, uint32 AbsTileX, uint32 AbsTileY, uint32 AbsTi
 internal add_low_entity_result
 AddFamiliar(game_state *GameState, uint32 AbsTileX, uint32 AbsTileY, uint32 AbsTileZ)
 {
-	v3 Dim = {1.0f, 0.5f, 0.5f};
 	world_position P = ChunkPositionFromTilePosition(GameState->World, AbsTileX, AbsTileY, AbsTileZ);
-	add_low_entity_result Entity = AddGroundedEntity(GameState, EntityType_Familiar, P, Dim);
+	add_low_entity_result Entity = AddGroundedEntity(GameState, EntityType_Familiar, P,
+		GameState->FamiliarCollision);
 	AddFlags(&Entity.Low->Sim, EntityFlag_Collides|EntityFlag_Moveable);
 
 	return(Entity);
@@ -550,6 +544,34 @@ AddCollisionRule(game_state *GameState, uint32 StorageIndexA, uint32 StorageInde
 	}
 }
 
+sim_entity_collision_volume_group *
+MakeSimpleGroundedCollision(game_state *GameState, real32 DimX, real32 DimY, real32 DimZ)
+{
+	// TODO: NOT WORLD ARENA! Change tp using the fundamental types arena, etc.
+	sim_entity_collision_volume_group *Group = PushStruct(&GameState->WorldArena, sim_entity_collision_volume_group);
+	Group->VolumeCount = 1;
+	Group->Volumes = PushArray(&GameState->WorldArena, Group->VolumeCount, sim_entity_collision_volume);
+	Group->TotalVolume.OffsetP = V3(0, 0, 0.5f*DimZ);
+	Group->TotalVolume.Dim = V3(DimX, DimY, DimZ);
+	Group->Volumes[0] = Group->TotalVolume;
+
+	return(Group);
+}
+
+sim_entity_collision_volume_group *
+MakeNullCollision(game_state *GameState)
+{
+	// TODO: NOT WORLD ARENA! Change tp using the fundamental types arena, etc.
+	sim_entity_collision_volume_group *Group = PushStruct(&GameState->WorldArena, sim_entity_collision_volume_group);
+	Group->VolumeCount = 0;
+	Group->Volumes = 0;
+	Group->TotalVolume.OffsetP = V3(0.0f, 0.0f, 0.0f);
+	// TODO: Should this be negative?
+	Group->TotalVolume.Dim = V3(0.0f, 0.0f, 0.0f);
+
+	return(Group);
+}
+
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
 	Assert((&Input->Controllers[0].Terminator - &Input->Controllers[0].Buttons[0]) == 
@@ -559,7 +581,30 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	game_state *GameState = (game_state *)Memory->PermanentStorage;
 	if (!Memory->IsInitialized)
 	{
+		// TODO: Talk about this soon! Let's start partitioning our memory space!
+		InitializeArena(&GameState->WorldArena, Memory->PermanentStorageSize - sizeof(game_state),
+			(uint8 *)Memory->PermanentStorage + sizeof(game_state));
+
 		AddLowEntity(GameState, EntityType_Null, NullPosition());
+
+		GameState->World = PushStruct(&GameState->WorldArena, world);
+		world *World = GameState->World;
+		InitializeWorld(World, 1.4f, 3.0f);
+
+		int32 TileSideInPixels = 60;
+		GameState->MetersToPixels = (real32)TileSideInPixels / World->TileSideInMeters;
+
+		GameState->NullCollision = MakeNullCollision(GameState);
+		GameState->SwordCollision = MakeSimpleGroundedCollision(GameState, 1.0f, 0.5f, 0.1f);
+		GameState->StairCollision = MakeSimpleGroundedCollision(GameState,
+			GameState->World->TileSideInMeters, 2.0f*GameState->World->TileSideInMeters,
+			1.1f*GameState->World->TileDepthInMeters);
+		GameState->PlayerCollision = MakeSimpleGroundedCollision(GameState, 1.0f, 0.5f, 1.2f);
+		GameState->MonsterCollision = MakeSimpleGroundedCollision(GameState, 1.0f, 0.5f, 0.5f);
+		GameState->FamiliarCollision = MakeSimpleGroundedCollision(GameState, 1.0f, 0.5f, 0.5f);
+		GameState->WallCollision = MakeSimpleGroundedCollision(GameState,
+			GameState->World->TileSideInMeters, GameState->World->TileSideInMeters,
+			GameState->World->TileDepthInMeters);
 
 		GameState->Backdrop = 
 			DEBUGLoadBMP(Thread, Memory->DEBUGPlatformReadEntireFile, "test/test_background.bmp");
@@ -598,16 +643,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		Bitmap->Torso = DEBUGLoadBMP(Thread, Memory->DEBUGPlatformReadEntireFile, "test/test_hero_front_torso.bmp");
 		Bitmap->Align = V2(72, 182);
 
-		InitializeArena(
-			&GameState->WorldArena, Memory->PermanentStorageSize - sizeof(game_state),
-			(uint8 *)Memory->PermanentStorage + sizeof(game_state));
-
-		GameState->World = PushStruct(&GameState->WorldArena, world);
-		world *World = GameState->World;
-		InitializeWorld(World, 1.4f, 3.0f);
-
-		int32 TileSideInPixels = 60;
-		GameState->MetersToPixels = (real32)TileSideInPixels / World->TileSideInMeters;
 
 		uint32 RandomNumberIndex = 0;
 		uint32 TilesPerWidth = 17;
@@ -872,7 +907,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			PieceGroup.PieceCount = 0;
 			real32 dt = Input->dtForFrame;	
 			// TODO: This is incorrect, should be computed after update!!!
-			real32 ShadowAlpha = 1.0f - 0.5f*(Entity->P.Z - Entity->Dim.Z);
+			real32 ShadowAlpha = 1.0f - 0.5f*Entity->P.Z;
 			if (ShadowAlpha < 0.0f)
 			{
 				ShadowAlpha = 0.0f;
@@ -933,8 +968,8 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 				} break;
 				case EntityType_Stairwell:
 				{
-					PushRect(&PieceGroup, V2(0, 0), 0, Entity->Dim.XY, V4(1.0f, 0.5f, 0, 1.0f), 0.0f);// 37, 36
-					PushRect(&PieceGroup, V2(0, 0), Entity->Dim.Z, Entity->Dim.XY, V4(1.0f, 1.0f, 0, 1.0f), 0.0f);// 37, 36
+					PushRect(&PieceGroup, V2(0, 0), 0, Entity->WalkableDim, V4(1.0f, 0.5f, 0, 1.0f), 0.0f);// 37, 36
+					PushRect(&PieceGroup, V2(0, 0), Entity->WalkableHeight, Entity->WalkableDim, V4(1.0f, 1.0f, 0, 1.0f), 0.0f);// 37, 36
 				} break;
 				case EntityType_Sword:
 				{

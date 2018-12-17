@@ -124,6 +124,33 @@ Lerp(real32 A, real32 t, real32 B)
     return(Result);
 }
 
+inline real32
+SafeRatioN(real32 Numerator, real32 Divisor, real32 N)
+{
+    real32 Result = N;
+
+    if (Divisor != 0.0f)
+    {
+        Result = Numerator / Divisor;
+    }
+
+    return(Result);
+}
+
+inline real32
+SafeRatio0(real32 Numerator, real32 Divisor)
+{
+    real32 Result = SafeRatioN(Numerator, Divisor, 0.0f);
+    return(Result);
+}
+
+inline real32
+SafeRatio1(real32 Numerator, real32 Divisor)
+{
+    real32 Result = SafeRatioN(Numerator, Divisor, 1.0f);
+    return(Result);
+}
+
 //
 // NOTE: v2 operation
 //
@@ -249,6 +276,17 @@ Clamp01(real32 Value)
     return(Result);
 }
 
+inline v2
+Clamp01(v2 Value)
+{
+    v2 Result;
+
+    Result.X = Clamp01(Value.X);
+    Result.Y = Clamp01(Value.Y);
+
+    return(Result);
+}
+
 //
 // NOTE: v3 operation
 //
@@ -354,18 +392,6 @@ Length(v3 A)
     return(Result);
 }
 
-inline v3
-Clamp01(v3 Value)
-{
-    v3 Result;
-
-    Result.X = Clamp01(Value.X);
-    Result.Y = Clamp01(Value.Y);
-    Result.Z = Clamp01(Value.Z); 
-
-    return(Result);
-}
-
 //
 // NOTE: Rectangle2
 //
@@ -451,6 +477,17 @@ IsInRectangle(rectangle2 Rectangle, v2 Test)
         (Test.X < Rectangle.Max.X) &&
         (Test.Y < Rectangle.Max.Y));
 
+    return(Result);
+}
+
+inline v2
+GetBarycentric(rectangle2 A, v2 P)
+{
+    v2 Result;
+
+    Result.X = SafeRatio0(P.X - A.Min.X, A.Max.X - A.Min.X);
+    Result.Y = SafeRatio0(P.Y - A.Min.Y, A.Max.Y - A.Min.Y);
+    
     return(Result);
 }
 
@@ -558,33 +595,6 @@ RectanglesIntersect(rectangle3 A, rectangle3 B)
 	return(Result);
 }
 
-inline real32
-SafeRatioN(real32 Numerator, real32 Divisor, real32 N)
-{
-    real32 Result = N;
-
-    if (Divisor != 0.0f)
-    {
-        Result = Numerator / Divisor;
-    }
-
-    return(Result);
-}
-
-inline real32
-SafeRatio0(real32 Numerator, real32 Divisor)
-{
-    real32 Result = SafeRatioN(Numerator, Divisor, 0.0f);
-    return(Result);
-}
-
-inline real32
-SafeRatio1(real32 Numerator, real32 Divisor)
-{
-    real32 Result = SafeRatioN(Numerator, Divisor, 1.0f);
-    return(Result);
-}
-
 inline v3
 GetBarycentric(rectangle3 A, v3 P)
 {
@@ -594,6 +604,17 @@ GetBarycentric(rectangle3 A, v3 P)
     Result.Y = SafeRatio0(P.Y - A.Min.Y, A.Max.Y - A.Min.Y);
     Result.Z = SafeRatio0(P.Z - A.Min.Z, A.Max.Z - A.Min.Z);
     
+    return(Result);
+}
+
+inline rectangle2
+ToRectangleXY(rectangle3 A)
+{
+    rectangle2 Result;
+
+    Result.Min = A.Min.XY;
+    Result.Max = A.Max.XY;
+
     return(Result);
 }
 
