@@ -136,13 +136,17 @@ struct game_state
 	uint32 LowEntityCount;
 	low_entity LowEntities[4096];
 
+	loaded_bitmap Grass[2];
+	loaded_bitmap Stone[4];
+	loaded_bitmap Tuft[3];
+
 	loaded_bitmap Backdrop;
 	loaded_bitmap Shadow;
-	loaded_bitmap Stairwell;
 	hero_bitmaps HeroBitmaps[4];
 
 	loaded_bitmap Tree;
 	loaded_bitmap Sword;
+	loaded_bitmap Stairwell;
 	real32 MetersToPixels;
 
 	// TODOL Must be power of to

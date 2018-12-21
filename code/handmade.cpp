@@ -92,8 +92,7 @@ DrawRectangle(
 internal void
 DrawBitmap(
 	game_offscreen_buffer *Buffer, loaded_bitmap *Bitmap,
-	real32 RealX, real32 RealY,
-	real32 CAlpha = 0)
+	real32 RealX, real32 RealY, real32 CAlpha = 1.0f)
 {
 	int MinX = RoundReal32ToInt32(RealX);
 	int MinY = RoundReal32ToInt32(RealY);
@@ -597,6 +596,57 @@ MakeNullCollision(game_state *GameState)
 	return(Group);
 }
 
+internal void
+DrawTestGround(game_state *GameState, game_offscreen_buffer *Buffer)
+{
+	// TODO: MakeRandom number generation more systemic
+	uint32 RandomNumberIndex = 0;
+
+	v2 Center = 0.5f*V2i(Buffer->Width, Buffer->Height);
+	for (uint32 GrassIndex = 0;
+	 	GrassIndex < 10;
+		++GrassIndex)
+	{
+		Assert(RandomNumberIndex < ArrayCount(RandomNumberTable));
+
+		loaded_bitmap *Stamp;
+		if (RandomNumberTable[RandomNumberIndex++]%2)
+		{
+			Stamp = GameState->Grass + (RandomNumberTable[RandomNumberIndex++]%ArrayCount(GameState->Grass));
+		}
+		else
+		{
+			Stamp = GameState->Stone + (RandomNumberTable[RandomNumberIndex++]%ArrayCount(GameState->Stone));
+		}
+		real32 Radius = 5.0f;
+		v2 BitmapCenter = 0.5f*V2i(Stamp->Width, Stamp->Height);
+		v2 Offset = {2.0f*(real32)RandomNumberTable[RandomNumberIndex++] / (real32)MaxRandomNumber - 1.0f,
+			2.0f*(real32)RandomNumberTable[RandomNumberIndex++] / (real32)MaxRandomNumber - 1.0f};
+		
+		v2 P = Center + GameState->MetersToPixels*Radius*Offset - BitmapCenter;
+
+		DrawBitmap(Buffer, Stamp, P.X, P.Y);
+	}
+		
+	for (uint32 GrassIndex = 0;
+	 	GrassIndex < 10;
+		++GrassIndex)
+	{
+		Assert(RandomNumberIndex < ArrayCount(RandomNumberTable));
+
+		loaded_bitmap *Stamp = GameState->Tuft + (RandomNumberTable[RandomNumberIndex++]%ArrayCount(GameState->Tuft));
+		
+		real32 Radius = 5.0f;
+		v2 BitmapCenter = 0.5f*V2i(Stamp->Width, Stamp->Height);
+		v2 Offset = {2.0f*(real32)RandomNumberTable[RandomNumberIndex++] / (real32)MaxRandomNumber - 1.0f,
+			2.0f*(real32)RandomNumberTable[RandomNumberIndex++] / (real32)MaxRandomNumber - 1.0f};
+		
+		v2 P = Center + GameState->MetersToPixels*Radius*Offset - BitmapCenter;
+
+		DrawBitmap(Buffer, Stamp, P.X, P.Y);
+	}
+}
+
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
 	Assert((&Input->Controllers[0].Terminator - &Input->Controllers[0].Buttons[0]) == 
@@ -638,6 +688,28 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			TilesPerWidth*GameState->World->TileSideInMeters,
 			TilesPerHeight*GameState->World->TileSideInMeters,
 			0.9f*GameState->World->TileDepthInMeters);
+
+		GameState->Grass[0] = 
+			DEBUGLoadBMP(Thread, Memory->DEBUGPlatformReadEntireFile, "test/rock03.bmp");
+		GameState->Grass[1] = 
+			DEBUGLoadBMP(Thread, Memory->DEBUGPlatformReadEntireFile, "test/rock03.bmp");
+
+		GameState->Tuft[0] = 
+			DEBUGLoadBMP(Thread, Memory->DEBUGPlatformReadEntireFile, "test/rock03.bmp");
+		GameState->Tuft[1] = 
+			DEBUGLoadBMP(Thread, Memory->DEBUGPlatformReadEntireFile, "test/rock03.bmp");
+		GameState->Tuft[2] = 
+			DEBUGLoadBMP(Thread, Memory->DEBUGPlatformReadEntireFile, "test/rock03.bmp");
+
+		GameState->Stone[0] = 
+			DEBUGLoadBMP(Thread, Memory->DEBUGPlatformReadEntireFile, "test/rock03.bmp");
+		GameState->Stone[1] = 
+			DEBUGLoadBMP(Thread, Memory->DEBUGPlatformReadEntireFile, "test/rock03.bmp");
+		GameState->Stone[2] = 
+			DEBUGLoadBMP(Thread, Memory->DEBUGPlatformReadEntireFile, "test/rock03.bmp");
+		GameState->Stone[3] = 
+			DEBUGLoadBMP(Thread, Memory->DEBUGPlatformReadEntireFile, "test/rock03.bmp");
+
 
 		GameState->Backdrop = 
 			DEBUGLoadBMP(Thread, Memory->DEBUGPlatformReadEntireFile, "test/test_background.bmp");
@@ -931,6 +1003,9 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 #else	
 	DrawBitmap(Buffer, &GameState->Backdrop, 0, 0);
 #endif
+
+	DrawTestGround(GameState, Buffer);
+
 	real32 ScreenCenterX = 0.5f*(real32)Buffer->Width;
 	real32 ScreenCenterY = 0.5f*(real32)Buffer->Height;
 
