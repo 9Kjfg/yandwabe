@@ -58,7 +58,8 @@ struct loaded_bitmap
 {
 	int32 Width;
 	int32 Height;
-	uint32 *Pixel;
+	int32 Pitch;
+	void *Memory;
 };
 
 struct hero_bitmaps
@@ -161,6 +162,8 @@ struct game_state
 	sim_entity_collision_volume_group *FamiliarCollision;
 	sim_entity_collision_volume_group *WallCollision;
 	sim_entity_collision_volume_group *StandartRoomCollision;
+
+	loaded_bitmap GroundBuffer;
 };
 
 // TODO: This is dumb, this should gust be just be part of

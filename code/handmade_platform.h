@@ -134,13 +134,15 @@ typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE(debug_platform_write_entire_file);
 // FOUR THINGS - timing, conroller/keyboard input, bitmap buffer to use, sound buffer to use
 
 // TODO: In the future, rendering _specifically_ will become a three-tiered abstaraction
+
+#define BITMAP_BYTES_PER_PIXEL 4
 typedef struct game_offscreen_buffer
 {
+	// NOTE: Pixels are always 32-bits wide. Memory Order BB GG RR XX
 	void *Memory;
 	int Width;
 	int Height;
 	int Pitch;
-	int BytesPerPixel;
 } game_offscreen_buffer;
 
 typedef struct game_sound_output_buffer
