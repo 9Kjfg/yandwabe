@@ -1123,8 +1123,8 @@ WinMain(
 			LPVOID BaseAddress = 0;
 #endif
 			game_memory GameMemory = {};
-			GameMemory.PermanentStorageSize = Megabytes(32);
-			GameMemory.TransientStorageSize = Megabytes(32);
+			GameMemory.PermanentStorageSize = Megabytes(15);
+			GameMemory.TransientStorageSize = Megabytes(50);
 			GameMemory.DEBUGPlatformFreeFileMemory = DEBUGPlatformFreeFileMemory;
 			GameMemory.DEBUGPlatformReadEntireFile = DEBUGPlatformReadEntireFile;
 			GameMemory.DEBUGPlatformWriteEntireFile = DEBUGPlatformWriteEntireFile;
