@@ -172,6 +172,8 @@ struct game_state
 	memory_arena WorldArena;
 	world *World;
 
+	real32 TypicalFloorHeight;
+
 	// TODO: Should we allow spit-screen?
 	uint32 CameraFollowingEntityIndex;
 	world_position CameraP;
@@ -194,6 +196,7 @@ struct game_state
 	loaded_bitmap Sword;
 	loaded_bitmap Stairwell;
 	real32 MetersToPixels;
+	real32 PixelsToMeters;
 
 	// TODOL Must be power of to
 	pairwise_collision_rule *CollisionRuleHash[256];
