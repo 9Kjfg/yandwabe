@@ -646,44 +646,82 @@ FillGroundChunk(transient_state *TranState, game_state *GameState, ground_buffer
 	Buffer.Memory = GroundBuffer->Memory;
 
 	GroundBuffer->P = *ChunkP;
-	// TODO: MakeRandom number generation more systemic
-	// TODO: Look into wang hashing or some other spatial seed generation "thing"
-	random_series Series = RandomSeed(139*ChunkP->ChunkX + 593*ChunkP->ChunkX + 329*ChunkP->ChunkZ);
 
 	real32 Width = (real32)Buffer.Width;
 	real32 Height = (real32)Buffer.Height;
-	v2 Center = 0.5f*V2(Width, Height);
-	for (uint32 GrassIndex = 0;
-	 	GrassIndex < 10;
-		++GrassIndex)
-	{
-		loaded_bitmap *Stamp;
-		if (RandomChoice(&Series, 2))
-		{
-			Stamp = GameState->Grass + RandomChoice(&Series, ArrayCount(GameState->Grass));
-		}
-		else
-		{
-			Stamp = GameState->Stone + RandomChoice(&Series, ArrayCount(GameState->Stone));
-		}
-		 
-		v2 BitmapCenter = 0.5f*V2i(Stamp->Width, Stamp->Height);
-		v2 Offset = {Width*RandomUnilateral(&Series), Height*RandomUnilateral(&Series)};
-		v2 P = Offset - BitmapCenter;
-		DrawBitmap(&Buffer, Stamp, P.X, P.Y);
-	}
-		
-	for (uint32 GrassIndex = 0;
-	 	GrassIndex < 10;
-		++GrassIndex)
-	{
-		loaded_bitmap *Stamp = GameState->Tuft + RandomChoice(&Series, ArrayCount(GameState->Tuft));
 
-		v2 BitmapCenter = 0.5f*V2i(Stamp->Width, Stamp->Height);
-		v2 Offset = {Width*RandomUnilateral(&Series), Height*RandomUnilateral(&Series)};
-		v2 P = Offset - BitmapCenter;
-		DrawBitmap(&Buffer, Stamp, P.X, P.Y);
+	for (int32 ChunkOffsetY =  -1;
+		ChunkOffsetY <= 1;
+		++ChunkOffsetY)
+	{
+		for (int32 ChunkOffsetX = -1;
+			ChunkOffsetX <= 1;
+			++ChunkOffsetX)
+		{
+			int32 ChunkX = ChunkP->ChunkX + ChunkOffsetX;
+			int32 ChunkY = ChunkP->ChunkY + ChunkOffsetY;
+			int32 ChunkZ = ChunkP->ChunkZ;
+
+			// TODO: MakeRandom number generation more systemic
+			// TODO: Look into wang hashing or some other spatial seed generation "thing"
+			random_series Series = RandomSeed(139*ChunkX + 593*ChunkX + 329*ChunkZ);
+
+			v2 Center = V2(ChunkOffsetX*Width, -ChunkOffsetY*Height);
+
+			for (uint32 GrassIndex = 0;
+				GrassIndex < 20;
+				++GrassIndex)
+			{
+				loaded_bitmap *Stamp;
+				if (RandomChoice(&Series, 2))
+				{
+					Stamp = GameState->Grass + RandomChoice(&Series, ArrayCount(GameState->Grass));
+				}
+				else
+				{
+					Stamp = GameState->Stone + RandomChoice(&Series, ArrayCount(GameState->Stone));
+				}
+				
+				v2 BitmapCenter = 0.5f*V2i(Stamp->Width, Stamp->Height);
+				v2 Offset = {Width*RandomUnilateral(&Series), Height*RandomUnilateral(&Series)};
+				v2 P = Center + Offset - BitmapCenter;
+				DrawBitmap(&Buffer, Stamp, P.X, P.Y);
+			}
+		}
 	}
+
+	for (int32 ChunkOffsetY =  -1;
+		ChunkOffsetY <= 1;
+		++ChunkOffsetY)
+	{
+		for (int32 ChunkOffsetX = -1;
+			ChunkOffsetX <= 1;
+			++ChunkOffsetX)
+		{
+			int32 ChunkX = ChunkP->ChunkX + ChunkOffsetX;
+			int32 ChunkY = ChunkP->ChunkY + ChunkOffsetY;
+			int32 ChunkZ = ChunkP->ChunkZ;
+
+			// TODO: MakeRandom number generation more systemic
+			// TODO: Look into wang hashing or some other spatial seed generation "thing"
+			random_series Series = RandomSeed(139*ChunkX + 593*ChunkX + 329*ChunkZ);
+
+			v2 Center = V2(ChunkOffsetX*Width, -ChunkOffsetY*Height);
+
+			for (uint32 GrassIndex = 0;
+				GrassIndex < 20;
+				++GrassIndex)
+			{
+				loaded_bitmap *Stamp = GameState->Tuft + RandomChoice(&Series, ArrayCount(GameState->Tuft));
+
+				v2 BitmapCenter = 0.5f*V2i(Stamp->Width, Stamp->Height);
+				v2 Offset = {Width*RandomUnilateral(&Series), Height*RandomUnilateral(&Series)};
+				v2 P = Center + Offset - BitmapCenter;
+				DrawBitmap(&Buffer, Stamp, P.X, P.Y);
+			}
+		}
+	}
+
 }
 
 internal void
@@ -1011,7 +1049,8 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		InitializeArena(&TranState->TranArena, Memory->TransientStorageSize - sizeof(transient_state),
 			(uint8 *)Memory->TransientStorage + sizeof(transient_state));
 		
-		TranState->GroundBufferCount = 128;
+		// TODO: Pick a real number here!
+		TranState->GroundBufferCount = 32;
 		TranState->GroundBuffers = PushArray(&TranState->TranArena, TranState->GroundBufferCount, ground_buffer);
 		for (uint32 GroundBufferIndex = 0;
 			GroundBufferIndex < TranState->GroundBufferCount;
@@ -1023,10 +1062,18 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			GroundBuffer->P = NullPosition();
 		}
 
-		// // TODO: This is just a test fill
-		// FillGroundChunk(TranState, GameState, TranState->GroundBuffers, &GameState->CameraP);
-
 		TranState->IsInitialized = true;
+	}
+
+	if (Input->ExecutableReloaded)
+	{
+		for (uint32 GroundBufferIndex = 0;
+			GroundBufferIndex < TranState->GroundBufferCount;
+			++GroundBufferIndex)
+		{
+			ground_buffer *GroundBuffer = TranState->GroundBuffers + GroundBufferIndex;
+			GroundBuffer->P = NullPosition();
+		}
 	}
 
 	world *World = GameState->World;
@@ -1122,71 +1169,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	rectangle3 CameraBoundsInMeters = RectCenterDim(V3(0, 0, 0),
 		V3(ScreenWidthInMeters, ScreenHeightInMeters, 0.0f));
 
-	{
-		world_position MinChunkP = MapIntoChunkSpace(World, GameState->CameraP, GetMinCorner(CameraBoundsInMeters));
-		world_position MaxChunkP = MapIntoChunkSpace(World, GameState->CameraP, GetMaxCorner(CameraBoundsInMeters));
-		
-		for (int32 ChunkZ = MinChunkP.ChunkZ;
-			ChunkZ <= MaxChunkP.ChunkZ;
-			++ChunkZ)
-		{
-			for (int32 ChunkY = MinChunkP.ChunkY;
-				ChunkY <= MaxChunkP.ChunkY;
-				++ChunkY)
-			{
-				for (int32 ChunkX = MinChunkP.ChunkX;
-					ChunkX <= MaxChunkP.ChunkX;
-					++ChunkX)
-				{
-					world_chunk *Chunk = GetWorldChunk(World, ChunkX, ChunkY, ChunkZ);
-					//if (Chunk)
-					{
-						world_position ChunkCenterP = CenteredChunkPoint(Chunk);
-						v3 RelP = Subtract(World, &ChunkCenterP, &GameState->CameraP);
-						v2 ScreenP = {ScreenCenter.X + MetersToPixels*RelP.X,
-							ScreenCenter.Y - MetersToPixels*RelP.Y};
-							
-						v2 ScreenDim = MetersToPixels*World->ChunkDimInMeters.XY;
-
-						// TODO: This is super indefficient fix it!
-						bool32 Found = false;
-						ground_buffer *EmptyBuffer = 0;
-						for (uint32 GroundBufferIndex = 0;
-							GroundBufferIndex < TranState->GroundBufferCount;
-							++GroundBufferIndex)
-						{
-							ground_buffer *GroundBuffer = TranState->GroundBuffers + GroundBufferIndex;
-							if (AreInSameChunk(World, &GroundBuffer->P, &ChunkCenterP))
-							{
-								Found = true;
-								break;
-							}
-							else if (!IsValid(GroundBuffer->P))
-							{
-								EmptyBuffer = GroundBuffer;
-							}
-						}	
-					
-						if (!Found && EmptyBuffer)
-						{
-							FillGroundChunk(TranState, GameState, EmptyBuffer, &ChunkCenterP);
-						}
-
-						DrawRectangleOutline(DrawBuffer, ScreenP - 0.5f*ScreenDim, ScreenP + 0.5*ScreenDim,
-							V3(1.0f, 1.0f, 0.0f));
-					}
-				}
-			}
-		}
-	}
-
-	// TODO: How big do we actually want to expand here?
-	v3 SimBoundsExpansion = {15.0f, 15.0f, 15.0f};
-	rectangle3 SimBounds = AddRadiusTo(CameraBoundsInMeters, SimBoundsExpansion);
-	temporary_memory SimMemory = BeginTemporaryMemory(&TranState->TranArena);
-	sim_region *SimRegion = BeginSim(&TranState->TranArena, GameState, 
-		GameState->World, GameState->CameraP, SimBounds, Input->dtForFrame);
-
 	for (uint32 GroundBufferIndex = 0;
 		GroundBufferIndex < TranState->GroundBufferCount;
 		++GroundBufferIndex)
@@ -1204,6 +1186,82 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			DrawBitmap(DrawBuffer, &Bitmap, Ground.X, Ground.Y);
 		}	
 	}
+
+	{
+		world_position MinChunkP = MapIntoChunkSpace(World, GameState->CameraP, GetMinCorner(CameraBoundsInMeters));
+		world_position MaxChunkP = MapIntoChunkSpace(World, GameState->CameraP, GetMaxCorner(CameraBoundsInMeters));
+		
+		for (int32 ChunkZ = MinChunkP.ChunkZ;
+			ChunkZ <= MaxChunkP.ChunkZ;
+			++ChunkZ)
+		{
+			for (int32 ChunkY = MinChunkP.ChunkY;
+				ChunkY <= MaxChunkP.ChunkY;
+				++ChunkY)
+			{
+				for (int32 ChunkX = MinChunkP.ChunkX;
+					ChunkX <= MaxChunkP.ChunkX;
+					++ChunkX)
+				{
+					//world_chunk *Chunk = GetWorldChunk(World, ChunkX, ChunkY, ChunkZ);
+					//if (Chunk)
+					{
+						world_position ChunkCenterP = CenteredChunkPoint(ChunkX, ChunkY, ChunkZ);
+						v3 RelP = Subtract(World, &ChunkCenterP, &GameState->CameraP);
+						v2 ScreenP = {ScreenCenter.X + MetersToPixels*RelP.X,
+							ScreenCenter.Y - MetersToPixels*RelP.Y};
+						v2 ScreenDim = MetersToPixels*World->ChunkDimInMeters.XY;
+
+						// TODO: This is super indefficient fix it!
+						real32 FurthestBufferLengthSq = 0.0f;
+						ground_buffer *FurthestBuffer = 0;
+						for (uint32 GroundBufferIndex = 0;
+							GroundBufferIndex < TranState->GroundBufferCount;
+							++GroundBufferIndex)
+						{
+							ground_buffer *GroundBuffer = TranState->GroundBuffers + GroundBufferIndex;
+							if (AreInSameChunk(World, &GroundBuffer->P, &ChunkCenterP))
+							{
+								FurthestBuffer = 0;
+								break;
+							}
+							else if (IsValid(GroundBuffer->P))
+							{
+								v3 RelP2 = Subtract(World, &GroundBuffer->P, &GameState->CameraP);
+								real32 BufferLengthSq = LengthSq(RelP2.XY);
+								if (FurthestBufferLengthSq < BufferLengthSq)
+								{
+									FurthestBufferLengthSq = BufferLengthSq;
+									FurthestBuffer = GroundBuffer;
+								}
+
+							}
+							else
+							{
+								FurthestBufferLengthSq = Real32Maximum;
+								FurthestBuffer = GroundBuffer;
+							}
+						}	
+					
+						if (FurthestBuffer)
+						{
+							FillGroundChunk(TranState, GameState, FurthestBuffer, &ChunkCenterP);
+						}
+
+						DrawRectangleOutline(DrawBuffer, ScreenP - 0.5f*ScreenDim, ScreenP + 0.5*ScreenDim,
+							V3(1.0f, 1.0f, 0.0f));
+					}
+				}
+			}
+		}
+	}
+
+	// TODO: How big do we actually want to expand here?
+	v3 SimBoundsExpansion = {15.0f, 15.0f, 15.0f};
+	rectangle3 SimBounds = AddRadiusTo(CameraBoundsInMeters, SimBoundsExpansion);
+	temporary_memory SimMemory = BeginTemporaryMemory(&TranState->TranArena);
+	sim_region *SimRegion = BeginSim(&TranState->TranArena, GameState, 
+		GameState->World, GameState->CameraP, SimBounds, Input->dtForFrame);
 	
 	entity_visible_piece_group PieceGroup;
 	PieceGroup.GameState = GameState;

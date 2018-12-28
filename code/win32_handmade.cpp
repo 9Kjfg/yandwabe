@@ -1201,6 +1201,7 @@ WinMain(
 				{
 					NewInput->dtForFrame = TargetSecondPerFrame;
 					
+					NewInput->ExecutableReloaded = false;
 					FILETIME NewDLLWriteTime = Win32GetLastWriteTime(SourceGameCodeDLLFullPath);
 					if (CompareFileTime(&NewDLLWriteTime, &Game.DLLLastWriteTime))
 					{
@@ -1209,6 +1210,8 @@ WinMain(
 							SourceGameCodeDLLFullPath,
 							TempGameCodeDLLFullPath,
 							GameCodeLockFullPath);
+						
+						NewInput->ExecutableReloaded = true;
 					}
 
 					// TODO: Zeroing macro
