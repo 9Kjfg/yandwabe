@@ -35,6 +35,7 @@ InitializeArena(memory_arena *Arena, memory_index Size, void *Base)
 
 #define PushStruct(Arena, type) (type *)PushSize_(Arena, sizeof(type))
 #define PushArray(Arena, Count, type) (type *)PushSize_(Arena, (Count)*sizeof(type))
+#define PushSize(Arena, Size) PushSize_(Arena, Size)
 inline void *
 PushSize_(memory_arena *Arena, memory_index Size)
 {
@@ -126,17 +127,6 @@ enum entity_residence
 	EntityResidence_High
 };
 
-struct entity_visible_piece
-{
-	loaded_bitmap *Bitmap;
-	v2 Offset;
-	real32 OffsetZ;
-	real32 EntityZC;
-	
-	real32 R, G, B, A;
-	v2 Dim;
-};
-
 struct controlled_hero
 {
 	uint32 EntityIndex;
@@ -164,7 +154,7 @@ struct ground_buffer
 {
 	// NOTE: An invalid P tells us that ground buffer has not been filled
 	world_position P; // NOTE: This is the center of the bitmap
-	void *Memory;
+	loaded_bitmap Bitmap;
 };
 
 struct game_state
@@ -217,18 +207,7 @@ struct transient_state
 	bool32 IsInitialized;
 	memory_arena TranArena;
 	uint32 GroundBufferCount;
-	loaded_bitmap GroundBitmapTemplate;
 	ground_buffer *GroundBuffers;
-};
-
-// TODO: This is dumb, this should gust be just be part of
-// the renderer pushbuffer - add correction of coordinates
-// in there and be done with it.
-struct entity_visible_piece_group
-{
-	game_state *GameState;
-	uint32 PieceCount;
-	entity_visible_piece Pieces[32];
 };
 
 inline low_entity *
