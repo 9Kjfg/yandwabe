@@ -14,11 +14,13 @@ struct render_entity_basis
 };
 
 // NOTE: render_group_entry is a "compact efficient disriminated uion"
+// TODO: Remove the header
 enum render_group_entry_type
 {
 	RenderGroupEntryType_render_entry_clear,
 	RenderGroupEntryType_render_entry_bitmap,
-	RenderGroupEntryType_render_entry_rectangle
+	RenderGroupEntryType_render_entry_rectangle,
+	RenderGroupEntryType_render_entry_cordinate_system
 };
 
 struct render_group_entry_header
@@ -29,6 +31,15 @@ struct render_group_entry_header
 struct render_entry_clear
 {
 	render_group_entry_header Header;
+	v4 Color;
+};
+
+struct render_entry_cordinate_system
+{
+	render_group_entry_header Header;
+	v2 Origin;
+	v2 XAxis;
+	v2 YAxis;
 	v4 Color;
 };
 
