@@ -1254,7 +1254,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	v2 Origin = ScreenCenter;
 	v2 XAxis = 100.f*V2(Cos(Angle), Sin(Angle));
 	v2 YAxis = 1.0f*V2(-XAxis.y, XAxis.x);
-	CoordinateSystem(RenderGroup, Origin, XAxis, YAxis, V4(1, 0, 0, 1));
+	CoordinateSystem(RenderGroup, Origin, XAxis, YAxis, V4(0.5f, 0, 1, 1));
 
 	RenderGroupToOutput(RenderGroup, DrawBuffer);
 
