@@ -41,6 +41,7 @@ struct render_entry_cordinate_system
 	v2 XAxis;
 	v2 YAxis;
 	v4 Color;
+	loaded_bitmap *Texture;
 };
 
 struct render_entry_bitmap
