@@ -1261,7 +1261,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	v2 XAxis = {100, 0};
 	v2 YAxis = {0, 100};
 #endif	
-	CoordinateSystem(RenderGroup, V2(Disp, 0) + Origin, XAxis, YAxis, V4(0.5f, 0, 1, 1), &GameState->Tree);
+	CoordinateSystem(RenderGroup, V2(Disp, 0) + Origin, XAxis, YAxis, V4(1, 1, 1, 1), &GameState->Tree);
 
 	RenderGroupToOutput(RenderGroup, DrawBuffer);
 
