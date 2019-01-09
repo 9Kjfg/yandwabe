@@ -1,8 +1,16 @@
 #if !defined(HANDMADE_RENDER_GROUP_H)
 
+struct loaded_bitmap
+{
+	int32 Width;
+	int32 Height;
+	int32 Pitch;
+	void *Memory;
+};
+
 struct environment_map
 {
-	loaded_bitmap *LOD[4];
+	loaded_bitmap LOD[4];
 };
 
 struct render_basis
@@ -55,13 +63,13 @@ struct render_entry_bitmap
 {;
 	render_entity_basis EntityBasis;
 	loaded_bitmap *Bitmap;
-	real32 R, G, B, A;
+	v4 Color;
 };
 
 struct render_entry_rectangle
 {
 	render_entity_basis EntityBasis;
-	real32 R, G, B, A;
+	v4 Color;
 	v2 Dim;
 };
 

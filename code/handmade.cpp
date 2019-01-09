@@ -1,6 +1,5 @@
 
 #include "handmade.h"
-#include "handmade_render_group.h"
 #include "handmade_render_group.cpp"
 #include "handmade_world.cpp"
 #include "handmade_random.h"
@@ -930,8 +929,30 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			GroundBuffer->P = NullPosition();
 		}
 
-		GameState->TreeNormal = MakeEmptyBitmap(&TranState->TranArena, GameState->Tree.Width, GameState->Tree.Height, false);
-		MakeSphereNormalMap(&GameState->TreeNormal, 0.0f);
+		GameState->TestDiffuse = MakeEmptyBitmap(&TranState->TranArena, 256, 256, false);
+		DrawRectangle(&GameState->TestDiffuse, V2(0, 0), V2(GameState->TestDiffuse.Width, GameState->TestDiffuse.Height), V4(0.5f, 0.5f, 0.5f, 1.0f));
+		GameState->TestNormal = MakeEmptyBitmap(&TranState->TranArena, GameState->TestDiffuse.Width, GameState->TestDiffuse.Height, false);
+		MakeSphereNormalMap(&GameState->TestNormal, 0.0f);
+
+		TranState->EnvMapWidth = 512;
+		TranState->EnvMapHeight = 256;
+
+		for (uint32 MapIndex = 0;
+			MapIndex < ArrayCount(TranState->EnvMaps);
+			++MapIndex)
+		{
+			environment_map *Map = TranState->EnvMaps + MapIndex;
+			uint32 Width = TranState->EnvMapWidth;
+			uint32 Height = TranState->EnvMapHeight;
+			for (uint32 LODIndex = 0;
+				LODIndex < ArrayCount(Map->LOD);
+				++LODIndex)
+			{
+				Map->LOD[LODIndex] = MakeEmptyBitmap(&TranState->TranArena, Width, Height, false);
+				Width >>= 1;
+				Height >>= 1;
+			}
+		}
 
 		TranState->IsInitialized = true;
 	}
@@ -1039,7 +1060,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	DrawBuffer->Pitch = Buffer->Pitch;
 	DrawBuffer->Memory = Buffer->Memory;
 	
-	Clear(RenderGroup, V4(0.5f, 0.5f, 0.5f, 0.0f));
+	Clear(RenderGroup, V4(0.25f, 0.25f, 0.25f, 0.0f));
 
 	v2 ScreenCenter = {0.5f*(real32)DrawBuffer->Width, 0.5f*(real32)DrawBuffer->Height};
 
@@ -1312,6 +1333,42 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	real32 Angle = 0.1f*GameState->Time;
 	real32 Disp = 100.0f * Cos(5.0f*Angle);
 
+	v3 MapColor[] =
+	{
+		{1, 0, 0},
+		{0, 1, 0},
+		{0, 0, 1}
+	};
+
+	for (uint32 MapIndex = 0;
+		MapIndex < ArrayCount(TranState->EnvMaps);
+		++MapIndex)
+	{
+		environment_map *Map = TranState->EnvMaps + MapIndex;
+		loaded_bitmap *LOD = &Map->LOD[0];
+		bool32 RowCheckerOn = false;
+		int32 CheckerWidth = 16;
+		int32 CheckerHeight = 16;
+		for (int32 Y = 0;
+			Y < LOD->Height;
+			Y += CheckerHeight)
+		{
+			bool32 CheckerOn = RowCheckerOn;
+			for (int32 X = 0;
+				X < LOD->Width;
+				X += CheckerWidth)
+			{
+				v4 Color = CheckerOn ? ToV4(MapColor[MapIndex], 1.0f) : V4(0, 0, 0, 1);
+				v2 MinP = V2i(X, Y);
+				v2 MaxP = MinP + V2i(CheckerWidth, CheckerHeight);
+				DrawRectangle(LOD, MinP, MaxP, Color);
+				CheckerOn = !CheckerOn;
+			}
+			RowCheckerOn = !RowCheckerOn;
+		}
+	}
+
+	Angle = 0.0f;
 	v2 Origin = ScreenCenter;
 #if 0
 	v2 XAxis = V2(Cos(Angle), Sin(Angle));
@@ -1324,9 +1381,28 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	v4 Color = V4(1, 1, 1, 1);
 
 	CoordinateSystem(RenderGroup, /*V2(Disp, 0) +*/Origin - 0.5f*XAxis - 0.5f*YAxis,
-		XAxis, YAxis, Color, &GameState->Tree,
-		&GameState->TreeNormal, 0, 0, 0);
+		XAxis, YAxis, Color,
+		&GameState->TestDiffuse,
+		&GameState->TestNormal,
+		TranState->EnvMaps + 2,
+		TranState->EnvMaps + 1,
+		TranState->EnvMaps + 0);
 
+	v2 MapP = {0.0f, 0.0f};
+	for (uint32 MapIndex = 0;
+		MapIndex < ArrayCount(TranState->EnvMaps);
+		++MapIndex)
+	{
+		environment_map *Map = TranState->EnvMaps + MapIndex;
+		loaded_bitmap *LOD = &Map->LOD[0];
+
+		XAxis = 0.5f*V2((real32)LOD->Width, 0);
+		YAxis = 0.5f*V2(0, (real32)LOD->Height);
+
+		CoordinateSystem(RenderGroup, MapP, XAxis, YAxis, Color, LOD, 0, 0, 0, 0);
+		MapP += YAxis + V2(0.0f, 6.0f);
+	}
+	
 	RenderGroupToOutput(RenderGroup, DrawBuffer);
 
 	EndSim(SimRegion, GameState);
