@@ -173,18 +173,16 @@ SampleEnvironmentMap(v2 ScreenSpaceUV, v3 SampleDirection, real32 Roughness, env
 	*/
 
 	// NOTE: Pick which LOD to sample from
-	uint32 LODIndex = (uint32)(Roughness*(real32)(ArrayCount(Map->LOD) - 1)) + 0.5f;
+	uint32 LODIndex = (uint32)(Roughness*(real32)(ArrayCount(Map->LOD) - 1) + 0.5f);
 	Assert(LODIndex < ArrayCount(Map->LOD));
 
 	loaded_bitmap *LOD = &Map->LOD[LODIndex];
 
 	// NOTE: Compute the distance to th emap and the scaling
 	// factor for meters-to-UVs
-	Assert(SampleDirection.y > 0.0f);
 	// TODO: Paramaterize this and should be different for X and Y based on map 
 	real32 UVsPerMeter = 0.01f;
 	real32 C = (UVsPerMeter*DistanceFromMapInZ) / SampleDirection.y;
-	// TODO: Make sure we know what direction Z should go in Y
 	v2 Offset = C * V2(SampleDirection.x, SampleDirection.z);
 	
 	// NOTE: Find the intersection point
@@ -206,10 +204,11 @@ SampleEnvironmentMap(v2 ScreenSpaceUV, v3 SampleDirection, real32 Roughness, env
 
 	Assert((X >= 0) && (X < LOD->Width));
 	Assert((Y >= 0) && (Y < LOD->Height));
-
+#if 0
+	
 	uint8 *TexelPtr = (uint8 *)LOD->Memory + Y*LOD->Pitch + X*BITMAP_BYTES_PER_PIXEL;
 	*(uint32 *)TexelPtr = 0xFFFFFFFF;
-
+#endif
 	bilinear_sample Sample = BilinearSample(LOD, X, Y);
 	v3 Result = SRGBBilinearBlend(Sample, fX, fY).xyz;
 
@@ -217,12 +216,16 @@ SampleEnvironmentMap(v2 ScreenSpaceUV, v3 SampleDirection, real32 Roughness, env
 }
 
 internal void
-DrawRectangleSlowly(loaded_bitmap *Buffer, v2 Origin, v2 XAxis, v2 YAxis, v4 Color,
+DrawRectangleSlowly(loaded_bitmap *Buffer,
+	v2 Origin, v2 XAxis, v2 YAxis, v4 Color,
 	loaded_bitmap *Texture, loaded_bitmap *NormalMap,
-	environment_map *Top, environment_map *Middle, environment_map *Bottom)
+	environment_map *Top, environment_map *Middle, environment_map *Bottom,
+	real32 PixelsToMeters)
 {
 	// NOTE: Premultiply color up front
 	Color.rgb *= Color.a;
+
+	// TODO: This will need to be specified separateley
 
 	real32 XAxisLength = Length(XAxis);
 	real32 YAxisLength = Length(YAxis);
@@ -249,8 +252,12 @@ DrawRectangleSlowly(loaded_bitmap *Buffer, v2 Origin, v2 XAxis, v2 YAxis, v4 Col
 	int WidthMax = Buffer->Width - 1;
 	int HeightMax = Buffer->Height - 1;
 
-	real32 InvWidthMax  = 1.0f / (real32)WidthMax;
-	real32 InvHeightMax  = 1.0f / (real32)HeightMax;
+	real32 InvWidthMax = 1.0f / (real32)WidthMax;
+	real32 InvHeightMax = 1.0f / (real32)HeightMax;
+	
+	real32 OriginZ = 0.5f;
+	real32 OriginY = (Origin + 0.5f*XAxis + 0.5f*YAxis).y;
+	real32 FixedCastY = InvHeightMax*OriginY;
 
 	int YMin = HeightMax;
 	int YMax = 0;
@@ -305,15 +312,18 @@ DrawRectangleSlowly(loaded_bitmap *Buffer, v2 Origin, v2 XAxis, v2 YAxis, v4 Col
 				(Edge2 < 0) &&
 				(Edge3 < 0))
 			{
-				v2 ScreenSpaceUV = {InvWidthMax*(real32)X, InvHeightMax * (real32)Y};
+				v2 ScreenSpaceUV = {InvWidthMax*(real32)X, FixedCastY};
+
+				real32 ZDiff = PixelsToMeters*((real32)Y - OriginY);
 
 				real32 U = InvXAxisLengthSq*Inner(d, XAxis);
 				real32 V = InvYAxisLengthSq*Inner(d, YAxis);
 
+#if 0
 				// TODO: SSE clamping
 				Assert((U >= 0.0f) && (U <= 1.0f));
 				Assert((V >= 0.0f) && (V <= 1.0f));
-
+#endif
 				// TODO: Formalize texture boundaries!
 				real32 tX = (U*(real32)(Texture->Width - 2));
 				real32 tY = (V*(real32)(Texture->Height - 2));
@@ -362,14 +372,14 @@ DrawRectangleSlowly(loaded_bitmap *Buffer, v2 Origin, v2 XAxis, v2 YAxis, v4 Col
 					BounceDirection.z = -BounceDirection.z;
 
 					environment_map *FarMap = 0;
-					real32 DistanceFromMapInZ = 1.0f;
+					real32 Pz = OriginZ + ZDiff;
+					real32 MapZ = 2.0f;
 					real32 tEnvMap = BounceDirection.y;
 					real32 tFarMap = 0.0f;
 					if (tEnvMap < -0.5f)
 					{
 						FarMap = Bottom;
 						tFarMap = -1.0f - 2.0f*tEnvMap;
-						DistanceFromMapInZ = -DistanceFromMapInZ;
 					}
 					else if (tEnvMap > 0.5f)
 					{
@@ -380,12 +390,19 @@ DrawRectangleSlowly(loaded_bitmap *Buffer, v2 Origin, v2 XAxis, v2 YAxis, v4 Col
 					v3 LightColor = {0 ,0, 0};// How do we sapmle from the middle map
 					if (FarMap)
 					{
+						real32 DistanceFromMapInZ = FarMap->Pz - Pz;
 						v3 FarMapColor = SampleEnvironmentMap(ScreenSpaceUV, BounceDirection, Normal.w, FarMap,
 							DistanceFromMapInZ);
 						LightColor = Lerp(LightColor, tFarMap, FarMapColor);
 					}
 
 					Texel.rgb = Texel.rgb + Texel.a*LightColor;
+				
+#if 0
+					// NOTE: Draws the bounce direction
+					Texel.rgb = V3(0.5f, 0.5f, 0.5f) + 0.5f*BounceDirection;
+					Texel.rgb *= Texel.a;
+#endif
 				}
 
 				Texel = Hadamard(Texel, Color);
@@ -590,9 +607,12 @@ RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget)
             case RenderGroupEntryType_render_entry_cordinate_system:
             {
                 render_entry_cordinate_system *Entry = (render_entry_cordinate_system *)Data;
-				DrawRectangleSlowly(OutputTarget, Entry->Origin,  Entry->XAxis, Entry->YAxis, Entry->Color,
+				DrawRectangleSlowly(
+					OutputTarget,
+					Entry->Origin, Entry->XAxis, Entry->YAxis, Entry->Color,
 					Entry->Texture, Entry->NormalMap,
-					Entry->Top, Entry->Middle, Entry->Bottom);
+					Entry->Top, Entry->Middle, Entry->Bottom,
+					1.0 / RenderGroup->MetersToPixels);
 				
 				v2 Dim = {2, 2};
 				v4 Color = {1, 1, 0, 1};

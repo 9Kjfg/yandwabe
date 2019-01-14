@@ -620,6 +620,56 @@ MakeSphereNormalMap(loaded_bitmap *Bitmap, real32 Roughness, real32 Cx = 1.0f, r
 	}
 }
 
+internal void
+MakeSphereDiffuseMap(loaded_bitmap *Bitmap, real32 Cx = 1.0f, real32 Cy = 1.0f)
+{
+	real32 InvWidth = 1.0f / (Bitmap->Width - 1);
+	real32 InvHeight = 1.0f / (Bitmap->Height - 1);
+
+	uint8 *Row = (uint8 *)Bitmap->Memory;
+
+	for (int32 Y = 0;
+		Y < Bitmap->Height;
+		++Y)
+	{
+		uint32 *Pixel = (uint32 *)Row;
+		for (int32 X = 0;
+			X < Bitmap->Width;
+			++X)
+		{
+			v2 BitmapUV = {InvWidth*(real32)X, InvHeight*(real32)Y};
+
+			real32 Nx = Cx*(2.0f*BitmapUV.x - 1.0f);
+			real32 Ny = Cy*(2.0f*BitmapUV.y - 1.0f);
+
+			real32 RootTerm = 1.0f - Nx*Nx - Ny*Ny;
+			real32 Alpha = 0.0f;
+			if (RootTerm >= 0.0f)
+			{
+				Alpha = 1.0f;
+			}
+
+			v3 BaseColor = {0.0f, 0.0f, 0.0f};
+			Alpha *= 255.0f;
+			v4 Color =
+			{
+				Alpha*BaseColor.x,
+				Alpha*BaseColor.y,
+				Alpha*BaseColor.z,
+				Alpha
+			};
+			
+			*Pixel++ = 
+				(((uint32)(Color.a + 0.5f) << 24)|
+				((uint32)(Color.r + 0.5f) << 16) |
+				((uint32)(Color.g + 0.5f) << 8) |
+				((uint32)(Color.b + 0.5f)) << 0);
+		}
+
+		Row += Bitmap->Pitch;
+	}
+}
+
 #if 0
 internal void
 RequestGroundBuffers(world_position CenterP, rectangle3 Bound)
@@ -932,7 +982,8 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		GameState->TestDiffuse = MakeEmptyBitmap(&TranState->TranArena, 256, 256, false);
 		DrawRectangle(&GameState->TestDiffuse, V2(0, 0), V2(GameState->TestDiffuse.Width, GameState->TestDiffuse.Height), V4(0.5f, 0.5f, 0.5f, 1.0f));
 		GameState->TestNormal = MakeEmptyBitmap(&TranState->TranArena, GameState->TestDiffuse.Width, GameState->TestDiffuse.Height, false);
-		MakeSphereNormalMap(&GameState->TestNormal, 0.0f, 0.0f, 1.0f);
+		MakeSphereNormalMap(&GameState->TestNormal, 0.0f);
+		MakeSphereDiffuseMap(&GameState->TestDiffuse);
 
 		TranState->EnvMapWidth = 512;
 		TranState->EnvMapHeight = 256;
@@ -1330,8 +1381,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	}
 
 	GameState->Time += Input->dtForFrame;
-	real32 Angle = 0.1f*GameState->Time;
-	real32 Disp = 100.0f * Cos(5.0f*Angle);
 
 	v3 MapColor[] =
 	{
@@ -1367,11 +1416,21 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			RowCheckerOn = !RowCheckerOn;
 		}
 	}
-
-	Angle = 0.0f;
+	TranState->EnvMaps[0].Pz = -2.0f;
+	TranState->EnvMaps[1].Pz = 0.0f;
+	TranState->EnvMaps[2].Pz = 2.0f;
+	
 	v2 Origin = ScreenCenter;
-#if 0
-	v2 XAxis = V2(Cos(Angle), Sin(Angle));
+	
+	real32 Angle = 0.1f*GameState->Time;
+#if 1
+	v2 Disp = {100.0f * Cos(5.0f*Angle), 100.0f * Sin(3.0f*Angle)};
+#else
+	v2 Disp = {};
+#endif
+
+#if 1
+	v2 XAxis = 100.0f*V2(Cos(10.0f*Angle), Sin(10.0f*Angle));
 	v2 YAxis = Perp(XAxis);
 #else
 	v2 XAxis = {100, 0};
@@ -1380,7 +1439,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
 	v4 Color = V4(1, 1, 1, 1);
 
-	CoordinateSystem(RenderGroup, /*V2(Disp, 0) +*/Origin - 0.5f*XAxis - 0.5f*YAxis,
+	CoordinateSystem(RenderGroup, Disp + Origin - 0.5f*XAxis - 0.5f*YAxis,
 		XAxis, YAxis, Color,
 		&GameState->TestDiffuse,
 		&GameState->TestNormal,
