@@ -1,5 +1,22 @@
 #if !defined(HANDMADE_RENDER_GROUP_H)
 
+/* NOTE:
+	1) Everywhere outside the render, Y _always_ goes upward, X to the right
+
+	2) All bitmaps including the render target are assumed to be bottom-up
+	(meaning that the first row pointer points to the bottom-most row
+	 when viewed on screen)
+
+	3) Unless otherwise specified, all inputs to the render are in world
+	coordinate ("meters"), NOT pixels. Anything that is in pixel values
+	will be explicitly marked as such
+	
+	4) Z is a specila coordinate vecouse it is vroken up into discrete slices
+	and the render actually understands these slices (potentially)
+
+	// TODO: ZHANDLING
+*/
+
 struct loaded_bitmap
 {
 	int32 Width;
@@ -46,6 +63,8 @@ struct render_entry_clear
 	v4 Color;
 };
 
+// NOTE: This is only for test
+// {
 struct render_entry_cordinate_system
 {
 	v2 Origin;
@@ -59,6 +78,7 @@ struct render_entry_cordinate_system
 	environment_map *Middle;
 	environment_map *Bottom;
 };
+// }
 
 struct render_entry_bitmap
 {;
