@@ -14,11 +14,16 @@
 	4) Z is a specila coordinate vecouse it is vroken up into discrete slices
 	and the render actually understands these slices (potentially)
 
+	5) All color values specifeid to the render as V4's are in
+	NON-premultplied alpha.
+
 	// TODO: ZHANDLING
 */
 
 struct loaded_bitmap
 {
+	v2 Align;
+
 	int32 Width;
 	int32 Height;
 	int32 Pitch;
@@ -39,9 +44,7 @@ struct render_basis
 struct render_entity_basis
 {
 	render_basis *Basis;
-	v2 Offset;
-	real32 OffsetZ;
-	real32 EntityZC;
+	v3 Offset;
 };
 
 // NOTE: render_group_entry is a "compact efficient disriminated uion"
@@ -107,6 +110,15 @@ struct render_group
     uint8 *PushBufferBase;
 };
 
+// NOTE: Render API
+
+#if 0
+internal inline void PushBitmap(render_group *Group, loaded_bitmap *Bitmap, v2 Offset, real32 OffsetZ,
+	v4 Color = V4(1, 1, 1, 1));
+internal inline void PushRect(render_group *Group, v2 Offset, real32 OffsetZ, v2 Dim, v4 Color);
+internal inline void PushRectOutline(render_group *Group, v2 Offset, real32 OffsetZ, v2 Dim, v4 Color);
+inline void Clear(render_group *Group, v4 Color);
+#endif
 
 #define HANDMADE_RENDER_GROUP_H
 #endif
