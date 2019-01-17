@@ -12,7 +12,9 @@
 	will be explicitly marked as such
 	
 	4) Z is a specila coordinate vecouse it is vroken up into discrete slices
-	and the render actually understands these slices (potentially)
+	and the render actually understands these slices. Z slices are what
+	control the _scaling_ of things, whereas Z offsets inside a slice are
+	what control Y offsetting.
 
 	5) All color values specifeid to the render as V4's are in
 	NON-premultplied alpha.
@@ -102,6 +104,7 @@ struct render_entry_rectangle
 // in there and be done with it.
 struct render_group
 {
+	real32 GlobalAlpha;
     render_basis *DefaultBasis;
     real32 MetersToPixels;
 

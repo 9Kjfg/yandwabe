@@ -245,7 +245,6 @@ EndSim(sim_region *Region, game_state *GameState)
             world_position NewCameraP = GameState->CameraP;
             
             NewCameraP.ChunkZ = Stored->P.ChunkZ;
-
   #if 0
             if (CameraFollowingEntity->P.x > (9.0f*World->TileSideInMeters))
             {
