@@ -115,7 +115,6 @@ struct sim_region
 	real32 MaxEntityRadius;
 	real32 MaxEntityVelocity;
 
-	v3 CameraPosition; // NOTE: This is the camera position relative to the origin of this region
     world_position Origin;
     rectangle3 Bounds;
 	rectangle3 UpdatableBounds;
