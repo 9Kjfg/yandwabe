@@ -177,8 +177,6 @@ struct game_state
 	loaded_bitmap Tree;
 	loaded_bitmap Sword;
 	loaded_bitmap Stairwell;
-	real32 MetersToPixels;
-	real32 PixelsToMeters;
 
 	// TODOL Must be power of to
 	pairwise_collision_rule *CollisionRuleHash[256];

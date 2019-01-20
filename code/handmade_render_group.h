@@ -7,9 +7,10 @@
 	(meaning that the first row pointer points to the bottom-most row
 	 when viewed on screen)
 
-	3) Unless otherwise specified, all inputs to the render are in world
-	coordinate ("meters"), NOT pixels. Anything that is in pixel values
-	will be explicitly marked as such
+	3) It is mandatory that  all inputs to the render are in world
+	coordinate ("meters"), NOT pixels. If for same reason something
+	absolutely has to be specified in pixels, that will be explicitly
+	marked in the API, but this should occur exceedingly sparingly
 	
 	4) Z is a specila coordinate vecouse it is vroken up into discrete slices
 	and the render actually understands these slices. Z slices are what
@@ -17,14 +18,15 @@
 	what control Y offsetting.
 
 	5) All color values specifeid to the render as V4's are in
-	NON-premultplied alpha.
+	NON-premultiplied alpha.
 
 	// TODO: ZHANDLING
 */
 
 struct loaded_bitmap
 {
-	v2 Align;
+	v2 AlignPercentage;
+	real32 WidthOverHeight;
 
 	int32 Width;
 	int32 Height;
@@ -89,6 +91,7 @@ struct render_entry_bitmap
 {;
 	render_entity_basis EntityBasis;
 	loaded_bitmap *Bitmap;
+	v2 Size;
 	v4 Color;
 };
 
@@ -106,7 +109,6 @@ struct render_group
 {
 	real32 GlobalAlpha;
     render_basis *DefaultBasis;
-    real32 MetersToPixels;
 
     uint32 MaxPushBufferSize;
     uint32 PushBufferSize;
