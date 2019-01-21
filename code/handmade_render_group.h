@@ -102,28 +102,28 @@ struct render_entry_rectangle
 	v2 Dim;
 };
 
-// TODO: This is dumb, this should gust be just be part of
-// the renderer pushbuffer - add correction of coordinates
-// in there and be done with it.
+struct render_group_camera
+{
+	// NOTE: Camera parameters
+	real32 FocalLength;
+	real32 DistanceAboveTarget;
+};
+
 struct render_group
 {
+	render_group_camera GameCamera;
+	render_group_camera RenderCamera;
+
+	real32 MetersToPixels; // NOTE: This translates meters _on the monitor_ into pixels _on the monitor_
+	v2 MonitroHalfDimInMeters;
 	real32 GlobalAlpha;
+
     render_basis *DefaultBasis;
 
     uint32 MaxPushBufferSize;
     uint32 PushBufferSize;
     uint8 *PushBufferBase;
 };
-
-// NOTE: Render API
-
-#if 0
-internal inline void PushBitmap(render_group *Group, loaded_bitmap *Bitmap, v2 Offset, real32 OffsetZ,
-	v4 Color = V4(1, 1, 1, 1));
-internal inline void PushRect(render_group *Group, v2 Offset, real32 OffsetZ, v2 Dim, v4 Color);
-internal inline void PushRectOutline(render_group *Group, v2 Offset, real32 OffsetZ, v2 Dim, v4 Color);
-inline void Clear(render_group *Group, v4 Color);
-#endif
 
 #define HANDMADE_RENDER_GROUP_H
 #endif
