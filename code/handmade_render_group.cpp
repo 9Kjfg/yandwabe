@@ -178,7 +178,7 @@ SampleEnvironmentMap(v2 ScreenSpaceUV, v3 SampleDirection, real32 Roughness, env
 
 	loaded_bitmap *LOD = &Map->LOD[LODIndex];
 
-	// NOTE: Compute the distance to th emap and the scaling
+	// NOTE: Compute the distance to the map and the scaling
 	// factor for meters-to-UVs
 	// TODO: Paramaterize this and should be different for X and Y based on map 
 	real32 UVsPerMeter = 0.01f;
@@ -221,7 +221,9 @@ DrawRectangleSlowly(loaded_bitmap *Buffer,
 	loaded_bitmap *Texture, loaded_bitmap *NormalMap,
 	environment_map *Top, environment_map *Middle, environment_map *Bottom,
 	real32 PixelsToMeters)
-{	
+{
+	BEGIN_TIMED_BLOCK(DrawRectangleSlowly);
+	
 	// NOTE: Premultiply color up front
 	Color.rgb *= Color.a;
 
@@ -286,9 +288,9 @@ DrawRectangleSlowly(loaded_bitmap *Buffer,
 	if (YMax > HeightMax) {YMax = HeightMax;}
 
 	uint8 *Row = 
-			((uint8 *)Buffer->Memory + 
-			XMin*BITMAP_BYTES_PER_PIXEL +
-			YMin*Buffer->Pitch);
+		((uint8 *)Buffer->Memory + 
+		XMin*BITMAP_BYTES_PER_PIXEL +
+		YMin*Buffer->Pitch);
 	
 	for (int Y = YMin;
 		Y < YMax;
@@ -299,6 +301,7 @@ DrawRectangleSlowly(loaded_bitmap *Buffer,
 			X < XMax;
 			++X)
 		{
+			BEGIN_TIMED_BLOCK(TestPixel);
 			v2 PixelP = V2i(X, Y);
 			v2 d = PixelP - Origin;
 			// TODO: PerpInner
@@ -312,6 +315,8 @@ DrawRectangleSlowly(loaded_bitmap *Buffer,
 				(Edge2 < 0) &&
 				(Edge3 < 0))
 			{
+				BEGIN_TIMED_BLOCK(FillPixel);
+
 				v2 ScreenSpaceUV = {InvWidthMax*(real32)X, FixedCastY};
 
 				real32 ZDiff = PixelsToMeters*((real32)Y - OriginY);
@@ -340,7 +345,7 @@ DrawRectangleSlowly(loaded_bitmap *Buffer,
 				bilinear_sample TexelSample = BilinearSample(Texture, X, Y);
 
 				v4 Texel = SRGBBilinearBlend(TexelSample, fX, fY);
-								
+#if 0	
 				if (NormalMap)
 				{
 					bilinear_sample NormalSample = BilinearSample(NormalMap, X, Y);
@@ -395,7 +400,7 @@ DrawRectangleSlowly(loaded_bitmap *Buffer,
 							DistanceFromMapInZ);
 						LightColor = Lerp(LightColor, tFarMap, FarMapColor);
 					}
-
+#endif
 					Texel.rgb = Texel.rgb + Texel.a*LightColor;
 				
 #if 0
@@ -428,12 +433,18 @@ DrawRectangleSlowly(loaded_bitmap *Buffer,
 					((uint32)(Blended255.r + 0.5f) << 16) |
 					((uint32)(Blended255.g + 0.5f) << 8) |
 					((uint32)(Blended255.b + 0.5f)) << 0);
+
+				END_TIMED_BLOCK(FillPixel);
 			}
 			++Pixel;
+
+			END_TIMED_BLOCK(TestPixel);
 		}
 
 		Row += Buffer->Pitch;
 	}
+	
+	END_TIMED_BLOCK(DrawRectangleSlowly);
 }
 
 inline void
@@ -573,7 +584,9 @@ GetRenderEntityBasisP(render_group *RenderGroup, render_entity_basis *EntityBasi
 internal void
 RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget)
 {
-	v2 ScreenDim = {(real32)OutputTarget->Width, (real32)OutputTarget->Height};;
+	BEGIN_TIMED_BLOCK(RenderGroupToOutput);
+
+	v2 ScreenDim = {(real32)OutputTarget->Width, (real32)OutputTarget->Height};
 	
 	// TODO: Remove this
 	real32 PixelsToMeters = 1.0 / RenderGroup->MetersToPixels;
@@ -655,6 +668,8 @@ RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget)
             InvalidDefaultCase;
         }
 	}
+
+	END_TIMED_BLOCK(RenderGroupToOutput);
 }
 
 internal render_group *
@@ -678,8 +693,8 @@ AllocateRenderGroup(memory_arena *Arena, uint32 MaxPushBufferSize,
 	Result->GlobalAlpha = 1.0f;
 
 	// TODO: Need to adjust this based on buffer size
-	real32 WidthOfMonitro = 0.635; // NOTE: Horizontal measurement of monitor in meters
-	Result->MetersToPixels = (real32)ResolutionPixelsX*WidthOfMonitro;
+	real32 WidthOfMonitor = 0.635; // NOTE: Horizontal measurement of monitor in meters
+	Result->MetersToPixels = (real32)ResolutionPixelsX*WidthOfMonitor;
 
 	real32 PixelsToMeters = 1.0f / Result->MetersToPixels;
 	Result->MonitroHalfDimInMeters = 

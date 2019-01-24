@@ -65,7 +65,6 @@ LoadEntityReference(game_state *GameState, sim_region *SimRegion, entity_referen
     }
 }
 
-
 inline void
 StoreEntityReference(entity_reference *Ref)
 {
@@ -84,7 +83,7 @@ AddEntityRaw(game_state *GameState, sim_region *SimRegion, uint32 StorageIndex, 
 	sim_entity_hash *Entry = GetHashFromStorageIndex(SimRegion, StorageIndex);
 	if (Entry->Ptr == 0)
 	{
-		 if (SimRegion->EntityCount < SimRegion->MaxEntityCount)
+		if (SimRegion->EntityCount < SimRegion->MaxEntityCount)
 		{
 			Entity = SimRegion->Entities + SimRegion->EntityCount++;
 

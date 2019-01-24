@@ -171,7 +171,6 @@ struct add_low_entity_result
 internal add_low_entity_result
 AddLowEntity(game_state *GameState, entity_type Type, world_position P)
 {
-	
 	Assert(GameState->LowEntityCount < ArrayCount(GameState->LowEntities));
 	uint32 EntityIndex = GameState->LowEntityCount++;
 	
@@ -370,7 +369,7 @@ ClearCollisionRulesFor(game_state *GameState, uint32 StorageIndex)
 		HashBucket < ArrayCount(GameState->CollisionRuleHash);
 		++HashBucket)
 	{
-		for (pairwise_collision_rule **Rule =& GameState->CollisionRuleHash[HashBucket];
+		for (pairwise_collision_rule **Rule = &GameState->CollisionRuleHash[HashBucket];
 			*Rule;
 			)
 		{
@@ -485,6 +484,7 @@ FillGroundChunk(transient_state *TranState, game_state *GameState, ground_buffer
 
 	Clear(RenderGroup, V4(0.5f, 0.5f, 0.5f, 1.0f));
 
+#if 0
 	GroundBuffer->P = *ChunkP;
 
 	real32 Width = GameState->World->ChunkDimInMeters.x;
@@ -562,6 +562,7 @@ FillGroundChunk(transient_state *TranState, game_state *GameState, ground_buffer
 		}
 	}
 
+#endif
 	RenderGroupToOutput(RenderGroup, Buffer);
 	EndTemporaryMemory(GroundMemory);
 }
@@ -705,8 +706,18 @@ SetToDownAlign(hero_bitmaps *Bitmap, v2 Align)
 	Bitmap->Torso.AlignPercentage = Align;
 }
 
+#if HANDMADE_INTERNAL
+game_memory *DebugGlobalMemory;
+#endif
+
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
+#if HANDMADE_INTERNAL
+	DebugGlobalMemory = Memory;
+#endif
+
+	BEGIN_TIMED_BLOCK(GameUpdateAndRender)
+
 	Assert((&Input->Controllers[0].Terminator - &Input->Controllers[0].Buttons[0]) == 
 		ArrayCount(Input->Controllers[0].Buttons));
 		
@@ -1154,7 +1165,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			
 			if ((Delta.z >= -1.0f) && (Delta.z < 1.0f))
 			{
-
 				render_basis *Basis = PushStruct(&TranState->TranArena, render_basis);
 				RenderGroup->DefaultBasis = Basis;
 				Basis->P = Delta;
@@ -1213,7 +1223,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 									FurthestBufferLengthSq = BufferLengthSq;
 									FurthestBuffer = GroundBuffer;
 								}
-
 							}
 							else
 							{
@@ -1535,6 +1544,8 @@ RenderGroup->GlobalAlpha = 1.0f;
 
 	CheckArena(&GameState->WorldArena);
 	CheckArena(&TranState->TranArena);
+
+	END_TIMED_BLOCK(GameUpdateAndRender)
 }
 
 extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)

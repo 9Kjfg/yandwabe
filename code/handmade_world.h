@@ -41,7 +41,7 @@ struct world
 
 	// TODO: WorldChunkHash should probably switch to pointers IF
 	// tile entity blocks continue to be stored en masse directly in the tile chunk!
-	// NOTE: A the moment, this must ve a power of two
+	// NOTE: A the moment, this must be a power of two
 
 	world_chunk ChunkHash[4096];
 

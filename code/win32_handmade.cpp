@@ -351,8 +351,7 @@ Win32DisplayBufferInWindow(
 	HDC DeviceContext, int WindowWidth, int WindowHeight)
 {
 	// TODO: Centering / black bars?
-	if (
-		(WindowWidth >= Buffer->Width*2) &&
+	if ((WindowWidth >= Buffer->Width*2) &&
 		(WindowHeight >= Buffer->Height*2))
 	{
 		StretchDIBits(
@@ -885,6 +884,35 @@ Win32GetSecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End)
 
 	return(Result);
 }
+
+internal void
+HandleDebugCycleCounters(game_memory *Memory)
+{
+#if HANDMADE_INTERNAL
+	OutputDebugStringA("DEBUG CYCLE COUNTS:\n");
+	for (int CounterIndex = 0;
+		CounterIndex < ArrayCount(Memory->Counters);
+		++CounterIndex)
+	{
+		debug_cycle_counter *Counter = Memory->Counters + CounterIndex;
+		
+		if (Counter->HitCount)
+		{
+			char TextBuffer[256];
+			_snprintf_s(TextBuffer, sizeof(TextBuffer),
+				"  %d: %I64ucy %uh %I64ucy/h\n",
+				CounterIndex,
+				Counter->CycleCount,
+				Counter->HitCount,
+				Counter->CycleCount / Counter->HitCount);
+			OutputDebugStringA(TextBuffer);
+			Counter->HitCount = 0;
+			Counter->CycleCount = 0;
+		}
+	}
+#endif
+}
+
 #if 0
 internal void
 Win32DebugDrawVertical(
@@ -1386,6 +1414,7 @@ WinMain(
 						if (Game.UpdateAndRender)
 						{
 							Game.UpdateAndRender(&Thread, &GameMemory, NewInput, &Buffer);
+							HandleDebugCycleCounters(&GameMemory);
 						}
 
 						LARGE_INTEGER AudioWallClock = Win32GetWallClock();
@@ -1403,7 +1432,7 @@ WinMain(
 								may vary by (let's say up to 2ms)
 
 								When we wake up to write audio, will look
-								and see what the paly cursor position is and we
+								and see what the play cursor position is and we
 								will forecast ahead where we think the play
 								cursor will be on the next farme boundary.
 
@@ -1580,7 +1609,7 @@ WinMain(
 						game_input *Temp = NewInput;
 						NewInput = OldInput;
 						OldInput = Temp;
-#if 1
+#if 0
 						uint64 EndCycleCount = __rdtsc();
 						uint64 CycleElapsed = EndCycleCount - LastCycleCount;
 						LastCycleCount = EndCycleCount;
