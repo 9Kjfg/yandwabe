@@ -517,6 +517,7 @@ DrawRectangleHopefullQuickly(loaded_bitmap *Buffer,
 	
 	__m128 One = _mm_set1_ps(1.0f);
 	__m128 Zero = _mm_set1_ps(0.0f);
+	__m128 Half_4x = _mm_set1_ps(0.5f); 
 
 	__m128 Colorr_4x = _mm_set1_ps(Color.r);
 	__m128 Colorg_4x = _mm_set1_ps(Color.g);
@@ -691,10 +692,18 @@ DrawRectangleHopefullQuickly(loaded_bitmap *Buffer,
 
 			// Lerp(Lerp(TexelA, fX, TexelB), fY, Lerp(TexelC, fX, TexelD))
 			// (ifY*(ifX*TexelA.r + fX*TexelB.r) + fY*(ifX*TexelC.r + fX*TexelD.r));
-			__m128 Texelr = _mm_add_ps(_mm_add_ps(_mm_add_ps(_mm_mul_ps(l0, TexelAr), _mm_mul_ps(l1, TexelBr)), _mm_mul_ps(l2, TexelCr)), _mm_mul_ps(l3, TexelDr));
-			__m128 Texelg = _mm_add_ps(_mm_add_ps(_mm_add_ps(_mm_mul_ps(l0, TexelAg), _mm_mul_ps(l1, TexelBg)), _mm_mul_ps(l2, TexelCg)), _mm_mul_ps(l3, TexelDg));
-			__m128 Texelb = _mm_add_ps(_mm_add_ps(_mm_add_ps(_mm_mul_ps(l0, TexelAb), _mm_mul_ps(l1, TexelBb)), _mm_mul_ps(l2, TexelCb)), _mm_mul_ps(l3, TexelDb));
-			__m128 Texela = _mm_add_ps(_mm_add_ps(_mm_add_ps(_mm_mul_ps(l0, TexelAa), _mm_mul_ps(l1, TexelBa)), _mm_mul_ps(l2, TexelCa)), _mm_mul_ps(l3, TexelDa));
+			__m128 Texelr = _mm_add_ps(
+				_mm_add_ps(_mm_mul_ps(l0, TexelAr), _mm_mul_ps(l1, TexelBr)),
+				_mm_add_ps(_mm_mul_ps(l2, TexelCr), _mm_mul_ps(l3, TexelDr)));
+			__m128 Texelg = _mm_add_ps(
+				_mm_add_ps(_mm_mul_ps(l0, TexelAg), _mm_mul_ps(l1, TexelBg)),
+				_mm_add_ps(_mm_mul_ps(l2, TexelCg), _mm_mul_ps(l3, TexelDg)));
+			__m128 Texelb = _mm_add_ps(
+				_mm_add_ps(_mm_mul_ps(l0, TexelAb), _mm_mul_ps(l1, TexelBb)),
+				_mm_add_ps(_mm_mul_ps(l2, TexelCb), _mm_mul_ps(l3, TexelDb)));
+			__m128 Texela = _mm_add_ps(
+				_mm_add_ps(_mm_mul_ps(l0, TexelAa), _mm_mul_ps(l1, TexelBa)),
+				_mm_add_ps(_mm_mul_ps(l2, TexelCa), _mm_mul_ps(l3, TexelDa)));
 
 			// NOTE: Modulate by incoming color
 			Texelr = _mm_mul_ps(Texelr, Colorr_4x);
@@ -725,24 +734,22 @@ DrawRectangleHopefullQuickly(loaded_bitmap *Buffer,
 			Blendedg = _mm_mul_ps(One255_4x, _mm_sqrt_ps(Blendedg));
 			Blendedb = _mm_mul_ps(One255_4x, _mm_sqrt_ps(Blendedb));
 			Blendeda = _mm_mul_ps(One255_4x, Blendeda);
-			
-			for (int I = 0;
-				I < 4;
-				++I)
-			{
-				if (ShouldFill[I])
-				{
-					// NOTE: Repack
-					*(Pixel + I) = 
-						(((uint32)(M(Blendeda, I) + 0.5f) << 24)|
-						((uint32)(M(Blendedr, I) + 0.5f) << 16) |
-						((uint32)(M(Blendedg, I) + 0.5f) << 8) |
-						((uint32)(M(Blendedb, I) + 0.5f)) << 0);
-				}
-			}
-				
-			Pixel += 4;
 
+			// TODO: Should we set the rounding mode to neares and save thea adds
+			__m128i Intr = _mm_cvttps_epi32(_mm_add_ps(Blendedr, Half_4x));
+			__m128i Intg = _mm_cvttps_epi32(_mm_add_ps(Blendedg, Half_4x));
+			__m128i Intb = _mm_cvttps_epi32(_mm_add_ps(Blendedb, Half_4x));
+			__m128i Inta = _mm_cvttps_epi32(_mm_add_ps(Blendeda, Half_4x));
+
+			__m128i Sr = _mm_slli_epi32(Intr, 16);
+			__m128i Sg = _mm_slli_epi32(Intg, 8);
+			__m128i Sb = Intb;
+			__m128i Sa = _mm_slli_epi32(Inta, 24);
+
+			__m128i Out = _mm_or_si128( _mm_or_si128(Sr, Sg), _mm_or_si128(Sb, Sa));
+
+			_mm_storeu_si128((__m128i *)Pixel, Out);				
+			Pixel += 4;
 		}
 		
 		Row += Buffer->Pitch;
