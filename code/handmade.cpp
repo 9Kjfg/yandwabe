@@ -482,10 +482,10 @@ FillGroundChunk(transient_state *TranState, game_state *GameState, ground_buffer
 	render_group *RenderGroup = AllocateRenderGroup(&TranState->TranArena, Megabytes(4),
 		 Buffer->Width, Buffer->Height);
 
-	Clear(RenderGroup, V4(0.5f, 0.5f, 0.5f, 1.0f));
+	Clear(RenderGroup, V4(1.0f, 1.0f, 0.0f, 1.0f));
 
-#if 0
 	GroundBuffer->P = *ChunkP;
+#if 0
 
 	real32 Width = GameState->World->ChunkDimInMeters.x;
 	real32 Height = GameState->World->ChunkDimInMeters.y;
