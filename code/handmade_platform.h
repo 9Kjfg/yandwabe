@@ -40,6 +40,10 @@ extern "C" {
 
 #if COMPILER_MSVC
 #include <intrin.h>
+#elif COMPILER_LLVM
+#include <x86intrin.h>
+#else
+#error SSE/NEON optimization are not available for this compiler yet!!!
 #endif
 
 //
@@ -60,6 +64,9 @@ typedef uint8_t uint8;
 typedef uint16_t uint16;
 typedef uint32_t uint32;
 typedef uint64_t uint64;
+
+typedef intptr_t intptr;
+typedef uintptr_t uintptr;
 
 typedef size_t memory_index;
 
@@ -150,6 +157,7 @@ extern struct game_memory *DebugGlobalMemory;
 	#define BEGIN_TIMED_BLOCK(ID) uint64 StartCycleCount##ID = __rdtsc();
 	#define END_TIMED_BLOCK(ID) DebugGlobalMemory->Counters[DebugCycleCounter_##ID].CycleCount += __rdtsc() - StartCycleCount##ID; \
 		++DebugGlobalMemory->Counters[DebugCycleCounter_##ID].HitCount;
+// TODO: Clamp END_TIMED_BLOCK_COUNTED so that if the calc is wrong, it won't overflow?
 	#define END_TIMED_BLOCK_COUNTED(ID, Count) DebugGlobalMemory->Counters[DebugCycleCounter_##ID].CycleCount += __rdtsc() - StartCycleCount##ID; \
 		DebugGlobalMemory->Counters[DebugCycleCounter_##ID].HitCount += (Count);
 #else
