@@ -40,17 +40,6 @@ struct environment_map
 	real32 Pz;
 };
 
-struct render_basis
-{
-    v3 P;
-};
-
-struct render_entity_basis
-{
-	render_basis *Basis;
-	v3 Offset;
-};
-
 // NOTE: render_group_entry is a "compact efficient disriminated uion"
 enum render_group_entry_type
 {
@@ -70,6 +59,23 @@ struct render_entry_clear
 	v4 Color;
 };
 
+
+struct render_entry_bitmap
+{;
+	loaded_bitmap *Bitmap;
+	
+	v4 Color;
+	v2 P;
+	v2 Size;
+};
+
+struct render_entry_rectangle
+{
+	v4 Color;
+	v2 P;
+	v2 Dim;
+};
+
 // NOTE: This is only for test
 // {
 struct render_entry_cordinate_system
@@ -81,44 +87,34 @@ struct render_entry_cordinate_system
 	loaded_bitmap *Texture;
 	loaded_bitmap *NormalMap;
 
+	real32 PixelsToMeters; // TODO: Need to store this for lighting
+
 	environment_map *Top;
 	environment_map *Middle;
 	environment_map *Bottom;
 };
 // }
 
-struct render_entry_bitmap
-{;
-	render_entity_basis EntityBasis;
-	loaded_bitmap *Bitmap;
-	v2 Size;
-	v4 Color;
-};
-
-struct render_entry_rectangle
-{
-	render_entity_basis EntityBasis;
-	v4 Color;
-	v2 Dim;
-};
-
-struct render_group_camera
+struct render_transform
 {
 	// NOTE: Camera parameters
+	real32 MetersToPixels; // NOTE: This translates meters _on the monitor_ into pixels _on the monitor_
+	v2 ScreenCenter;
+
 	real32 FocalLength;
 	real32 DistanceAboveTarget;
+
+	v3 OffsetP;
+	real32 Scale;
 };
 
 struct render_group
 {
-	render_group_camera GameCamera;
-	render_group_camera RenderCamera;
-
-	real32 MetersToPixels; // NOTE: This translates meters _on the monitor_ into pixels _on the monitor_
-	v2 MonitroHalfDimInMeters;
 	real32 GlobalAlpha;
 
-    render_basis *DefaultBasis;
+	v2 MonitroHalfDimInMeters;
+
+    render_transform Transform;
 
     uint32 MaxPushBufferSize;
     uint32 PushBufferSize;
