@@ -59,7 +59,6 @@ struct render_entry_clear
 	v4 Color;
 };
 
-
 struct render_entry_bitmap
 {;
 	loaded_bitmap *Bitmap;
