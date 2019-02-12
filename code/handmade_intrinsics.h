@@ -1,10 +1,16 @@
 #if !defined(HANDMADE_INTRINSICS_H)
 
-#include <math.h>
-
 // TODO: Convert all of these to platform-efficient versions
 // and remove math.h
 
+#include <math.h>
+
+#if COMPILER_MSVC
+#define CompletePreviousWritesBeforeFutureWrites _WriteBarrier();
+#else
+// TODO: Need to define these on GCC/LLVM?
+#define
+#endif
 inline int32
 SignOf(int32 Value)
 {
