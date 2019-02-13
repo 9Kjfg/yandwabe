@@ -59,14 +59,18 @@ GetArenaSizeRemaining(memory_arena *Arena, memory_index Alignment = 4)
 #define PushArray(Arena, Count, type, ...) (type *)PushSize_(Arena, (Count)*sizeof(type), ##__VA_ARGS__)
 #define PushSize(Arena, Size, ...) PushSize_(Arena, Size, ##__VA_ARGS__)
 inline void *
-PushSize_(memory_arena *Arena, memory_index Size, memory_index Alignment = 4)
+PushSize_(memory_arena *Arena, memory_index SizeInit, memory_index Alignment = 4)
 {
-	memory_index AlignmentOffset = GetAlignmentOffset(Arena);
+	memory_index Size = SizeInit;
+
+	memory_index AlignmentOffset = GetAlignmentOffset(Arena, Alignment);
 	Size += AlignmentOffset;
 
 	Assert((Arena->Used + Size) <= Arena->Size);
 	void *Result = Arena->Base + Arena->Used + AlignmentOffset;
 	Arena->Used += Size;
+
+	Assert(Size >= SizeInit);
 
 	return(Result);
 }
@@ -183,6 +187,42 @@ struct ground_buffer
 	loaded_bitmap Bitmap;
 };
 
+enum game_assets_id
+{
+	GAI_Backdrop,
+	GAI_Shadow,
+	GAI_Tree,
+	GAI_Sword,
+	GAI_Stairwell,
+
+	GAI_Count
+};
+
+struct game_assets
+{
+	// TODO: Not thrilled aboud this back-pointer
+	struct transient_state *TranState;
+	memory_arena Arena;
+	debug_platform_read_entire_file *ReadEntireFile;
+
+	loaded_bitmap *Bitmaps[GAI_Count];
+
+	// NOTE: Array'd assets
+	loaded_bitmap Grass[2];
+	loaded_bitmap Stone[4];
+	loaded_bitmap Tuft[3];
+
+	// NOTE: Structured assets
+	hero_bitmaps HeroBitmaps[4];
+};
+
+inline loaded_bitmap *
+GetBitmap(game_assets *Assets, game_assets_id ID)
+{
+	loaded_bitmap *Result = Assets->Bitmaps[ID];
+	return(Result);
+}
+
 struct game_state
 {
 	memory_arena WorldArena;
@@ -199,18 +239,6 @@ struct game_state
 	// TODO: Change the name to "stored entity"
 	uint32 LowEntityCount;
 	low_entity LowEntities[4096];
-
-	loaded_bitmap Grass[2];
-	loaded_bitmap Stone[4];
-	loaded_bitmap Tuft[3];
-
-	loaded_bitmap Backdrop;
-	loaded_bitmap Shadow;
-	hero_bitmaps HeroBitmaps[4];
-
-	loaded_bitmap Tree;
-	loaded_bitmap Sword;
-	loaded_bitmap Stairwell;
 
 	// TODOL Must be power of to
 	pairwise_collision_rule *CollisionRuleHash[256];
@@ -229,6 +257,7 @@ struct game_state
 
 	loaded_bitmap TestDiffuse; // TODO: Re-fill this guy with gray
 	loaded_bitmap TestNormal;
+
 };
 
 struct task_with_memory
@@ -258,6 +287,7 @@ struct transient_state
 	// NOTE: 0 is buttom, 1 is middle, 2 is top
 	environment_map EnvMaps[3];
 
+	game_assets Assets;
 };
 
 inline low_entity *
@@ -275,6 +305,8 @@ GetLowEntity(game_state *GameState, uint32 Index)
 
 global_variable platform_add_entry *PlatformAddEntry;
 global_variable platform_complete_all_work *PlatformCompleteAllWork;
+
+internal void LoadAsset(game_assets *Assets, game_assets_id ID);
 
 #define HANDMADE_H
 #endif

@@ -1102,7 +1102,7 @@ TileRenderGroupToOutput(platform_work_queue *RenderQueue,
 }
 
 internal render_group *
-AllocateRenderGroup(memory_arena *Arena, uint32 MaxPushBufferSize)
+AllocateRenderGroup(game_assets *Assets, memory_arena *Arena, uint32 MaxPushBufferSize)
 {
     render_group *Result = PushStruct(Arena, render_group);
     
@@ -1111,6 +1111,7 @@ AllocateRenderGroup(memory_arena *Arena, uint32 MaxPushBufferSize)
 		MaxPushBufferSize = (uint32)GetArenaSizeRemaining(Arena);
 	}
 	
+	Result->Assets = Assets;
 	Result->PushBufferBase = (uint8 *)PushSize(Arena, MaxPushBufferSize);
 
     Result->MaxPushBufferSize = MaxPushBufferSize;
@@ -1248,6 +1249,20 @@ PushBitmap(render_group *Group, loaded_bitmap *Bitmap, real32 Height, v3 Offset,
 			Entry->Color = Group->GlobalAlpha*Color;
 			Entry->Size = Basis.Scale*Size;
 		}
+	}
+}
+
+internal inline void
+PushBitmap(render_group *Group, game_assets_id ID, real32 Height, v3 Offset, v4 Color = V4(1, 1, 1, 1))
+{
+	loaded_bitmap *Bitmap = GetBitmap(Group->Assets, ID);
+	if (Bitmap)
+	{
+		PushBitmap(Group, Bitmap, Height, Offset, Color);
+	}
+	else
+	{
+		LoadAsset(Group->Assets, ID);
 	}
 }
 
