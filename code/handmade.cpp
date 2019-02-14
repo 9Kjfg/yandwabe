@@ -516,6 +516,40 @@ PLATFORM_WORK_QUEUE_CALLBACK(FillGroundChunkWork)
 	EndTaskWidthMemory(Work->Task);
 }
 
+internal int32
+PickBest(int32 InfoCount, asset_bitmap_info *Infos, asset_tag *Tags, 
+	real32 *MatchVector, real32 *WeightVector)
+{
+	real32 BestDiff = Real32Maximum;
+	int32 BestIndex = 0;
+
+	for (int32 InfoIndex = 0;
+		InfoIndex < InfoCount;
+		++InfoIndex)
+	{
+		asset_bitmap_info *Info = Infos + InfoIndex;
+
+		real32 TotalWeightedDiff = 0.0f;
+		for (uint32 TagIndex = Info->FirstTagIndex;
+			TagIndex < Info->OnePastLastTagIndex;
+			++TagIndex)
+		{
+			asset_tag *Tag = Tags + TagIndex;
+			real32 Difference = MatchVector[Tag->ID] - Tag->Value;
+			real32 Weighted = WeightVector[Tag->ID]*AbsoluteValue(Difference);
+			TotalWeightedDiff += Weighted;
+		}
+
+		if (BestDiff > TotalWeightedDiff)
+		{
+			BestDiff = TotalWeightedDiff;
+			BestIndex = InfoIndex;
+		}
+	}
+
+	return(BestIndex);
+}
+
 internal void
 FillGroundChunk(transient_state *TranState, game_state *GameState, ground_buffer *GroundBuffer, world_position *ChunkP)
 {
@@ -523,8 +557,6 @@ FillGroundChunk(transient_state *TranState, game_state *GameState, ground_buffer
 	if (Task)
 	{
 		fill_ground_chunk_work *Work = PushStruct(&Task->Arena, fill_ground_chunk_work);
-
-		GroundBuffer->P = *ChunkP;
 		
 		loaded_bitmap *Buffer = &GroundBuffer->Bitmap;
 		Buffer->AlignPercentage = V2(0.5f, 0.5f);
@@ -616,11 +648,16 @@ FillGroundChunk(transient_state *TranState, game_state *GameState, ground_buffer
 			}
 		}
 
-		Work->RenderGroup = RenderGroup;
-		Work->Buffer = Buffer;
-		Work->Task = Task;
+		if (AllResourcesPresent(RenderGroup))
+		{
+			GroundBuffer->P = *ChunkP;
 
-		PlatformAddEntry(TranState->LowPriorityQueue, FillGroundChunkWork, Work);
+			Work->RenderGroup = RenderGroup;
+			Work->Buffer = Buffer;
+			Work->Task = Task;
+
+			PlatformAddEntry(TranState->LowPriorityQueue, FillGroundChunkWork, Work);
+		}
 	}
 }
 
@@ -770,19 +807,35 @@ struct load_asset_work
 	game_assets_id ID;
 	task_with_memory *Task;
 	loaded_bitmap *Bitmap;
+
+	bool32 HasAlignmet;
+	int32 AlignX;
+	int32 TopDownAlignY;
+
+	asset_state FinalState;
 };
 
 internal
 PLATFORM_WORK_QUEUE_CALLBACK(LoadAssetWork)
 {
 	load_asset_work *Work = (load_asset_work *)Data;
+
 	// TODO: Get rid of this thread thing when i load throught when i load thorught a queue instead of the debug call
 	thread_context *Thread = 0;
-	*Work->Bitmap = DEBUGLoadBMP(Thread, Work->Assets->ReadEntireFile, Work->FileName);
-	// AlignX, TopDownAlignY
 
-	// TODO: Fence
-	Work->Assets->Bitmaps[Work->ID] = Work->Bitmap;
+	if (Work->HasAlignmet)
+	{
+		*Work->Bitmap = DEBUGLoadBMP(Thread, Work->Assets->ReadEntireFile, Work->FileName, Work->AlignX, Work->TopDownAlignY);
+	}
+	else
+	{
+		*Work->Bitmap = DEBUGLoadBMP(Thread, Work->Assets->ReadEntireFile, Work->FileName);
+	}
+
+	CompletePreviousWritesBeforeFutureWrites;
+
+	Work->Assets->Bitmaps[Work->ID].Bitmap = Work->Bitmap;
+	Work->Assets->Bitmaps[Work->ID].State = Work->FinalState;
 
 	EndTaskWidthMemory(Work->Task);
 }
@@ -790,54 +843,66 @@ PLATFORM_WORK_QUEUE_CALLBACK(LoadAssetWork)
 internal void
 LoadAsset(game_assets *Assets, game_assets_id ID)
 {
-	task_with_memory *Task = BeginTaskWidthMemory(Assets->TranState);
-	if (Task)
+	if (AtomicCompareExchangeUInt32((uint32 *)&Assets->Bitmaps[ID].State, AssetState_Unloaded, AssetState_Queued) ==
+		AssetState_Unloaded)
 	{
-		// TODO: Get rid of this thread thing when i load throught when i load thorught a queue instead of the debug call
-		debug_platform_read_entire_file *ReadEntireFile = Assets->ReadEntireFile;
-
-		load_asset_work *Work = PushStruct(&Task->Arena, load_asset_work);
-
-		Work->Assets = Assets;
-		Work->ID = ID;
-		Work->FileName = "";
-		Work->Task = Task;
-		Work->Bitmap = PushStruct(&Assets->Arena, loaded_bitmap);
-
-		PlatformAddEntry(Assets->TranState->LowPriorityQueue, LoadAssetWork, Work);
-
-		thread_context *Thread = 0;
-		switch (ID)
+		task_with_memory *Task = BeginTaskWidthMemory(Assets->TranState);
+		if (Task)
 		{
-			case GAI_Backdrop:
-			{
-				Work->FileName = "test/test_background.bmp";
-			} break;
+			// TODO: Get rid of this thread thing when i load throught when i load thorught a queue instead of the debug call
+			debug_platform_read_entire_file *ReadEntireFile = Assets->ReadEntireFile;
 
-			case GAI_Shadow:
-			{
-				Work->FileName = "test/test_hero_shadow.bmp";
-				// 72 182
-			} break;
-			
-			case GAI_Tree:
-			{
-				Work->FileName = "test/tree.bmp";
-				// 40 50
-			} break;
+			load_asset_work *Work = PushStruct(&Task->Arena, load_asset_work);
 
-			case GAI_Stairwell:
-			{
-				Work->FileName = "test/rock03.bmp";
-			} break;
+			Work->Assets = Assets;
+			Work->ID = ID;
+			Work->FileName = "";
+			Work->Task = Task;
+			Work->Bitmap = PushStruct(&Assets->Arena, loaded_bitmap);
+			Work->HasAlignmet = false;
+			Work->FinalState = AssetState_Loaded;
 
-			case GAI_Sword:
+			thread_context *Thread = 0;
+			switch (ID)
 			{
-				Work->FileName = "test/rock03.bmp";
-				// 29 19
-			} break;
+				case GAI_Backdrop:
+				{
+					Work->FileName = "test/test_background.bmp";
+				} break;
+
+				case GAI_Shadow:
+				{
+					Work->FileName = "test/test_hero_shadow.bmp";
+					Work->HasAlignmet = true;
+					Work->AlignX = 72;
+					Work->TopDownAlignY = 182;
+				} break;
+				
+				case GAI_Tree:
+				{
+					Work->FileName = "test/tree.bmp";
+					Work->HasAlignmet = true;
+					Work->AlignX = 40;
+					Work->TopDownAlignY = 50;
+				} break;
+
+				case GAI_Stairwell:
+				{
+					Work->FileName = "test/rock03.bmp";
+				} break;
+
+				case GAI_Sword:
+				{
+					Work->FileName = "test/rock03.bmp";
+					Work->HasAlignmet = true;
+					Work->AlignX = 29;
+					Work->TopDownAlignY = 19;
+				} break;
+			}
+
+			PlatformAddEntry(Assets->TranState->LowPriorityQueue, LoadAssetWork, Work);
 		}
-	}	
+	}		
 }
 
 #if HANDMADE_INTERNAL
@@ -1594,7 +1659,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 				} break;
 				case EntityType_Space:
 				{
-#if 1
+#if 0
 					for (uint32 VolumeIndex = 0;
 						VolumeIndex < Entity->Collision->VolumeCount;
 						++VolumeIndex)
