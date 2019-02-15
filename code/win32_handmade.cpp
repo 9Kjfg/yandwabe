@@ -86,7 +86,7 @@ DEBUG_PLATFORM_READ_ENTIRE_FILE(DEBUGPlatformReadEntireFile)
 				else
 				{
 					// TODO: Loggin
-					DEBUGPlatformFreeFileMemory(Thread, Result.Contents);
+					DEBUGPlatformFreeFileMemory(Result.Contents);
 					Result.Contents = 0;
 				}
 			}
@@ -1553,7 +1553,6 @@ WinMain(
 								NewController->IsConnected = false;
 							}
 						}
-						thread_context Thread = {};
 
 						game_offscreen_buffer Buffer = {};
 						Buffer.Memory = GlobalBackBaffer.Memory;
@@ -1573,7 +1572,7 @@ WinMain(
 
 						if (Game.UpdateAndRender)
 						{
-							Game.UpdateAndRender(&Thread, &GameMemory, NewInput, &Buffer);
+							Game.UpdateAndRender(&GameMemory, NewInput, &Buffer);
 							HandleDebugCycleCounters(&GameMemory);
 						}
 
@@ -1664,7 +1663,7 @@ WinMain(
 							SoundBuffer.Samples = Samples;
 							if (Game.GetSoundSamples)
 							{
-								Game.GetSoundSamples(&Thread, &GameMemory, &SoundBuffer);
+								Game.GetSoundSamples(&GameMemory, &SoundBuffer);
 							}
 #if HANDMADE_INTERNAL
 							win32_debug_time_marker *Marker = &DebugTimeMarkers[DebugTimeMarketIntex];
