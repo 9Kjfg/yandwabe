@@ -447,6 +447,10 @@ FillGroundChunk(transient_state *TranState, game_state *GameState, ground_buffer
 		Orthographic(RenderGroup, Buffer->Width, Buffer->Height, (Buffer->Width - 2) / Width);
 		Clear(RenderGroup, V4(1.0f, 0.0f, 1.0f, 1.0f));
 
+		Work->RenderGroup = RenderGroup;
+		Work->Buffer = Buffer;
+		Work->Task = Task;
+
 		for (int32 ChunkOffsetY =  -1;
 			ChunkOffsetY <= 1;
 			++ChunkOffsetY)
@@ -477,18 +481,13 @@ FillGroundChunk(transient_state *TranState, game_state *GameState, ground_buffer
 					GrassIndex < 10;
 					++GrassIndex)
 				{
-					loaded_bitmap *Stamp;
-					if (RandomChoice(&Series, 2))
-					{
-						Stamp = TranState->Assets->Grass + RandomChoice(&Series, ArrayCount(TranState->Assets->Grass));
-					}
-					else
-					{
-						Stamp = TranState->Assets->Stone + RandomChoice(&Series, ArrayCount(TranState->Assets->Stone));
-					}
-					
+					bitmap_id Stamp = RandomAssetFrom(
+							TranState->Assets,
+							RandomChoice(&Series, 2) ? Asset_Grass : Asset_Stone,
+							&Series);
+
 					v2 P = Center + Hadamard(HalfDim, V2(RandomBilateral(&Series), RandomBilateral(&Series)));
-					PushBitmap(RenderGroup, Stamp, 4.0f, V3(P, 0.0f), Color);
+					PushBitmap(RenderGroup, Stamp, 2.0f, V3(P, 0.0f), Color);
 				}
 			}
 		}
@@ -515,8 +514,7 @@ FillGroundChunk(transient_state *TranState, game_state *GameState, ground_buffer
 					GrassIndex < 10;
 					++GrassIndex)
 				{
-					loaded_bitmap *Stamp = TranState->Assets->Tuft + RandomChoice(&Series, ArrayCount(TranState->Assets->Tuft));
-
+					bitmap_id Stamp = RandomAssetFrom(TranState->Assets, Asset_Tuft, &Series);
 					v2 P = Center + Hadamard(HalfDim, V2(RandomBilateral(&Series), RandomBilateral(&Series)));
 					PushBitmap(RenderGroup, Stamp, 0.1f, V3(P, 0.0f));
 				}
@@ -527,11 +525,11 @@ FillGroundChunk(transient_state *TranState, game_state *GameState, ground_buffer
 		{
 			GroundBuffer->P = *ChunkP;
 
-			Work->RenderGroup = RenderGroup;
-			Work->Buffer = Buffer;
-			Work->Task = Task;
-
 			PlatformAddEntry(TranState->LowPriorityQueue, FillGroundChunkWork, Work);
+		}
+		else
+		{
+			EndTaskWidthMemory(Work->Task);
 		}
 	}
 }
@@ -689,7 +687,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	
 	Assert(sizeof(game_state) <= Memory->PermanentStorageSize);
 	game_state *GameState = (game_state *)Memory->PermanentStorage;
-	if (!Memory->IsInitialized)
+	if (!GameState->IsInitialized)
 	{
 		uint32 TilesPerWidth = 17;
 		uint32 TilesPerHeight = 9;
@@ -890,7 +888,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			}
 		}
 
-		Memory->IsInitialized = true;
+		GameState->IsInitialized = true;
 	}
 
 	// NOTE: Transient initialization

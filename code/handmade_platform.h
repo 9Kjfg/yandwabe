@@ -250,8 +250,6 @@ typedef void platform_complete_all_work(platform_work_queue *Queue);
 
 typedef struct game_memory
 {
-	bool32 IsInitialized;
-
 	uint64 PermanentStorageSize;
 	void *PermanentStorage; // NOTE: REQUIRED to be cleared ro zero at startup
 
