@@ -80,6 +80,7 @@ typedef double real64;
 #define global_variable static
 
 #define Pi32 3.14159265359f
+#define Tau32 6.2831853071f
 
 #if HANDMADE_SLOW
 #define Assert(Expression) if (!(Expression)) {*(int *)0 = 0;}
@@ -243,7 +244,6 @@ typedef struct game_input
 struct platform_work_queue;
 #define PLATFORM_WORK_QUEUE_CALLBACK(name) void name(platform_work_queue *Queue, void *Data)
 typedef PLATFORM_WORK_QUEUE_CALLBACK(platform_work_queue_callback);
-
 
 typedef void platform_add_entry(platform_work_queue *Queue, platform_work_queue_callback *Callback, void *Data);
 typedef void platform_complete_all_work(platform_work_queue *Queue);

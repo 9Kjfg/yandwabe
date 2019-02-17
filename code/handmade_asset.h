@@ -1,12 +1,5 @@
 #if !defined(HANDMADE_ASSET_H)
 
-struct hero_bitmaps
-{
-	loaded_bitmap Head;
-	loaded_bitmap Cape;
-	loaded_bitmap Torso;
-};
-
 enum asset_state
 {
 	AssetState_Unloaded,
@@ -25,6 +18,7 @@ enum asset_tag_id
 {
 	Tag_Smotheness,
 	Tag_Flatness,
+	Tag_FacingDirection, // NOTE: Angle in radians off of due right
 
 	Tag_Count
 };
@@ -43,7 +37,21 @@ enum asset_type_id
 	Asset_Tuft,
 	Asset_Stone,
 
+	Asset_Head,
+	Asset_Cape,
+	Asset_Torso,
+
 	Asset_Count
+};
+
+struct bitmap_id
+{
+    uint32 Value;
+};
+
+struct audio_id
+{
+    uint32 Value;
 };
 
 struct asset_tag
@@ -59,16 +67,29 @@ struct asset
 	uint32 SlotID;
 };
 
+struct asset_vector
+{
+	real32 E[Tag_Count];
+};
+
 struct asset_type
 {
 	uint32 FirstAssetIndex;
-	uint32 OnePastLastTagIndex;
+	uint32 OnePastLastAssetIndex;
 };
 
 struct asset_bitmap_info
 {
 	v2 AlignPercentage;
 	char *FileName;
+};
+
+
+struct hero_bitmap_id
+{
+	bitmap_id Head;
+	bitmap_id Cape;
+	bitmap_id Torso;
 };
 
 struct game_assets
@@ -97,23 +118,16 @@ struct game_assets
 	loaded_bitmap Tuft[3];
 
 	// NOTE: Structured assets
-	hero_bitmaps HeroBitmaps[4];
+	//hero_bitmaps HeroBitmaps[4];
 
 	// TODO: These should go away once we actually load a asset pack file	
 	uint32 DEBUGUsedBitmapCount;
 	uint32 DEBUGUsedAssetCount;
+	uint32 DEBUGUsedTagCount;
 	asset_type *DEBUGAssetType;
+	asset *DEBUGAsset;
 };
 
-struct bitmap_id
-{
-    uint32 Value;
-};
-
-struct audio_id
-{
-    uint32 Value;
-};
 
 inline loaded_bitmap *
 GetBitmap(game_assets *Assets, bitmap_id ID)

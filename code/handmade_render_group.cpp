@@ -1091,9 +1091,9 @@ TileRenderGroupToOutput(platform_work_queue *RenderQueue,
 			Work->ClipRect = ClipRect;
 
 #if 1
-				PlatformAddEntry(RenderQueue, DoTileRenderWork, Work);
+			PlatformAddEntry(RenderQueue, DoTileRenderWork, Work);
 #else
-				DoTileRenderWork(RenderQueue, Work);
+			DoTileRenderWork(RenderQueue, Work);
 #endif
 		}
 	}
@@ -1258,8 +1258,10 @@ internal inline void
 PushBitmap(render_group *Group, bitmap_id ID, real32 Height, v3 Offset, v4 Color = V4(1, 1, 1, 1))
 {
 	loaded_bitmap *Bitmap = GetBitmap(Group->Assets, ID);
-	if (Bitmap)
+	
+	if (Bitmap && (Bitmap->Memory != 0))
 	{
+		Assert(Bitmap->Memory != 0);
 		PushBitmap(Group, Bitmap, Height, Offset, Color);
 	}
 	else

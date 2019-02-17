@@ -1174,32 +1174,6 @@ WinMain(
 	platform_work_queue LowPriorityQueue = {};
 	Win32MakeQueue(&LowPriorityQueue, 2);
 
-#if 0
-	Win32AddEntry(&Queue, DoWorkerWork, "String A0");
-	Win32AddEntry(&Queue, DoWorkerWork, "String A1");
-	Win32AddEntry(&Queue, DoWorkerWork, "String A2");
-	Win32AddEntry(&Queue, DoWorkerWork, "String A3");
-	Win32AddEntry(&Queue, DoWorkerWork, "String A4");
-	Win32AddEntry(&Queue, DoWorkerWork, "String A5");
-	Win32AddEntry(&Queue, DoWorkerWork, "String A6");
-	Win32AddEntry(&Queue, DoWorkerWork, "String A7");
-	Win32AddEntry(&Queue, DoWorkerWork, "String A8");
-	Win32AddEntry(&Queue, DoWorkerWork, "String A9");
-
-	Win32AddEntry(&Queue, DoWorkerWork, "String B0");
-	Win32AddEntry(&Queue, DoWorkerWork, "String B1");
-	Win32AddEntry(&Queue, DoWorkerWork, "String B2");
-	Win32AddEntry(&Queue, DoWorkerWork, "String B3");
-	Win32AddEntry(&Queue, DoWorkerWork, "String B4");
-	Win32AddEntry(&Queue, DoWorkerWork, "String B5");
-	Win32AddEntry(&Queue, DoWorkerWork, "String B6");
-	Win32AddEntry(&Queue, DoWorkerWork, "String B7");
-	Win32AddEntry(&Queue, DoWorkerWork, "String B8");
-	Win32AddEntry(&Queue, DoWorkerWork, "String B9");
-
-	Win32CompleteAllWork(&Queue);
-#endif
-
 	LARGE_INTEGER PerCountFrequencyResult;
 	QueryPerformanceFrequency(&PerCountFrequencyResult);
 	GlobalPerCountFrequency = PerCountFrequencyResult.QuadPart;
