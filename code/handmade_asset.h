@@ -1,5 +1,11 @@
 #if !defined(HANDMADE_ASSET_H)
 
+struct loaded_sound
+{
+	int32 SameCount;
+	void *Memory;
+};
+
 enum asset_state
 {
 	AssetState_Unloaded,
@@ -11,7 +17,11 @@ enum asset_state
 struct asset_slot
 {
 	asset_state State;
-	loaded_bitmap *Bitmap;
+	union
+	{
+		loaded_bitmap *Bitmap;
+		loaded_sound *Sound;
+	};
 };
 
 enum asset_tag_id
@@ -49,7 +59,7 @@ struct bitmap_id
     uint32 Value;
 };
 
-struct audio_id
+struct sound_id
 {
     uint32 Value;
 };
@@ -84,6 +94,10 @@ struct asset_bitmap_info
 	char *FileName;
 };
 
+struct asset_sound_info
+{
+	char *FileName;
+};
 
 struct hero_bitmap_id
 {
@@ -98,11 +112,14 @@ struct game_assets
 	struct transient_state *TranState;
 	memory_arena Arena;
 
+	real32 TagRange[Tag_Count];
+
 	uint32 BitmapCount;
 	asset_bitmap_info *BitmapInfos;
 	asset_slot *Bitmaps;
 
 	uint32 SoundCount;
+	asset_sound_info *SoundInfos;
 	asset_slot *Sounds;
 
     uint32 TagCount;
@@ -137,7 +154,7 @@ GetBitmap(game_assets *Assets, bitmap_id ID)
 }
 
 internal void LoadBitmap(game_assets *Assets, bitmap_id ID);
-internal void LoadSound(game_assets *Assets, audio_id ID);
+internal void LoadSound(game_assets *Assets, sound_id ID);
 
 #define HANDMADE_ASSET_H
 #endif
