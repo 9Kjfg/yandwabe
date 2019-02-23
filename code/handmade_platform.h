@@ -70,6 +70,17 @@ typedef uintptr_t uintptr;
 
 typedef size_t memory_index;
 
+typedef int8 s8;
+typedef int16 s16;
+typedef int32 s32;
+typedef int64 s64;
+typedef int32 b32;
+
+typedef uint8 u8;
+typedef uint16 u16;
+typedef uint32 u32;
+typedef uint64 u64;
+
 typedef float real32;
 typedef double real64;
 
