@@ -81,6 +81,8 @@ typedef uint16 u16;
 typedef uint32 u32;
 typedef uint64 u64;
 
+typedef float r32;
+
 typedef float real32;
 typedef double real64;
 

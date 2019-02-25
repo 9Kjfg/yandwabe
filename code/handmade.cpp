@@ -893,6 +893,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		TranState->IsInitialized = true;
 	}
 
+#if 0
 	if (Input->ExecutableReloaded)
 	{
 		for (uint32 GroundBufferIndex = 0;
@@ -903,8 +904,16 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			GroundBuffer->P = NullPosition();
 		}
 	}
+#endif
 
 	world *World = GameState->World;
+
+	{
+		v2 MusicVolume;
+		MusicVolume.x = SafeRatio0((r32)Input->MouseX, (r32)Buffer->Width);
+		MusicVolume.y = 1.0 - MusicVolume.x;
+		ChangeVolume(&GameState->AudioState, GameState->Music, 0.01f, MusicVolume);
+	}
 
 	for (int ControllerIndex = 0;
 		ControllerIndex < ArrayCount(Input->Controllers);

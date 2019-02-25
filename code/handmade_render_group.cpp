@@ -1259,8 +1259,9 @@ PushBitmap(render_group *Group, bitmap_id ID, real32 Height, v3 Offset, v4 Color
 {
 	loaded_bitmap *Bitmap = GetBitmap(Group->Assets, ID);
 	
-	if (Bitmap)
+	if (Bitmap && Bitmap->Memory)
 	{
+		Assert(Bitmap->Memory);
 		PushBitmap(Group, Bitmap, Height, Offset, Color);
 	}
 	else

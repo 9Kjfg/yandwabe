@@ -279,11 +279,13 @@ Win32InitDSound(HWND Window, int32 SamplesPerSecond, int32 BufferSize)
 				// TODO: Diagnostic
 			}
 			// NOTE: "Create" a secondary buffer
-			
 
 			DSBUFFERDESC BufferDecsription = {};
 			BufferDecsription.dwSize = sizeof(BufferDecsription);
-			BufferDecsription.dwFlags = DSBCAPS_GETCURRENTPOSITION2;
+			BufferDecsription.dwFlags = DSBCAPS_GETCURRENTPOSITION2|DSBCAPS_GLOBALFOCUS;
+#if HANDMADE_INTERNAL
+			BufferDecsription.dwFlags |= DSBCAPS_GLOBALFOCUS;
+#endif
 			BufferDecsription.dwBufferBytes = BufferSize;
 			BufferDecsription.lpwfxFormat = &WaveFormat;
 
@@ -1367,6 +1369,9 @@ WinMain(
 					FILETIME NewDLLWriteTime = Win32GetLastWriteTime(SourceGameCodeDLLFullPath);
 					if (CompareFileTime(&NewDLLWriteTime, &Game.DLLLastWriteTime))
 					{
+						Win32CompleteAllWork(&HighPriorityQueue);
+						Win32CompleteAllWork(&LowPriorityQueue);
+
 						Win32UnloadGameCode(&Game);
 						Game = Win32LoadGameCode(
 							SourceGameCodeDLLFullPath,

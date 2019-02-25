@@ -76,6 +76,31 @@ PushSize_(memory_arena *Arena, memory_index SizeInit, memory_index Alignment = 4
 	return(Result);
 }
 
+// NOTE: This is generally not for production use, this is probabbly
+// only really something we need during testing, but who knows
+
+inline char *
+PushString(memory_arena *Arena, char *Source)
+{
+	u32 Size = 1;
+	for (char *At = Source;
+		*At;
+		++At)
+	{
+		++Size;
+	}
+
+	char *Dest = (char *)PushSize_(Arena, Size);
+	for (u32 CharIndex = 0;
+		CharIndex < Size;
+		++CharIndex)
+	{
+		Dest[CharIndex] = Source[CharIndex];
+	}
+
+	return(Dest);
+}
+
 #define ZeroStruct(Instance) ZeroSize(sizeof(Instance), &(Instance));
 
 inline temporary_memory
