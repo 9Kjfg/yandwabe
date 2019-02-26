@@ -80,22 +80,26 @@ OutputPlayingSounds(audio_state *AudioState,
 {
 	temporary_memory MixerMemory = BeginTemporaryMemory(TempArena);
 
-	real32 *RealChannel0 = PushArray(TempArena, SoundBuffer->SampleCount, real32);
-	real32 *RealChannel1 = PushArray(TempArena, SoundBuffer->SampleCount, real32);
+	u32 SampleCountAlign4 = Align4(SoundBuffer->SampleCount);
+	u32 SampleCount4 = SampleCountAlign4 / 4;
+
+	__m128 *RealChannel0 = PushArray(TempArena, SampleCount4, __m128, 16);
+	__m128 *RealChannel1 = PushArray(TempArena, SampleCount4, __m128, 16);
 
 	real32 SecondsPerSample = 1.0f / (real32)SoundBuffer->SamplesPerSecond;
 #define AudioStateOutputChannelCount 2
 
 	// NOTE: Clear out the mixer channels
+	__m128 Zero = _mm_set1_ps(0.0f);
 	{
-		real32 *Dest0 = RealChannel0;
-		real32 *Dest1 = RealChannel1;
-		for (int SampleIndex = 0;
-			SampleIndex < SoundBuffer->SampleCount;
+		__m128 *Dest0 = RealChannel0;
+		__m128 *Dest1 = RealChannel1;
+		for (u32 SampleIndex = 0;
+			SampleIndex < SampleCount4;
 			++SampleIndex)
 		{
-			*Dest0++ = 0.0f; 
-			*Dest1++ = 0.0f; 
+			_mm_store_ps((float *)Dest0++, Zero); 
+			_mm_store_ps((float *)Dest1++, Zero); 
 		}
 	}
 
@@ -108,8 +112,8 @@ OutputPlayingSounds(audio_state *AudioState,
 		bool32 SoundFinished = false;
 		
 		uint32 TotalSamplesToMix = SoundBuffer->SampleCount;
-		real32 *Dest0 = RealChannel0;
-		real32 *Dest1 = RealChannel1;
+		real32 *Dest0 = (real32 *)RealChannel0;
+		real32 *Dest1 = (real32 *)RealChannel1;
 
 		while (TotalSamplesToMix && !SoundFinished)
 		{
@@ -225,16 +229,26 @@ OutputPlayingSounds(audio_state *AudioState,
 
 	// NOTE: Convert to 16-bit
 	{
-		real32 *Source0 = RealChannel0;
-		real32 *Source1 = RealChannel1;
+		__m128 *Source0 = RealChannel0;
+		__m128 *Source1 = RealChannel1;
 
-		int16 *SampleOut = SoundBuffer->Samples;
-		for (int SampleIndex = 0;
-			SampleIndex < SoundBuffer->SampleCount;
+		__m128i *SampleOut = (__m128i *)SoundBuffer->Samples;
+		for (u32 SampleIndex = 0;
+			SampleIndex < SampleCount4;
 			++SampleIndex)
 		{
-			*SampleOut++ = (int16)(*Source0++ + 0.5f);
-			*SampleOut++ = (int16)(*Source1++ + 0.5f);
+			__m128 S0 = _mm_load_ps((float *)Source0++);
+			__m128 S1 = _mm_load_ps((float *)Source1++);
+
+			__m128i L = _mm_cvtps_epi32(S0);
+			__m128i R = _mm_cvtps_epi32(S1);
+		
+			__m128i LR0 = _mm_unpacklo_epi32(L, R);
+			__m128i LR1 = _mm_unpackhi_epi32(L, R);
+		
+			__m128i S01 = _mm_packs_epi32(LR0, LR1);
+
+			*SampleOut++ = S01;
 		}
 	}
 

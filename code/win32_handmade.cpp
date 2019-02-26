@@ -1273,8 +1273,9 @@ WinMain(
 #endif
 
 			// TODO: Pool with bitmap init
+			u32 MaxPossibleOverrun = 2*4*sizeof(u16);
 			int16 *Samples = (int16 *)VirtualAlloc(
-				0, SoundOutput.SecondaryByfferSize, 
+				0, SoundOutput.SecondaryByfferSize + MaxPossibleOverrun, 
 				MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 
 #if HANDMADE_INTERNAL
