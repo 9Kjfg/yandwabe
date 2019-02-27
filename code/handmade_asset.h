@@ -1,8 +1,18 @@
 #if !defined(HANDMADE_ASSET_H)
 
+struct bitmap_id
+{
+    uint32 Value;
+};
+
+struct sound_id
+{
+    uint32 Value;
+};
+
 struct loaded_sound
 {
-	uint32 SampleCount;
+	uint32 SampleCount; // NOTE: This is the sample count divided by 8
 	uint32 ChannelCount;
 	int16 *Samples[2];
 };
@@ -70,15 +80,6 @@ enum asset_type_id
 	Asset_Count
 };
 
-struct bitmap_id
-{
-    uint32 Value;
-};
-
-struct sound_id
-{
-    uint32 Value;
-};
 
 struct asset_tag
 {
