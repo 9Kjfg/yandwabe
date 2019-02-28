@@ -80,23 +80,23 @@ OutputPlayingSounds(audio_state *AudioState,
 {
 	temporary_memory MixerMemory = BeginTemporaryMemory(TempArena);
 
-	Assert((SoundBuffer->SampleCount & 7) == 0);
-	u32 SampleCount8 = SoundBuffer->SampleCount / 8;
-	u32 SampleCount4 = SoundBuffer->SampleCount / 4;
+	Assert((SoundBuffer->SampleCount & 3) == 0);
+	u32 ChunkCount = SoundBuffer->SampleCount / 4;
 
-	__m128 *RealChannel0 = PushArray(TempArena, SampleCount4, __m128, 16);
-	__m128 *RealChannel1 = PushArray(TempArena, SampleCount4, __m128, 16);
+	__m128 *RealChannel0 = PushArray(TempArena, ChunkCount, __m128, 16);
+	__m128 *RealChannel1 = PushArray(TempArena, ChunkCount, __m128, 16);
 
 	real32 SecondsPerSample = 1.0f / (real32)SoundBuffer->SamplesPerSecond;
 #define AudioStateOutputChannelCount 2
 
 	// NOTE: Clear out the mixer channels
+	__m128 One = _mm_set1_ps(1.0f);
 	__m128 Zero = _mm_set1_ps(0.0f);
 	{
 		__m128 *Dest0 = RealChannel0;
 		__m128 *Dest1 = RealChannel1;
 		for (u32 SampleIndex = 0;
-			SampleIndex < SampleCount4;
+			SampleIndex < ChunkCount;
 			++SampleIndex)
 		{
 			_mm_store_ps((float *)Dest0++, Zero); 
@@ -112,11 +112,11 @@ OutputPlayingSounds(audio_state *AudioState,
 		playing_sound *PlayingSound = *PlayingSoundPtr;
 		bool32 SoundFinished = false;
 		
-		uint32 TotalSamplesToMix8 = SampleCount8;
+		uint32 TotalChunksToMix = ChunkCount;
 		__m128 *Dest0 = RealChannel0;
 		__m128 *Dest1 = RealChannel1;
 
-		while (TotalSamplesToMix8 && !SoundFinished)
+		while (TotalChunksToMix && !SoundFinished)
 		{
 			loaded_sound *LoadedSound = GetSound(Assets, PlayingSound->ID);
 			if (LoadedSound)
@@ -126,38 +126,41 @@ OutputPlayingSounds(audio_state *AudioState,
 
 				v2 Volume = PlayingSound->CurrentVolume;
 				v2 dVolume = SecondsPerSample*PlayingSound->dCurrentVolume;
-				v2 dVolume8 = 8.0f*dVolume;
+				v2 dVolumeChunk = 4.0f*dVolume;
 				real32 dSample = PlayingSound->dSample;
-				real32 dSample8 = 8.0f*PlayingSound->dSample;
+				real32 dSampleChunk = 4.0f*PlayingSound->dSample;
 
-				__m128 MasterVolume4_0 = _mm_set1_ps(AudioState->MasterVolume.E[0]);
-				__m128 MasterVolume4_1 = _mm_set1_ps(AudioState->MasterVolume.E[1]);
-				__m128 Volume4_0 = _mm_setr_ps(
+				// NOTE: Channel 0
+				__m128 MasterVolume0 = _mm_set1_ps(AudioState->MasterVolume.E[0]);
+				__m128 Volume0 = _mm_setr_ps(
 					Volume.E[0] + 0.0f*dVolume.E[0],
 					Volume.E[0] + 1.0f*dVolume.E[0],
 					Volume.E[0] + 2.0f*dVolume.E[0],
 					Volume.E[0] + 3.0f*dVolume.E[0]);
-				__m128 dVolume4_0 = _mm_set1_ps(dVolume.E[0]);
-				__m128 dVolume84_0 = _mm_set1_ps(dVolume8.E[0]);
+				__m128 dVolume0 = _mm_set1_ps(dVolume.E[0]);
+				__m128 dVolumeChunk0 = _mm_set1_ps(dVolumeChunk.E[0]);
 
-				__m128 Volume4_1 = _mm_setr_ps(
+				// NOTE: Channel 1
+				__m128 MasterVolume1 = _mm_set1_ps(AudioState->MasterVolume.E[1]);
+				__m128 Volume1 = _mm_setr_ps(
 					Volume.E[1] + 0.0f*dVolume.E[1],
 					Volume.E[1] + 1.0f*dVolume.E[1],
 					Volume.E[1] + 2.0f*dVolume.E[1],
 					Volume.E[1] + 3.0f*dVolume.E[1]);
-				__m128 dVolume4_1 = _mm_set1_ps(dVolume.E[1]);
-				__m128 dVolume84_1 = _mm_set1_ps(dVolume8.E[1]);
-				
+				__m128 dVolume1 = _mm_set1_ps(dVolume.E[1]);
+				__m128 dVolumeChunk1 = _mm_set1_ps(dVolumeChunk.E[1]);
 
-				Assert(PlayingSound->SamplesPlayed >= 0);
+				Assert(PlayingSound->SamplesPlayed >= 0.0f);
 
-				u32 SamplesToMix8 = TotalSamplesToMix8;
-				r32 RealSampleRemainingInSound8 = 
-					(LoadedSound->SampleCount - RoundReal32ToInt32(PlayingSound->SamplesPlayed)) / dSample8;
-				u32 SamplesRemainingInSound8 = RoundReal32ToInt32(RealSampleRemainingInSound8);
-				if (SamplesToMix8 > SamplesRemainingInSound8)
+				u32 ChunksToMix = TotalChunksToMix;
+				r32 RealChunksRemainingInSound = 
+					(LoadedSound->SampleCount - RoundReal32ToInt32(PlayingSound->SamplesPlayed)) / dSampleChunk;
+				u32 ChunksRemainingInSound = RoundReal32ToInt32(RealChunksRemainingInSound);
+				b32 InputSamplesEnded = false;
+				if (ChunksToMix > ChunksRemainingInSound)
 				{
-					SamplesToMix8 = SamplesRemainingInSound8;
+					ChunksToMix = ChunksRemainingInSound;
+					InputSamplesEnded = true;
 				}
 
 				b32 VolumeEnded[AudioStateOutputChannelCount] = {};
@@ -165,32 +168,52 @@ OutputPlayingSounds(audio_state *AudioState,
 					ChannelIndex < ArrayCount(VolumeEnded);
 					++ChannelIndex)
 				{
-					if (dVolume8.E[ChannelIndex] != 0.0f)
+					if (dVolumeChunk.E[ChannelIndex] != 0.0f)
 					{
 						real32 DeltaVolume = PlayingSound->TargetVolume.E[ChannelIndex] - Volume.E[ChannelIndex];
-						u32 VolumeSampleCount8 = (u32)(((DeltaVolume / dVolume8.E[ChannelIndex]) + 0.5f));
-						if (SamplesToMix8 > VolumeSampleCount8)
+						u32 VolumeChunkCount = (u32)(((DeltaVolume / dVolumeChunk.E[ChannelIndex]) + 0.5f));
+						if (ChunksToMix > VolumeChunkCount)
 						{
-							SamplesToMix8 = VolumeSampleCount8;
+							ChunksToMix = VolumeChunkCount;
 							VolumeEnded[ChannelIndex] = true;
 						}
 					}
 				}
 
 				// TODO: Handle stereo!
-				real32 SamplePosition = PlayingSound->SamplesPlayed;
+				real32 BeginSamplePosition = PlayingSound->SamplesPlayed;
+				real32 EndSamplePosition = BeginSamplePosition + ChunksToMix*dSampleChunk;
+				real32 LoopIndexC = (EndSamplePosition - BeginSamplePosition) / (r32)ChunksToMix;
 				for (u32 LoopIndex = 0;
-					LoopIndex < SamplesToMix8;
+					LoopIndex < ChunksToMix;
 					++LoopIndex)
 				{
-#if 0
-					r32 OffsetSamplePosition = SamplePosition + (r32)SampleOffset*dSample;
-					u32 SampleIndex = FloorReal32ToInt32(OffsetSamplePosition);
-					r32 Frac = OffsetSamplePosition - (r32)SampleIndex;
+					real32 SamplePosition = BeginSamplePosition + LoopIndexC*(r32)LoopIndex;
+#if 1
+					__m128 SamplePos = _mm_setr_ps(
+						SamplePosition + 0.0f*dSample,
+						SamplePosition + 1.0f*dSample,
+						SamplePosition + 2.0f*dSample,
+						SamplePosition + 3.0f*dSample);
 
-					r32 Sample0 = (r32)LoadedSound->Samples[0][SampleIndex];
-					r32 Sample1 = (r32)LoadedSound->Samples[0][SampleIndex + 1];
-					r32 SampleValue = Lerp(Sample0, Frac, Sample1);
+					__m128i SampleIndex = _mm_cvttps_epi32(SamplePos);
+					__m128 Frac = _mm_sub_ps(SamplePos, _mm_cvtepi32_ps(SampleIndex));
+
+					__m128 SampleValueF = _mm_setr_ps(
+						LoadedSound->Samples[0][((int32 *)&SampleIndex)[0]], 
+						LoadedSound->Samples[0][((int32 *)&SampleIndex)[1]],
+						LoadedSound->Samples[0][((int32 *)&SampleIndex)[2]],
+						LoadedSound->Samples[0][((int32 *)&SampleIndex)[3]]);
+
+					__m128 SampleValueC = _mm_setr_ps(
+						LoadedSound->Samples[0][((int32 *)&SampleIndex)[0] + 1],
+						LoadedSound->Samples[0][((int32 *)&SampleIndex)[1] + 1],
+						LoadedSound->Samples[0][((int32 *)&SampleIndex)[2] + 1],
+						LoadedSound->Samples[0][((int32 *)&SampleIndex)[3] + 1]);
+
+					__m128 SampleValue = _mm_add_ps(
+						_mm_mul_ps(_mm_sub_ps(One, Frac), SampleValueF),
+						_mm_mul_ps(Frac, SampleValueC));
 #else			
 					__m128 SampleValue_0 = _mm_setr_ps(
 						LoadedSound->Samples[0][RoundReal32ToInt32(SamplePosition + 0.0f*dSample)], 
@@ -198,36 +221,24 @@ OutputPlayingSounds(audio_state *AudioState,
 						LoadedSound->Samples[0][RoundReal32ToInt32(SamplePosition + 2.0f*dSample)],
 						LoadedSound->Samples[0][RoundReal32ToInt32(SamplePosition + 3.0f*dSample)]);
 
-					__m128 SampleValue_1 = _mm_setr_ps(
-						LoadedSound->Samples[0][RoundReal32ToInt32(SamplePosition + 4.0f*dSample)], 
-						LoadedSound->Samples[0][RoundReal32ToInt32(SamplePosition + 5.0f*dSample)],
-						LoadedSound->Samples[0][RoundReal32ToInt32(SamplePosition + 6.0f*dSample)],
-						LoadedSound->Samples[0][RoundReal32ToInt32(SamplePosition + 7.0f*dSample)]);	
 #endif
-					__m128 D0_0 = _mm_load_ps((float *)&Dest0[0]);
-					__m128 D0_1 = _mm_load_ps((float *)&Dest0[1]);
-					__m128 D1_0 = _mm_load_ps((float *)&Dest1[0]);
-					__m128 D1_1 = _mm_load_ps((float *)&Dest1[1]);
+					__m128 D0 = _mm_load_ps((float *)&Dest0[0]);
+					__m128 D1 = _mm_load_ps((float *)&Dest1[0]);
 					
-					D0_0 = _mm_add_ps(D0_0, _mm_mul_ps(_mm_mul_ps(MasterVolume4_0, Volume4_0), SampleValue_0));
-					D0_1 = _mm_add_ps(D0_1, _mm_mul_ps(_mm_mul_ps(MasterVolume4_0, _mm_add_ps(dVolume4_0, Volume4_0)), SampleValue_0));
-					D1_0 = _mm_add_ps(D1_0, _mm_mul_ps(_mm_mul_ps(MasterVolume4_1, Volume4_1), SampleValue_1));
-					D1_1 = _mm_add_ps(D1_1, _mm_mul_ps(_mm_mul_ps(MasterVolume4_1, _mm_add_ps(dVolume4_1, Volume4_1)), SampleValue_1));
+					D0 = _mm_add_ps(D0, _mm_mul_ps(_mm_mul_ps(MasterVolume0, Volume0), SampleValue));
+					D1 = _mm_add_ps(D1, _mm_mul_ps(_mm_mul_ps(MasterVolume1, Volume1), SampleValue));
 
-					_mm_store_ps((float *)&Dest0[0], D0_0);
-					_mm_store_ps((float *)&Dest0[1], D0_1);
-					_mm_store_ps((float *)&Dest1[0], D1_0);
-					_mm_store_ps((float *)&Dest1[1], D1_1);
+					_mm_store_ps((float *)&Dest0[0], D0);
+					_mm_store_ps((float *)&Dest1[0], D1);
 
-					Dest0 += 2;
-					Dest1 += 2;
-					Volume4_0 = _mm_add_ps(Volume4_0, dVolume84_0);
-					Volume4_1 = _mm_add_ps(Volume4_1, dVolume84_1);
-					Volume += dVolume8;
-					SamplePosition += dSample8;
+					++Dest0;
+					++Dest1;
+					Volume0 = _mm_add_ps(Volume0, dVolumeChunk0);
+					Volume1 = _mm_add_ps(Volume1, dVolumeChunk1);
 				}
 
-				PlayingSound->CurrentVolume = Volume;
+				PlayingSound->CurrentVolume.E[0] = ((r32 *)&Volume0)[0];
+				PlayingSound->CurrentVolume.E[1] = ((r32 *)&Volume1)[1];
 				for (u32 ChannelIndex = 0;
 					ChannelIndex < ArrayCount(VolumeEnded);
 					++ChannelIndex)
@@ -240,16 +251,17 @@ OutputPlayingSounds(audio_state *AudioState,
 					}
 				}
 
-				PlayingSound->SamplesPlayed = SamplePosition;
-				Assert(TotalSamplesToMix8 >= SamplesToMix8);
-				TotalSamplesToMix8 -= SamplesToMix8;
+				PlayingSound->SamplesPlayed = EndSamplePosition;
+				Assert(TotalChunksToMix >= ChunksToMix);
+				TotalChunksToMix -= ChunksToMix;
 
-				if ((uint32)PlayingSound->SamplesPlayed >= LoadedSound->SampleCount)
+				if (InputSamplesEnded)
 				{
 					if (IsValid(Info->NextIDToPlay))
 					{
 						PlayingSound->ID = Info->NextIDToPlay;
-						PlayingSound->SamplesPlayed = 0;
+						Assert(PlayingSound->SamplesPlayed >= LoadedSound->SampleCount);
+						PlayingSound->SamplesPlayed -= (r32)LoadedSound->SampleCount;
 					}
 					else
 					{
@@ -283,7 +295,7 @@ OutputPlayingSounds(audio_state *AudioState,
 
 		__m128i *SampleOut = (__m128i *)SoundBuffer->Samples;
 		for (u32 SampleIndex = 0;
-			SampleIndex < SampleCount4;
+			SampleIndex < ChunkCount;
 			++SampleIndex)
 		{
 			__m128 S0 = _mm_load_ps((float *)Source0++);
