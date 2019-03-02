@@ -1,5 +1,14 @@
 #if !defined(HANDMADE_ASSET_TYPE_ID)
 
+enum asset_tag_id
+{
+	Tag_Smotheness,
+	Tag_Flatness,
+	Tag_FacingDirection, // NOTE: Angle in radians off of due right
+
+	Tag_Count
+};
+
 enum asset_type_id
 {
     Asset_None,

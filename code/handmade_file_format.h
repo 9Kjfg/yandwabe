@@ -1,0 +1,64 @@
+#if !defined(HANDMADE_FILE_FORMAT_H)
+
+#define HHA_CODE(a, b, c, d) (((uint32)(a) << 0) | ((uint32)(b) << 8) | ((uint32)(c) << 16) | ((uint32)(d) << 24))
+
+#pragma pack(push, 1)
+struct hha_header
+{
+#define HHA_MAGIC_VALUE HHA_CODE('h', 'h', 'a', 'f' )
+    u32 MagicValue;
+
+#define HHA_VERSION 0
+    u32 Version;
+
+    u32 TagCount;
+    u32 AssetCount;
+    u32 AssetTypeCount;
+
+    u64 Tags; // hha_tag[TagCount]
+    u64 Assets; // hha_asset[AssetCount]
+    u64 AssetsTypes; // hha_asset_type[AssetTypeEntryCount]
+};
+
+struct hha_tag
+{
+    u32 ID;
+    r32 Value;
+};
+
+struct hha_asset_type
+{
+    u32 TypeID;
+    u32 FirstAssetIndex;
+    u32 OnePastLastAssetIndex;
+};
+
+struct hha_bitmap
+{
+    u32 Dim[2];
+	r32 AlignPercentage[2];
+};
+
+struct hha_sound
+{
+	uint32 FirstSampleIndex;
+	uint32 SampleCount;
+	sound_id NextIDToPlay;
+};
+
+struct hha_asset
+{
+    u64 DataOffset;
+	u32 FirstTagIndex;
+	u32 OnePastLastTagIndex;
+    union
+    {
+        hha_bitmap Bitmap;
+        hha_sound Sound;
+    };
+};
+
+#pragma pack(pop)
+
+#define HANDMADE_FILE_FORMAT_H
+#endif

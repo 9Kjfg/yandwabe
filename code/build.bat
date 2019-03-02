@@ -8,14 +8,15 @@ set CommonLinkerFlags= -incremental:no -opt:ref user32.lib gdi32.lib winmm.lib
 IF NOT EXIST ..\..\build mkdir ..\..\build
 pushd ..\..\build
 
+del *.pdb > NUL 2> NUL
+
 REM Asset file builder build
-REM cl %CommonCompilerFlags% ..\handmade\code\test_asset_builder.cpp /link %CommonLinkerFlags%
+cl %CommonCompilerFlags% -D_CRT_SECURE_NO_WARNINGS=1 ..\handmade\code\test_asset_builder.cpp /link %CommonLinkerFlags%
 
 REM 32-bit build
 REM cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp /link -suvsystem:windows,5.1 %CommonLinkerFlags
 
 REM 64-bit build
-del *.pdb > NUL 2> NUL
 REM Optimization switches /O2
 echo WAITING FOR PDB > lock.tmp
 cl %CommonCompilerFlags% -I..\..\iaca-win64 ..\handmade\code\handmade.cpp -Fmhandmade.map -LD /link -incremental:no -PDB:handmade_%random%.pdb -EXPORT:GameGetSoundSamples -EXPORT:GameUpdateAndRender
