@@ -106,6 +106,7 @@ struct game_assets
 	loaded_bitmap Stone[4];
 	loaded_bitmap Tuft[3];
 
+#if 0
 	// NOTE: Structured assets
 	//hero_bitmaps HeroBitmaps[4];
 
@@ -114,6 +115,7 @@ struct game_assets
 	uint32 DEBUGUsedTagCount;
 	asset_type *DEBUGAssetType;
 	asset *DEBUGAsset;
+#endif
 };
 
 

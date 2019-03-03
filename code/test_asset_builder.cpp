@@ -1,6 +1,368 @@
 #include "test_asset_builder.h"
 
-FILE *Out = 0;
+#pragma pack(push, 1)
+struct bitmap_header
+{
+    uint16 FileType;        /* File type, always 4D42h ("BM") */
+    uint32 FileSize;        /* Size of the file in bytes */
+    uint16 Reserved1;       /* Always 0 */
+    uint16 Reserved2;       /* Always 0 */
+    uint32 BitmapOffset;    /* Starting position of image data in bytes */
+    uint32 Size;            /* Size of this header in bytes */
+    int32 Width;            /* Image width in pixels */
+    int32 Height;           /* Image height in pixels */
+    uint16 Planes;          /* Number of color planes */
+    uint16 BitsPerPixel;    /* Number of bits per pixel */
+	int32 Compression;
+    int32 SizeOfBitmap;		/* Size of bitmap in bytes */
+    int32 HorzResolution;	/* Horizontal resolution in pixels per meter */
+    int32 VertResolution;	/* Vertical resolution in pixels per meter */
+    int32 ColorsUsed;       /* Number of colors in the image */
+    int32 ColorsImportant;  /* Minimum number of important colors */
+
+    uint32 RedMask;
+    uint32 GreenMask;
+    uint32 BlueMask;
+};
+
+#define RIFF_CODE(a, b, c, d) (((uint32)(a) << 0) | ((uint32)(b) << 8) | ((uint32)(c) << 16) | ((uint32)(d) << 24))
+enum
+{
+	WAVE_ChunkID_fmt = RIFF_CODE('f', 'm', 't', ' '),
+	WAVE_ChunkID_data = RIFF_CODE('d', 'a', 't', 'a'),
+	WAVE_ChunkID_RIFF = RIFF_CODE('R', 'I', 'F', 'F'),
+	WAVE_ChunkID_WAVE = RIFF_CODE('W', 'A', 'V', 'E')
+};
+
+struct WAVE_header 
+{
+	uint32 RIFFID;
+	uint32 Size;
+	uint32 WAVEID;
+};
+
+struct WAVE_chunk
+{
+	uint32 ID;
+	uint32 Size;
+};
+
+struct WAVE_fmt
+{
+	uint16 wFormatTag;
+	uint16 nChannels;
+	uint32 nSamplesPerSec;
+	uint32 nAvgBytesPerSec;
+	uint16 nBlockAlign;
+	uint16 wBitsPerSamle;
+	uint16 cbSize;
+	uint16 wValidBitsPerSample;
+	uint32 dwChannelMask;
+	uint8 SubFormt[16];
+};
+
+#pragma pack(pop)
+
+struct loaded_bitmap
+{
+	int32 Width;
+	int32 Height;
+	int32 Pitch;
+	void *Memory;
+
+	void *Free;
+};
+
+struct entire_file
+{
+	u32 ContentsSize;
+	void *Contents;
+};
+
+entire_file
+ReadEntireFile(char *FileName)
+{
+	entire_file Result = {};
+
+	FILE *In = fopen(FileName, "rb");
+	if (In)
+	{
+		fseek(In, 0, SEEK_END);
+		Result.ContentsSize = ftell(In);
+		fseek(In, 0, SEEK_SET);
+
+		Result.Contents = malloc(Result.ContentsSize);
+		fread(Result.Contents, Result.ContentsSize, 1, In);
+		fclose(In);
+	}
+	else
+	{
+		printf("ERROR: Cannot open file %s.\n", FileName);
+	}
+
+	return(Result);
+}
+
+internal loaded_bitmap
+LoadBMP(char *FileName)
+{
+	loaded_bitmap Result = {};
+
+    entire_file ReadResult = ReadEntireFile(FileName);
+	if (ReadResult.ContentsSize != 0)
+	{
+		Result.Free = ReadResult.Contents;
+
+		bitmap_header *Header = (bitmap_header *)ReadResult.Contents;
+		uint32 *Pixel = (uint32 *)((uint8 *)ReadResult.Contents + Header->BitmapOffset);
+		Result.Memory = Pixel;
+		Assert(Result.Memory != 0);
+		Result.Width = Header->Width;
+		Result.Height = Header->Height;
+		
+		Assert(Result.Height >= 0);
+		Assert(Header->Compression == 3);
+
+		// NOTE; Byte order in memory is determined by the Header itself,
+		// os we have to read out the masks and convert hte pixels ourselves
+		uint32 RedMask = Header->RedMask;
+    	uint32 GreenMask = Header->GreenMask;
+    	uint32 BlueMask = Header->BlueMask;
+		uint32 AlphaMask = ~(RedMask | GreenMask | BlueMask);
+
+		bit_scan_result RedScan = FindLeastSignificantSetBit(RedMask);
+		bit_scan_result GreenScan = FindLeastSignificantSetBit(GreenMask);
+		bit_scan_result BlueScan = FindLeastSignificantSetBit(BlueMask);
+		bit_scan_result AlphaScan = FindLeastSignificantSetBit(AlphaMask);
+
+		Assert(RedScan.Found);
+		Assert(GreenScan.Found);
+		Assert(BlueScan.Found);
+		Assert(AlphaScan.Found);
+
+		int32 RedShiftDown = (int32)RedScan.Index;
+		int32 GreenShiftDown = (int32)GreenScan.Index;
+		int32 BlueShiftDown = (int32)BlueScan.Index;
+		int32 AlphaShiftDown = (int32)AlphaScan.Index;
+
+		uint32 *SourceDest = Pixel;
+		for (int32 Y = 0;
+			Y < Header->Width;
+			++Y)
+		{
+			for (int32 X = 0;
+				X < Header->Height;
+				++X)
+			{
+				uint32 C = *SourceDest;
+
+				v4 Texel = 
+				{
+					(real32)((C & RedMask) >> RedShiftDown),
+					(real32)((C & GreenMask) >> GreenShiftDown),
+					(real32)((C & BlueMask) >> BlueShiftDown),
+					(real32)((C & AlphaMask) >> AlphaShiftDown)
+				};
+				
+				Texel = SRGB255ToLinear1(Texel);
+#if 1
+				Texel.rgb *= Texel.a;
+#endif
+				Texel = Linear1ToSRGB255(Texel);
+
+				*SourceDest++ = 
+					(((uint32)(Texel.a + 0.5f) << 24)|
+					((uint32)(Texel.r + 0.5f) << 16) |
+					((uint32)(Texel.g + 0.5f) << 8) |
+					((uint32)(Texel.b + 0.5f)) << 0);
+			}
+		}
+	}
+	Result.Pitch = Result.Width*BITMAP_BYTES_PER_PIXEL;
+#if 0
+	Result.Memory = (uint8 *)Result.Memory + Result.Pitch*(Result.Height - 1);
+	Result.Pitch = -Result.Pitch
+#endif
+	return(Result);
+}
+
+struct riff_iterator
+{
+	uint8 *At;
+	uint8 *Stop;
+};
+
+inline riff_iterator
+ParseChunkAt(void *At, void *Stop)
+{
+	riff_iterator Iter;
+
+	Iter.At = (uint8 *)At;
+	Iter.Stop = (uint8 *)Stop;
+
+	return(Iter);
+}
+
+inline riff_iterator
+NextChunk(riff_iterator Iter)
+{
+	WAVE_chunk *Chunk = (WAVE_chunk *)Iter.At;
+	uint32 Size = (Chunk->Size + 1) & ~1;
+	Iter.At += sizeof(WAVE_chunk) + Size;
+
+	return(Iter);
+}
+
+inline bool32
+IsValid(riff_iterator Iter)
+{
+	bool32 Result = (Iter.At < Iter.Stop);
+	return(Result);
+}
+
+inline void *
+GetChunkData(riff_iterator Iter)
+{
+	void *Result = (Iter.At + sizeof(WAVE_chunk));
+	return(Result);
+}
+
+inline uint32
+GetType(riff_iterator Iter)
+{
+	WAVE_chunk *Chunk = (WAVE_chunk *)Iter.At;
+	uint32 Result = Chunk->ID;
+
+	return(Result);
+}
+
+inline uint32
+GetChunkDataSize(riff_iterator Iter)
+{
+	WAVE_chunk *Chunk = (WAVE_chunk *)Iter.At;
+	uint32 Result = Chunk->Size;
+
+	return(Result);
+}
+
+struct loaded_sound
+{
+	uint32 SampleCount; // NOTE: This is the sample count divided by 8
+	uint32 ChannelCount;
+	int16 *Samples[2];
+
+	void *Free;
+};
+
+internal loaded_sound
+LoadWAV(char *FileName, uint32 SectionFirstSampleIndex, uint32 SectionSampleCount)
+{
+	loaded_sound Result = {};
+
+	entire_file ReadResult = ReadEntireFile(FileName);
+	if (ReadResult.ContentsSize != 0)
+	{
+		Result.Free = ReadResult.Contents;
+
+		WAVE_header *Header = (WAVE_header *)ReadResult.Contents;
+		Assert(Header->RIFFID == WAVE_ChunkID_RIFF);
+		Assert(Header->WAVEID == WAVE_ChunkID_WAVE);
+		
+		uint32 ChannelCount = 0;
+		uint32 SampleDataSize = 0;
+		int16 *SampleData = 0;
+		for (riff_iterator Iter = ParseChunkAt(Header + 1, (uint8 *)(Header + 1) + Header->Size - 4);
+			IsValid(Iter);
+			Iter = NextChunk(Iter))
+		{
+			switch (GetType(Iter))
+			{
+				case WAVE_ChunkID_fmt:
+				{
+					WAVE_fmt *fmt = (WAVE_fmt *)GetChunkData(Iter);
+					Assert(fmt->wFormatTag == 1); // NOTE: Only support PCM
+					//Assert(fmt->nSamplesPerSec == 48000);
+					Assert(fmt->wBitsPerSamle == 16);
+					Assert(fmt->nBlockAlign == (2*fmt->nChannels));
+					ChannelCount = fmt->nChannels;
+				} break;
+
+				case WAVE_ChunkID_data:
+				{
+					SampleData = (int16 *)GetChunkData(Iter);
+					SampleDataSize = GetChunkDataSize(Iter);
+				} break;
+			}
+		}
+
+		Assert(ChannelCount && SampleData);
+
+		Result.ChannelCount = ChannelCount;
+		u32 SampleCount = SampleDataSize / (ChannelCount*sizeof(int16));
+		if (ChannelCount == 1)
+		{
+			Result.Samples[0] = SampleData;
+			Result.Samples[1] = 0;
+		}
+		else if (ChannelCount == 2)
+		{
+			Result.Samples[0] = SampleData;
+			Result.Samples[1] = SampleData + SampleCount;
+
+			for (uint32 SampleIndex = 0;
+				SampleIndex < SampleCount;
+				++SampleIndex)
+			{
+				int16 Source = SampleData[2*SampleIndex];
+				SampleData[2*SampleIndex] = SampleData[SampleIndex];
+				SampleData[SampleIndex] = Source;
+			}
+		}
+		else
+		{
+			Assert(!"Invalid channel count in WAV file");
+		}
+
+		// TODO: Load right channels
+		b32 AtEnd = true;
+		Result.ChannelCount = 1;
+		if (SectionSampleCount)
+		{
+			Assert((SectionFirstSampleIndex + SectionSampleCount) <= SampleCount);
+			AtEnd = (SectionFirstSampleIndex + SectionSampleCount) == SampleCount;
+			SampleCount = SectionSampleCount;
+			for (uint32 ChannelIndex = 0;
+				ChannelIndex < Result.ChannelCount;
+				++ChannelIndex)
+			{
+				Result.Samples[ChannelIndex] += SectionFirstSampleIndex;
+			}
+		}
+
+		if (AtEnd)
+		{	
+			// TODO: All sounds have to be padded with their subsequent sound out
+			// to 8 samples past their end
+			u32 SampleCountAlign8 = Align8(SampleCount);
+			for (uint32 ChannelIndex = 0;
+				ChannelIndex < Result.ChannelCount;
+				++ChannelIndex)
+			{
+				for (u32 SampleIndex = SampleCount;
+					SampleIndex < (SampleCount + 8);
+					++SampleIndex)
+				{
+					Result.Samples[ChannelIndex][SampleIndex] = 0;
+				}
+
+			}	
+		}
+
+		Result.SampleCount = SampleCount;
+	}
+
+	return(Result);
+}
 
 internal void
 BeginAssetType(game_assets *Assets, asset_type_id TypeID)
@@ -19,14 +381,17 @@ AddBitmapAsset(game_assets *Assets, char *FileName, r32 AlignPercentageX = 0.5f,
 	Assert(Assets->DEBUGAssetType->OnePastLastAssetIndex < ArrayCount(Assets->Assets));
 
 	bitmap_id Result = {Assets->DEBUGAssetType->OnePastLastAssetIndex++};
-	asset *Asset = Assets->Assets + Result.Value;
-	Asset->FirstTagIndex = Assets->TagCount;
-	Asset->OnePastLastTagIndex = Asset->FirstTagIndex;
-	Asset->Bitmap.FileName = FileName;
-	Asset->Bitmap.AlignPercentage[0] = AlignPercentageX;
-	Asset->Bitmap.AlignPercentage[1] = AlignPercentageY;
+	asset_source *Source = Assets->AssetSources + Result.Value;
+	hha_asset *HHA = Assets->Assets + Result.Value;
+	HHA->FirstTagIndex = Assets->TagCount;
+	HHA->OnePastLastTagIndex = HHA->FirstTagIndex;
+	HHA->Bitmap.AlignPercentage[0] = AlignPercentageX;
+	HHA->Bitmap.AlignPercentage[1] = AlignPercentageY;
 
-	Assets->DEBUGAsset = Asset;
+	Source->Type = AssetType_Bitmap;
+	Source->Filename = FileName;
+	
+	Assets->AssetIndex = Result.Value;
 
 	return(Result);
 }
@@ -38,24 +403,29 @@ AddSoundAsset(game_assets *Assets, char *FileName, u32 FirstSampleIndex = 0, u32
 	Assert(Assets->DEBUGAssetType->OnePastLastAssetIndex < ArrayCount(Assets->Assets));
 
 	sound_id Result = {Assets->DEBUGAssetType->OnePastLastAssetIndex++};
-	asset *Asset = Assets->Assets + Result.Value;
-	Asset->FirstTagIndex = Assets->TagCount;
-	Asset->OnePastLastTagIndex = Asset->FirstTagIndex;
-	Asset->Sound.FileName = FileName;
-	Asset->Sound.FirstSampleIndex = FirstSampleIndex;
-	Asset->Sound.SampleCount = SampleCount;
-	Asset->Sound.NextIDToPlay.Value = 0;
+	asset_source *Source = Assets->AssetSources + Result.Value;
+	hha_asset *HHA = Assets->Assets + Result.Value;
+	HHA->FirstTagIndex = Assets->TagCount;
+	HHA->OnePastLastTagIndex = HHA->FirstTagIndex;
+	HHA->Sound.SampleCount = SampleCount;
+	HHA->Sound.NextIDToPlay = 0;
 
-	Assets->DEBUGAsset = Asset;
+	Source->Type = AssetType_Sound;
+	Source->Filename = FileName;
+	Source->FirstSampleIndex = FirstSampleIndex;
+
+	Assets->AssetIndex = Result.Value;
 
 	return(Result);
 }
+
 internal void
 AddTag(game_assets *Assets, asset_tag_id ID, real32 Value)
 {
-	Assert(Assets->DEBUGAsset);
+	Assert(Assets->AssetIndex);
 
-	++Assets->DEBUGAsset->OnePastLastTagIndex;
+	hha_asset *HHA = Assets->Assets + Assets->AssetIndex;
+	++HHA->OnePastLastTagIndex;
 	hha_tag *Tag = Assets->Tags + Assets->TagCount++;
 
 	Tag->ID = ID;
@@ -68,6 +438,7 @@ EndAssetType(game_assets *Assets)
 	Assert(Assets->DEBUGAssetType);
 	Assets->AssetCount = Assets->DEBUGAssetType->OnePastLastAssetIndex;
 	Assets->DEBUGAssetType = 0;
+	Assets->AssetIndex = 0;
 }
 
 int
@@ -79,7 +450,7 @@ main(int ArgCoutn, char **Args)
 	Assets->TagCount = 1;
 	Assets->AssetCount = 1;
 	Assets->DEBUGAssetType = 0;
-	Assets->DEBUGAsset = 0;
+	Assets->AssetIndex = 0;
 
     BeginAssetType(Assets, Asset_Shadow);
 	AddBitmapAsset(Assets, "test/test_hero_shadow.bmp", 0.5f, 0.156682829f);
@@ -187,7 +558,7 @@ main(int ArgCoutn, char **Args)
 		sound_id ThisMusic = AddSoundAsset(Assets, "test/music0.wav", FirstSampleIndex, SampleCount);
 		if (LastMusic.Value)
 		{
-			Assets->Assets[LastMusic.Value].Sound.NextIDToPlay = ThisMusic;
+			Assets->Assets[LastMusic.Value].Sound.NextIDToPlay = ThisMusic.Value;
 		}
 		LastMusic = ThisMusic;
 	}
@@ -197,8 +568,9 @@ main(int ArgCoutn, char **Args)
 	AddSoundAsset(Assets, "test/drop0.wav");
 	EndAssetType(Assets);
 
+	FILE *Out = 0;
+
     Out = fopen("test.hha", "wb");
-    
     if (Out)
     {
 		hha_header Header = {};
@@ -219,7 +591,48 @@ main(int ArgCoutn, char **Args)
 		fwrite(&Header, sizeof(Header), 1, Out);
 		fwrite(&Assets->Tags, TagArraySize, 1, Out);
 		fwrite(&Assets->AssetTypes, AssetTypeArraySize, 1, Out);
-		//fwrite(&Asset->AssetArray, AssetArraySize, 1, Out);
+		fseek(Out, AssetArraySize, SEEK_CUR);
+		for (u32 AssetIndex = 1;
+			AssetIndex < Header.AssetCount;
+			++AssetIndex)
+		{
+			asset_source *Source = Assets->AssetSources + AssetIndex;
+			hha_asset *Dest = Assets->Assets + AssetIndex;
+			
+			Dest->DataOffset = ftell(Out);
+
+			if (Source->Type == AssetType_Sound)
+			{
+				loaded_sound WAV = LoadWAV(Source->Filename, Source->FirstSampleIndex, Dest->Sound.SampleCount);
+				Dest->Sound.SampleCount = WAV.SampleCount;
+				Dest->Sound.ChannelCount = WAV.ChannelCount;
+				
+				for (u32 ChannelIndex = 0;
+					ChannelIndex < WAV.ChannelCount;
+					++ChannelIndex)
+				{
+					fwrite(WAV.Samples[ChannelIndex], Dest->Sound.SampleCount*sizeof(s16), 1, Out);
+				}
+
+				free(WAV.Free);
+			}
+			else
+			{
+				Assert(Source->Type == AssetType_Bitmap);
+
+				loaded_bitmap Bitmap = LoadBMP(Source->Filename);
+
+				Dest->Bitmap.Dim[0] = Bitmap.Width;
+				Dest->Bitmap.Dim[1] = Bitmap.Height;
+
+				Assert((Bitmap.Width*4) == Bitmap.Pitch);
+				fwrite(Bitmap.Memory, Bitmap.Width*Bitmap.Height*4, 1, Out);
+
+				free(Bitmap.Free);
+			}
+		}
+		fseek(Out, (u32)Header.Assets, SEEK_SET);
+		fwrite(Assets->Assets, AssetArraySize, 1, Out);
 
         fclose(Out);
     }

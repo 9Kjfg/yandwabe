@@ -1,4 +1,4 @@
-
+#if 0
 #pragma pack(push, 1)
 struct bitmap_header
 {
@@ -311,6 +311,23 @@ DEBUGLoadWAV(char *FileName, uint32 SectionFirstSampleIndex, uint32 SectionSampl
 
 	return(Result);
 }
+#endif
+
+internal loaded_bitmap
+DEBUGLoadBMP(char *FileName, v2 AlignPercentage = V2(0.5f, 0.5f))
+{
+	Assert(!"NO NO NO NO");
+	loaded_bitmap Result = {};
+	return(Result);
+}
+
+internal loaded_sound
+DEBUGLoadWAV(char *FileName, uint32 SectionFirstSampleIndex, uint32 SectionSampleCount)
+{
+	Assert(!"NO NO NO NO");
+	loaded_sound Result = {};
+	return(Result);
+}
 
 struct load_bitmap_work
 {	
@@ -380,7 +397,6 @@ PLATFORM_WORK_QUEUE_CALLBACK(LoadSoundWork)
 {
 	load_sound_work *Work = (load_sound_work *)Data;
 
-	// TODO: Get rid of this thread thing when i load throught when i load thorught a queue instead of the debug call
 	asset_sound_info *Info = &Work->Assets->Assets[Work->ID.Value].Sound;
 	*Work->Sound = DEBUGLoadWAV(Info->FileName, Info->FirstSampleIndex, Info->SampleCount);
 
@@ -535,6 +551,7 @@ GetRandomSoundFrom(game_assets *Assets, asset_type_id TypeID, random_series *Ser
     return(Result);
 }
 
+#if 0
 internal void
 BeginAssetType(game_assets *Assets, asset_type_id TypeID)
 {
@@ -601,6 +618,7 @@ EndAssetType(game_assets *Assets)
 	Assets->DEBUGUsedAssetCount = Assets->DEBUGAssetType->OnePastLastAssetIndex;
 	Assets->DEBUGAssetType = 0;
 }
+#endif
 
 internal game_assets *
 AllocateGameAssets(memory_arena *Arena, transient_state *TranState, memory_index Size)
@@ -618,13 +636,48 @@ AllocateGameAssets(memory_arena *Arena, transient_state *TranState, memory_index
 
 	Assets->TagRange[Tag_FacingDirection] = Tau32;
 
-    Assets->AssetCount = 2*256*Asset_Count;
-    Assets->Assets = PushArray(Arena, Assets->AssetCount, asset);
-	Assets->Slots = PushArray(Arena, Assets->AssetCount, asset_slot);
 
-	Assets->TagCount = 1024*Asset_Count;
-	Assets->Tags = PushArray(Arena, Assets->TagCount, asset_tag);
+	debug_read_file_result ReadResult = DEBUGPlatformReadEntireFile("test.hha");
+	if (ReadResult.ContentsSize != 0)
+	{
+		hha_header *Header = (hha_header *)ReadResult.Contents;
+		Assert(Header->MagicValue == HHA_MAGIC_VALUE);
+		Assert(Header->Version == HHA_VERSION);
 
+		Assets->AssetCount = Header->AssetCount;
+		Assets->Assets = PushArray(Arena, Assets->AssetCount, asset);
+		Assets->Slots = PushArray(Arena, Assets->AssetCount, asset_slot);
+
+		Assets->TagCount = Header->TagCount;
+		Assets->Tags = PushArray(Arena, Assets->TagCount, asset_tag);
+
+		hha_tag *HHATags = (hha_tag *)((u8 *)ReadResult.Contents + Header->Tags);
+
+		for (u32 TagIndex = 0;
+			TagIndex < Assets->TagCount;
+			++TagIndex)
+		{
+			hha_tag *Source = HHATags + TagIndex;
+			asset_tag *Dest = Assets->Tags + TagIndex;
+
+			Dest->ID = Source->ID;
+			Dest->Value = Source->Value;
+		}
+
+#if 0
+		for ()
+		{
+
+		}
+
+		for ()
+		{
+			
+		}
+#endif
+	}
+
+#if 0
 	Assets->DEBUGUsedAssetCount = 1;
 
 	BeginAssetType(Assets, Asset_Shadow);
@@ -742,6 +795,7 @@ AllocateGameAssets(memory_arena *Arena, transient_state *TranState, memory_index
 	BeginAssetType(Assets, Asset_Puhp);
 	AddSoundAsset(Assets, "test/drop0.wav");
 	EndAssetType(Assets);
+#endif
 
     return(Assets);
 }
