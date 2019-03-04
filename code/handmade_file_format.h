@@ -3,6 +3,19 @@
 #define HHA_CODE(a, b, c, d) (((uint32)(a) << 0) | ((uint32)(b) << 8) | ((uint32)(c) << 16) | ((uint32)(d) << 24))
 
 #pragma pack(push, 1)
+
+
+struct bitmap_id
+{
+    uint32 Value;
+};
+
+struct sound_id
+{
+    uint32 Value;
+};
+
+
 struct hha_header
 {
 #define HHA_MAGIC_VALUE HHA_CODE('h', 'h', 'a', 'f' )
@@ -17,7 +30,7 @@ struct hha_header
 
     u64 Tags; // hha_tag[TagCount]
     u64 Assets; // hha_asset[AssetCount]
-    u64 AssetsTypes; // hha_asset_type[AssetTypeEntryCount]
+    u64 AssetTypes; // hha_asset_type[AssetTypeEntryCount]
 };
 
 struct hha_tag
@@ -43,7 +56,7 @@ struct hha_sound
 {
 	uint32 SampleCount;
 	u32 ChannelCount;
-    u32 NextIDToPlay;
+    sound_id NextIDToPlay;
 };
 
 struct hha_asset

@@ -341,9 +341,6 @@ LoadWAV(char *FileName, uint32 SectionFirstSampleIndex, uint32 SectionSampleCoun
 
 		if (AtEnd)
 		{	
-			// TODO: All sounds have to be padded with their subsequent sound out
-			// to 8 samples past their end
-			u32 SampleCountAlign8 = Align8(SampleCount);
 			for (uint32 ChannelIndex = 0;
 				ChannelIndex < Result.ChannelCount;
 				++ChannelIndex)
@@ -408,7 +405,7 @@ AddSoundAsset(game_assets *Assets, char *FileName, u32 FirstSampleIndex = 0, u32
 	HHA->FirstTagIndex = Assets->TagCount;
 	HHA->OnePastLastTagIndex = HHA->FirstTagIndex;
 	HHA->Sound.SampleCount = SampleCount;
-	HHA->Sound.NextIDToPlay = 0;
+	HHA->Sound.NextIDToPlay.Value = 0;
 
 	Source->Type = AssetType_Sound;
 	Source->Filename = FileName;
@@ -558,7 +555,7 @@ main(int ArgCoutn, char **Args)
 		sound_id ThisMusic = AddSoundAsset(Assets, "test/music0.wav", FirstSampleIndex, SampleCount);
 		if (LastMusic.Value)
 		{
-			Assets->Assets[LastMusic.Value].Sound.NextIDToPlay = ThisMusic.Value;
+			Assets->Assets[LastMusic.Value].Sound.NextIDToPlay = ThisMusic;
 		}
 		LastMusic = ThisMusic;
 	}
@@ -585,8 +582,8 @@ main(int ArgCoutn, char **Args)
 		u32 AssetArraySize = Header.AssetCount*sizeof(hha_asset);
 		
 		Header.Tags = sizeof(Header);
-		Header.AssetsTypes = Header.Tags + TagArraySize;
-		Header.Assets = Header.AssetsTypes + AssetTypeArraySize;
+		Header.AssetTypes = Header.Tags + TagArraySize;
+		Header.Assets = Header.AssetTypes + AssetTypeArraySize;
 
 		fwrite(&Header, sizeof(Header), 1, Out);
 		fwrite(&Assets->Tags, TagArraySize, 1, Out);
