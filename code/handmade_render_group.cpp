@@ -1061,14 +1061,14 @@ TileRenderGroupToOutput(platform_work_queue *RenderQueue,
 			Work->ClipRect = ClipRect;
 
 #if 1
-			PlatformAddEntry(RenderQueue, DoTileRenderWork, Work);
+			Platform.AddEntry(RenderQueue, DoTileRenderWork, Work);
 #else
 			DoTileRenderWork(RenderQueue, Work);
 #endif
 		}
 	}
 
-	PlatformCompleteAllWork(RenderQueue);
+	Platform.CompleteAllWork(RenderQueue);
 }
 
 internal render_group *
