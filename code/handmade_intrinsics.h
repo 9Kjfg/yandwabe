@@ -6,6 +6,7 @@
 #include <math.h>
 
 #if COMPILER_MSVC
+#define CompletePreviousReadsBeforeFutureReads _ReadBarrier()
 #define CompletePreviousWritesBeforeFutureWrites _WriteBarrier();
 inline uint32
 AtomicCompareExchangeUInt32(uint32 volatile *Value, uint32 New, uint32 Expected)
@@ -14,6 +15,8 @@ AtomicCompareExchangeUInt32(uint32 volatile *Value, uint32 New, uint32 Expected)
 	return(Result);
 }
 #elif COMPILER_LLVM
+// TODO: Not sure
+#define CompletePreviousReadsBeforeFutureReads asm volatile("" ::: "memory")
 #define CompletePreviousWritesBeforeFutureWrites asm volatile("" ::: "memory")
 inline uint32
 AtomicCompareExchangeUInt32(uint32 volatile *Value, uint32 New, uint32 Expected)
@@ -22,9 +25,10 @@ AtomicCompareExchangeUInt32(uint32 volatile *Value, uint32 New, uint32 Expected)
 	return(Result);
 }
 #else
-// TODO: Need GCC/LLVM equivalents
+// TODO: Other compilers/platfoorm??
 #define
 #endif
+
 inline int32
 SignOf(int32 Value)
 {

@@ -1,317 +1,3 @@
-#if 0
-#pragma pack(push, 1)
-struct bitmap_header
-{
-    uint16 FileType;        /* File type, always 4D42h ("BM") */
-    uint32 FileSize;        /* Size of the file in bytes */
-    uint16 Reserved1;       /* Always 0 */
-    uint16 Reserved2;       /* Always 0 */
-    uint32 BitmapOffset;    /* Starting position of image data in bytes */
-    uint32 Size;            /* Size of this header in bytes */
-    int32 Width;            /* Image width in pixels */
-    int32 Height;           /* Image height in pixels */
-    uint16 Planes;          /* Number of color planes */
-    uint16 BitsPerPixel;    /* Number of bits per pixel */
-	int32 Compression;
-    int32 SizeOfBitmap;		/* Size of bitmap in bytes */
-    int32 HorzResolution;	/* Horizontal resolution in pixels per meter */
-    int32 VertResolution;	/* Vertical resolution in pixels per meter */
-    int32 ColorsUsed;       /* Number of colors in the image */
-    int32 ColorsImportant;  /* Minimum number of important colors */
-
-    uint32 RedMask;
-    uint32 GreenMask;
-    uint32 BlueMask;
-};
-
-#define RIFF_CODE(a, b, c, d) (((uint32)(a) << 0) | ((uint32)(b) << 8) | ((uint32)(c) << 16) | ((uint32)(d) << 24))
-enum
-{
-	WAVE_ChunkID_fmt = RIFF_CODE('f', 'm', 't', ' '),
-	WAVE_ChunkID_data = RIFF_CODE('d', 'a', 't', 'a'),
-	WAVE_ChunkID_RIFF = RIFF_CODE('R', 'I', 'F', 'F'),
-	WAVE_ChunkID_WAVE = RIFF_CODE('W', 'A', 'V', 'E')
-};
-
-struct WAVE_header 
-{
-	uint32 RIFFID;
-	uint32 Size;
-	uint32 WAVEID;
-};
-
-struct WAVE_chunk
-{
-	uint32 ID;
-	uint32 Size;
-};
-
-struct WAVE_fmt
-{
-	uint16 wFormatTag;
-	uint16 nChannels;
-	uint32 nSamplesPerSec;
-	uint32 nAvgBytesPerSec;
-	uint16 nBlockAlign;
-	uint16 wBitsPerSamle;
-	uint16 cbSize;
-	uint16 wValidBitsPerSample;
-	uint32 dwChannelMask;
-	uint8 SubFormt[16];
-};
-
-#pragma pack(pop)
-
-internal loaded_bitmap
-DEBUGLoadBMP(char *FileName, v2 AlignPercentage = V2(0.5f, 0.5f))
-{
-	loaded_bitmap Result = {};
-
-    debug_read_file_result ReadResult = DEBUGPlatformReadEntireFile(FileName);
-	if (ReadResult.ContentsSize != 0)
-	{
-		bitmap_header *Header = (bitmap_header *)ReadResult.Contents;
-		uint32 *Pixel = (uint32 *)((uint8 *)ReadResult.Contents + Header->BitmapOffset);
-		Result.Memory = Pixel;
-		Assert(Result.Memory != 0);
-		Result.Width = Header->Width;
-		Result.Height = Header->Height;
-		Result.AlignPercentage = AlignPercentage;
-		Result.WidthOverHeight = SafeRatio0((real32)Result.Width, (real32)Result.Height);
-		
-		Assert(Result.Height >= 0);
-		Assert(Header->Compression == 3);
-
-		// NOTE; Byte order in memory is determined by the Header itself,
-		// os we have to read out the masks and convert hte pixels ourselves
-		uint32 RedMask = Header->RedMask;
-    	uint32 GreenMask = Header->GreenMask;
-    	uint32 BlueMask = Header->BlueMask;
-		uint32 AlphaMask = ~(RedMask | GreenMask | BlueMask);
-
-		bit_scan_result RedScan = FindLeastSignificantSetBit(RedMask);
-		bit_scan_result GreenScan = FindLeastSignificantSetBit(GreenMask);
-		bit_scan_result BlueScan = FindLeastSignificantSetBit(BlueMask);
-		bit_scan_result AlphaScan = FindLeastSignificantSetBit(AlphaMask);
-
-		Assert(RedScan.Found);
-		Assert(GreenScan.Found);
-		Assert(BlueScan.Found);
-		Assert(AlphaScan.Found);
-
-		int32 RedShiftDown = (int32)RedScan.Index;
-		int32 GreenShiftDown = (int32)GreenScan.Index;
-		int32 BlueShiftDown = (int32)BlueScan.Index;
-		int32 AlphaShiftDown = (int32)AlphaScan.Index;
-
-		uint32 *SourceDest = Pixel;
-		for (int32 Y = 0;
-			Y < Header->Width;
-			++Y)
-		{
-			for (int32 X = 0;
-				X < Header->Height;
-				++X)
-			{
-				uint32 C = *SourceDest;
-
-				v4 Texel = 
-				{
-					(real32)((C & RedMask) >> RedShiftDown),
-					(real32)((C & GreenMask) >> GreenShiftDown),
-					(real32)((C & BlueMask) >> BlueShiftDown),
-					(real32)((C & AlphaMask) >> AlphaShiftDown)
-				};
-				
-				Texel = SRGB255ToLinear1(Texel);
-#if 1
-				Texel.rgb *= Texel.a;
-#endif
-				Texel = Linear1ToSRGB255(Texel);
-
-				*SourceDest++ = 
-					(((uint32)(Texel.a + 0.5f) << 24)|
-					((uint32)(Texel.r + 0.5f) << 16) |
-					((uint32)(Texel.g + 0.5f) << 8) |
-					((uint32)(Texel.b + 0.5f)) << 0);
-			}
-		}
-	}
-	Result.Pitch = Result.Width*BITMAP_BYTES_PER_PIXEL;
-#if 0
-	Result.Memory = (uint8 *)Result.Memory + Result.Pitch*(Result.Height - 1);
-	Result.Pitch = -Result.Pitch
-#endif
-	return(Result);
-}
-
-struct riff_iterator
-{
-	uint8 *At;
-	uint8 *Stop;
-};
-
-inline riff_iterator
-ParseChunkAt(void *At, void *Stop)
-{
-	riff_iterator Iter;
-
-	Iter.At = (uint8 *)At;
-	Iter.Stop = (uint8 *)Stop;
-
-	return(Iter);
-}
-
-inline riff_iterator
-NextChunk(riff_iterator Iter)
-{
-	WAVE_chunk *Chunk = (WAVE_chunk *)Iter.At;
-	uint32 Size = (Chunk->Size + 1) & ~1;
-	Iter.At += sizeof(WAVE_chunk) + Size;
-
-	return(Iter);
-}
-
-inline bool32
-IsValid(riff_iterator Iter)
-{
-	bool32 Result = (Iter.At < Iter.Stop);
-	return(Result);
-}
-
-inline void *
-GetChunkData(riff_iterator Iter)
-{
-	void *Result = (Iter.At + sizeof(WAVE_chunk));
-	return(Result);
-}
-
-inline uint32
-GetType(riff_iterator Iter)
-{
-	WAVE_chunk *Chunk = (WAVE_chunk *)Iter.At;
-	uint32 Result = Chunk->ID;
-
-	return(Result);
-}
-
-inline uint32
-GetChunkDataSize(riff_iterator Iter)
-{
-	WAVE_chunk *Chunk = (WAVE_chunk *)Iter.At;
-	uint32 Result = Chunk->Size;
-
-	return(Result);
-}
-
-internal loaded_sound
-DEBUGLoadWAV(char *FileName, uint32 SectionFirstSampleIndex, uint32 SectionSampleCount)
-{
-	loaded_sound Result = {};
-
-	debug_read_file_result ReadResult = DEBUGPlatformReadEntireFile(FileName);
-	if (ReadResult.ContentsSize != 0)
-	{
-		WAVE_header *Header = (WAVE_header *)ReadResult.Contents;
-		Assert(Header->RIFFID == WAVE_ChunkID_RIFF);
-		Assert(Header->WAVEID == WAVE_ChunkID_WAVE);
-		
-		uint32 ChannelCount = 0;
-		uint32 SampleDataSize = 0;
-		int16 *SampleData = 0;
-		for (riff_iterator Iter = ParseChunkAt(Header + 1, (uint8 *)(Header + 1) + Header->Size - 4);
-			IsValid(Iter);
-			Iter = NextChunk(Iter))
-		{
-			switch (GetType(Iter))
-			{
-				case WAVE_ChunkID_fmt:
-				{
-					WAVE_fmt *fmt = (WAVE_fmt *)GetChunkData(Iter);
-					Assert(fmt->wFormatTag == 1); // NOTE: Only support PCM
-					//Assert(fmt->nSamplesPerSec == 48000);
-					Assert(fmt->wBitsPerSamle == 16);
-					Assert(fmt->nBlockAlign == (2*fmt->nChannels));
-					ChannelCount = fmt->nChannels;
-				} break;
-
-				case WAVE_ChunkID_data:
-				{
-					SampleData = (int16 *)GetChunkData(Iter);
-					SampleDataSize = GetChunkDataSize(Iter);
-				} break;
-			}
-		}
-
-		Assert(ChannelCount && SampleData);
-
-		Result.ChannelCount = ChannelCount;
-		u32 SampleCount = SampleDataSize / (ChannelCount*sizeof(int16));
-		if (ChannelCount == 1)
-		{
-			Result.Samples[0] = SampleData;
-			Result.Samples[1] = 0;
-		}
-		else if (ChannelCount == 2)
-		{
-			Result.Samples[0] = SampleData;
-			Result.Samples[1] = SampleData + SampleCount;
-
-			for (uint32 SampleIndex = 0;
-				SampleIndex < SampleCount;
-				++SampleIndex)
-			{
-				int16 Source = SampleData[2*SampleIndex];
-				SampleData[2*SampleIndex] = SampleData[SampleIndex];
-				SampleData[SampleIndex] = Source;
-			}
-		}
-		else
-		{
-			Assert(!"Invalid channel count in WAV file");
-		}
-
-		// TODO: Load right channels
-		b32 AtEnd = true;
-		Result.ChannelCount = 1;
-		if (SectionSampleCount)
-		{
-			Assert((SectionFirstSampleIndex + SectionSampleCount) <= SampleCount);
-			AtEnd = (SectionFirstSampleIndex + SectionSampleCount) == SampleCount;
-			SampleCount = SectionSampleCount;
-			for (uint32 ChannelIndex = 0;
-				ChannelIndex < Result.ChannelCount;
-				++ChannelIndex)
-			{
-				Result.Samples[ChannelIndex] += SectionFirstSampleIndex;
-			}
-		}
-
-		if (AtEnd)
-		{	
-			// TODO: All sounds have to be padded with their subsequent sound out
-			// to 8 samples past their end
-			u32 SampleCountAlign8 = Align8(SampleCount);
-			for (uint32 ChannelIndex = 0;
-				ChannelIndex < Result.ChannelCount;
-				++ChannelIndex)
-			{
-				for (u32 SampleIndex = SampleCount;
-					SampleIndex < (SampleCount + 8);
-					++SampleIndex)
-				{
-					Result.Samples[ChannelIndex][SampleIndex] = 0;
-				}
-
-			}	
-		}
-
-		Result.SampleCount = SampleCount;
-	}
-
-	return(Result);
-}
-#endif
 
 struct load_asset_work
 {
@@ -330,14 +16,13 @@ internal
 PLATFORM_WORK_QUEUE_CALLBACK(LoadAssetWork)
 {
 	load_asset_work *Work = (load_asset_work *)Data;
-#if 0
+
 	Platform.ReadDataFromFile(Work->Handle, Work->Offset, Work->Size, Work->Destination);
-#endif
 
 	CompletePreviousWritesBeforeFutureWrites;
 
 	// TODO: Should we actually fill in bogus data here and set to final state anyway
-	//if (PlatformNoFileErrors(Work->Handle))
+	if (PlatformNoFileErrors(Work->Handle))
 	{
 		Work->Slot->State = Work->FinalState;
 	}
@@ -345,43 +30,15 @@ PLATFORM_WORK_QUEUE_CALLBACK(LoadAssetWork)
 	EndTaskWidthMemory(Work->Task);
 }
 
-#if 0
-struct load_bitmap_work
-{	
-	game_assets *Assets;
-	bitmap_id ID;
-	task_with_memory *Task;
-	loaded_bitmap *Bitmap;
 
-	asset_state FinalState;
-};
-
-internal
-PLATFORM_WORK_QUEUE_CALLBACK(LoadBitmapWork)
+internal platform_file_handle *
+GetFileHandleFor(game_assets *Assets, u32 FileIndex)
 {
-	load_bitmap_work *Work = (load_bitmap_work *)Data;
+	Assert(FileIndex < Assets->FileCount);
+	platform_file_handle *Result = Assets->Files[FileIndex].Handle;
 
-	hha_asset *HHAAsset = &Work->Assets->Assets[Work->ID.Value];
-	hha_bitmap *Info = &HHAAsset->Bitmap;
-	loaded_bitmap *Bitmap = Work->Bitmap;
-
-	Bitmap->AlignPercentage = V2(Info->AlignPercentage[0], Info->AlignPercentage[1]);
-	Bitmap->WidthOverHeight = (r32)Info->Dim[0] / (r32)Info->Dim[1];
-	Bitmap->Width = Info->Dim[0];
-	Bitmap->Height = Info->Dim[1];
-	Bitmap->Pitch = 4*Info->Dim[0];
-	Bitmap->Memory = Work->Assets->HHAContents + HHAAsset->DataOffset;
-
-	Work->Assets->Slots[Work->ID.Value].Bitmap = Work->Bitmap;
-
-	CompletePreviousWritesBeforeFutureWrites;
-
-	Work->Assets->Slots[Work->ID.Value].Bitmap = Work->Bitmap;
-	Work->Assets->Slots[Work->ID.Value].State = Work->FinalState;
-
-	EndTaskWidthMemory(Work->Task);
+	return(Result);
 }
-#endif
 
 internal void
 LoadBitmap(game_assets *Assets, bitmap_id ID)
@@ -393,8 +50,8 @@ LoadBitmap(game_assets *Assets, bitmap_id ID)
 		task_with_memory *Task = BeginTaskWidthMemory(Assets->TranState);
 		if (Task)
 		{	
-			hha_asset *HHAAsset = Assets->Assets + ID.Value;
-			hha_bitmap *Info = &HHAAsset->Bitmap;
+			asset *Asset = Assets->Assets + ID.Value;
+			hha_bitmap *Info = &Asset->HHA.Bitmap;
 			loaded_bitmap *Bitmap = PushStruct(&Assets->Arena, loaded_bitmap);
 
 			Bitmap->AlignPercentage = V2(Info->AlignPercentage[0], Info->AlignPercentage[1]);
@@ -404,18 +61,16 @@ LoadBitmap(game_assets *Assets, bitmap_id ID)
 			Bitmap->Pitch = 4*Info->Dim[0];
 			u32 MemorySize = Bitmap->Pitch*Bitmap->Height;
 			Bitmap->Memory = PushSize(&Assets->Arena, MemorySize);
-			
+
 			load_asset_work *Work = PushStruct(&Task->Arena, load_asset_work);
 			Work->Task = Task;
 			Work->Slot = Assets->Slots + ID.Value;
-			Work->Handle = 0;
-			Work->Offset = HHAAsset->DataOffset;
+			Work->Handle = GetFileHandleFor(Assets, Asset->FileIndex);
+			Work->Offset = Asset->HHA.DataOffset;
 			Work->Size = MemorySize;
 			Work->Destination = Bitmap->Memory;
 			Work->FinalState = AssetState_Loaded;
 			Work->Slot->Bitmap = Bitmap;
-
-			Bitmap->Memory = Assets->HHAContents + HHAAsset->DataOffset;
 
 			Platform.AddEntry(Assets->TranState->LowPriorityQueue, LoadAssetWork, Work);
 		}
@@ -424,46 +79,6 @@ LoadBitmap(game_assets *Assets, bitmap_id ID)
 			Assets->Slots[ID.Value].State = AssetState_Unloaded;
 		}
 	}		
-}
-
-struct load_sound_work
-{	
-	game_assets *Assets;
-	sound_id ID;
-	task_with_memory *Task;
-	loaded_sound *Sound;
-
-	asset_state FinalState;
-};
-
-internal
-PLATFORM_WORK_QUEUE_CALLBACK(LoadSoundWork)
-{
-	load_sound_work *Work = (load_sound_work *)Data;
-
-	hha_asset *HHAAsset = &Work->Assets->Assets[Work->ID.Value];
-	hha_sound *Info = &HHAAsset->Sound;
-	loaded_sound *Sound= Work->Sound;
-
-	Sound->SampleCount = Info->SampleCount;
-	Sound->ChannelCount = Info->ChannelCount;
-	Assert(Sound->ChannelCount < ArrayCount(Sound->Samples));
-	u64 SampleDataOffset = HHAAsset->DataOffset;
-	for (u32 ChannelIndex = 0;
-		ChannelIndex < Sound->ChannelCount;
-		++ChannelIndex)
-	{		
-		Sound->Samples[ChannelIndex] = (int16 *)Work->Assets->HHAContents + SampleDataOffset;
-		SampleDataOffset += Sound->SampleCount*sizeof(int16);
-	}
-
-
-	CompletePreviousWritesBeforeFutureWrites;
-
-	Work->Assets->Slots[Work->ID.Value].Sound = Work->Sound;
-	Work->Assets->Slots[Work->ID.Value].State = Work->FinalState;
-
-	EndTaskWidthMemory(Work->Task);
 }
 
 internal void
@@ -476,15 +91,37 @@ LoadSound(game_assets *Assets, sound_id ID)
 		task_with_memory *Task = BeginTaskWidthMemory(Assets->TranState);
 		if (Task)
 		{
-			load_sound_work *Work = PushStruct(&Task->Arena, load_sound_work);
+			asset *Asset = Assets->Assets + ID.Value;
+			hha_sound *Info = &Asset->HHA.Sound;
+			
+			loaded_sound *Sound = PushStruct(&Assets->Arena, loaded_sound);
+			Sound->SampleCount = Info->SampleCount;
+			Sound->ChannelCount = Info->ChannelCount;
+			u32 ChannelSize = Sound->SampleCount*sizeof(int16);
+			u32 MemorySize = Sound->ChannelCount*ChannelSize;
+			
+			void *Memory = PushSize(&Assets->Arena, MemorySize);
 
-			Work->Assets = Assets;
-			Work->ID = ID;
+			int16 *SoundAt = (int16 *)Memory;
+			for (u32 ChannelIndex = 0;
+				ChannelIndex < Sound->ChannelCount;
+				++ChannelIndex)
+			{
+				Sound->Samples[ChannelIndex] = SoundAt;
+				SoundAt += ChannelSize;
+			}
+
+			load_asset_work *Work = PushStruct(&Task->Arena, load_asset_work);
 			Work->Task = Task;
-			Work->Sound = PushStruct(&Assets->Arena, loaded_sound);
+			Work->Slot = Assets->Slots + ID.Value;
+			Work->Handle = GetFileHandleFor(Assets, Asset->FileIndex);
+			Work->Offset = Asset->HHA.DataOffset;
+			Work->Size = MemorySize;
+			Work->Destination = Memory;
 			Work->FinalState = AssetState_Loaded;
+			Work->Slot->Sound = Sound;
 
-			Platform.AddEntry(Assets->TranState->LowPriorityQueue, LoadSoundWork, Work);
+			Platform.AddEntry(Assets->TranState->LowPriorityQueue, LoadAssetWork, Work);
 		}
 		else
 		{
@@ -505,11 +142,11 @@ GetBestMatchAssetFrom(game_assets *Assets, asset_type_id TypeID,
 		AssetIndex < Type->OnePastLastAssetIndex;
 		++AssetIndex)
 	{
-		hha_asset *Asset = Assets->Assets + AssetIndex;
+		asset *Asset = Assets->Assets + AssetIndex;
 
 		real32 TotalWeightedDiff = 0.0f;
-		for (uint32 TagIndex = Asset->FirstTagIndex;
-			TagIndex < Asset->OnePastLastTagIndex;
+		for (uint32 TagIndex = Asset->HHA.FirstTagIndex;
+			TagIndex < Asset->HHA.OnePastLastTagIndex;
 			++TagIndex)
 		{
 			hha_tag *Tag = Assets->Tags + TagIndex;
@@ -623,7 +260,7 @@ AllocateGameAssets(memory_arena *Arena, transient_state *TranState, memory_index
 		Assets->TagRange[TagType] = 1000000.0f;
 	}
 	Assets->TagRange[Tag_FacingDirection] = Tau32;
-#if 0
+
 	Assets->TagCount = 0;
 	Assets->AssetCount = 0;
 
@@ -631,22 +268,22 @@ AllocateGameAssets(memory_arena *Arena, transient_state *TranState, memory_index
 		platform_file_group FileGroup = Platform.GetAllFilesOfTypeBegin("hha");
 		Assets->FileCount = FileGroup.FileCount;
 		Assets->Files = PushArray(Arena, Assets->FileCount, asset_file);
-		for (u32 FileIndexs = 0;
-			FileIndexs < Assets->FileCount;
-			++FileIndexs;)
+		for (u32 FileIndex = 0;
+			FileIndex < Assets->FileCount;
+			++FileIndex)
 		{
 			asset_file *File = Assets->Files + FileIndex;
 
 			File->TagBase = Assets->TagCount;
 
-			u64 AssetTypeArraySize = File->Header.AssetTypeCount*sizeof(hha_asset_type);
-
 			ZeroStruct(File->Header);
 			File->Handle = Platform.OpenFile(FileGroup, FileIndex);
 			Platform.ReadDataFromFile(File->Handle, 0, sizeof(File->Header), &File->Header);
-			File->AssetTypeArray = (hha_asset_type)PushSize(Arena, AssetTypeArraySize);
+			
+			u32 AssetTypeArraySize = File->Header.AssetTypeCount*sizeof(hha_asset_type);
+			File->AssetTypeArray = (hha_asset_type *)PushSize(Arena, AssetTypeArraySize);
 			Platform.ReadDataFromFile(File->Handle, File->Header.AssetTypes, 
-				AssetTypeArraySize,	&File->AssetTypeArray);
+				AssetTypeArraySize,	File->AssetTypeArray);
 
 			if (File->Header.MagicValue != HHA_MAGIC_VALUE)
 			{
@@ -666,27 +303,27 @@ AllocateGameAssets(memory_arena *Arena, transient_state *TranState, memory_index
 			else
 			{
 				// TODO: Eventually, have some way of notifying user of bogus files?
-				InvalidCodepath;
+				InvalidCodePath;
 			}
 		}
 		Platform.GetAllFilesOfTypeEnd(FileGroup);
 	}
 
 	// NOTE: All metadata space
-	Assets->Assets = PushArray(Arena, Assets->AssetCount, hha_asset);
-	Assets->AssetCount = PushArray(Arena, Assets->AssetCount, asset_slot);
-	Assets->Slots = PushArray(Arena, Assets->TagCount, hha_tag);
+	Assets->Assets = PushArray(Arena, Assets->AssetCount, asset);
+	Assets->Slots = PushArray(Arena, Assets->AssetCount, asset_slot);
+	Assets->Tags = PushArray(Arena, Assets->TagCount, hha_tag);
 
 	// NOTE: Load tags
-	for (u32 FileIndexs = 0;
-		FileIndexs < Assets->FileCount;
-		++FileIndexs;)
+	for (u32 FileIndex = 0;
+		FileIndex < Assets->FileCount;
+		++FileIndex)
 	{
 		asset_file *File = Assets->Files + FileIndex;
 		if (PlatformNoFileErrors(File->Handle))
 		{
 			u32 TagArraySize = sizeof(hha_tag)*File->Header.TagCount;
-			Platform.ReadDataFromFile(File->Handle, File.Header.Tags, 
+			Platform.ReadDataFromFile(File->Handle, File->Header.Tags, 
 				TagArraySize, Assets->Tags + File->TagBase);
 		}
 	}
@@ -701,37 +338,47 @@ AllocateGameAssets(memory_arena *Arena, transient_state *TranState, memory_index
 		asset_type *DestType = Assets->AssetTypes + DestTypeID;
 		DestType->FirstAssetIndex = AssetCount;
 
-		for (u32 FileIndexs = 0;
-				FileIndexs < Assets->FileCount;
-				++FileIndexs;)
+		for (u32 FileIndex = 0;
+			FileIndex < Assets->FileCount;
+			++FileIndex)
 		{
 			asset_file *File = Assets->Files + FileIndex;
 			if (PlatformNoFileErrors(File->Handle))
 			{
 				for (u32 SourceIndex = 0;
-					SourceIndex < File->Header.AssetTypeCount
+					SourceIndex < File->Header.AssetTypeCount;
 					++SourceIndex)
 				{
 					hha_asset_type *SourceType = File->AssetTypeArray + SourceIndex;
 
 					if (SourceType->TypeID == DestTypeID)
 					{
-						u32 AssetCountForType = (SourceType->OnePastLastAssetIndex - 
-							SourceType->FirstAssetIndex);
+						u32 AssetCountForType = 
+							(SourceType->OnePastLastAssetIndex - SourceType->FirstAssetIndex);
+
+						temporary_memory TempMem = BeginTemporaryMemory(&TranState->TranArena);
+						hha_asset *HHAAssetArray = PushArray(&TranState->TranArena, AssetCountForType, hha_asset);
+
 						Platform.ReadDataFromFile(File->Handle, 
-							File->Header.Assets + SourceType->FirstAssetIndex*sizeof(hha_asset)
-							AssetCountForType*sizeof(hha_asset),
-							Assets->Assets + AssetCount);
-						for (u32 AssetIndex = AssetCount;
-							AssetIndex < (AssetCount + AssetCountForType);
+							File->Header.Assets + SourceType->FirstAssetIndex*sizeof(hha_asset),
+							AssetCountForType*sizeof(hha_asset), HHAAssetArray);
+
+						for (u32 AssetIndex = 0;
+							AssetIndex < AssetCountForType;
 							++AssetIndex)
 						{
-							hha_asset *Asset = Assets->Assets + AssetIndex;
-							Asset->FirstTagIndex += File->TagBase;
-							Asset->OnepastLastTagIndex += File->TagBase;
+							hha_asset *HHAAsset = HHAAssetArray + AssetIndex;
+
+							Assert(AssetCount < Assets->AssetCount);
+							asset *Asset = Assets->Assets + AssetCount++;
+						
+							Asset->FileIndex = FileIndex;
+							Asset->HHA = *HHAAsset;
+							Asset->HHA.FirstTagIndex += File->TagBase;
+							Asset->HHA.OnePastLastTagIndex += File->TagBase;
 						}
-						AssetCount += AssetCountForType;
-						Assert(AssetCount < Assets->AssetCount);
+
+						EndTemporaryMemory(TempMem);
 					}
 				}
 			}
@@ -740,10 +387,9 @@ AllocateGameAssets(memory_arena *Arena, transient_state *TranState, memory_index
 		DestType->OnePastLastAssetIndex = AssetCount;
 	}
 
-	Assert(AssetCount == Assets->AssetCount);
-#endif
+	//Assert(AssetCount == Assets->AssetCount);
 
-#if 1
+#if 0
 	debug_read_file_result ReadResult = Platform.DEBUGReadEntireFile("test.hha");
 	if (ReadResult.ContentsSize != 0)
 	{
