@@ -846,7 +846,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			SubArena(&Task->Arena, &TranState->TranArena, Megabytes(1));	
 		}
 		
-		TranState->Assets = AllocateGameAssets(&TranState->TranArena, TranState, Megabytes(4));
+		TranState->Assets = AllocateGameAssets(&TranState->TranArena, TranState, Megabytes(20));
 
 		GameState->Music = PlaySound(&GameState->AudioState, GetFirstSoundFrom(TranState->Assets, Asset_Music));
 

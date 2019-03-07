@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "handmade_platform.h"
 #include "handmade_asset_type_id.h"
 #include "handmade_file_format.h"

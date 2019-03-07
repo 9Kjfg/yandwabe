@@ -34,13 +34,17 @@ enum asset_type_id
 	//
 	//NOTE: Sounds!
 	//
-
+	
 	Asset_Bloop,
 	Asset_Crack,
 	Asset_Drop,
 	Asset_Glide,
 	Asset_Music,
 	Asset_Puhp,
+
+	//
+	//
+	//
 
 	Asset_Count
 };
