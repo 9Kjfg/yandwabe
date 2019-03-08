@@ -263,20 +263,20 @@ typedef struct platform_file_handle
 {
 	b32 NoErrors;
 } platform_file_handle;
+
 typedef struct paltform_file_group
 {
 	u32 FileCount;
-	void *Data;
 } platform_file_group;
 
-#define	PLATFORM_GET_ALL_FILE_OF_TYPES_BEGIN(name) platform_file_group name(char *Type) 
+#define	PLATFORM_GET_ALL_FILE_OF_TYPES_BEGIN(name) platform_file_group* name(char *Type) 
 typedef PLATFORM_GET_ALL_FILE_OF_TYPES_BEGIN(platform_get_all_files_of_type_begin);
 
-#define	PLATFORM_GET_ALL_FILE_OF_TYPES_END(name) void name(platform_file_group FileGroup) 
+#define	PLATFORM_GET_ALL_FILE_OF_TYPES_END(name) void name(platform_file_group *FileGroup) 
 typedef PLATFORM_GET_ALL_FILE_OF_TYPES_END(platform_get_all_files_of_type_end);
 
-#define	PLATFORM_OPEN_FILE(name) platform_file_handle * name(platform_file_group FileGroup, u32 FileIndex) 
-typedef PLATFORM_OPEN_FILE(platform_open_file);
+#define	PLATFORM_OPEN_NEXT_FILE(name) platform_file_handle *name(platform_file_group *FileGroup) 
+typedef PLATFORM_OPEN_NEXT_FILE(platform_open_next_file);
 
 #define	PLATFORM_READ_DATA_FROM_FILE(name) void name(platform_file_handle *Source, u64 Offset, u64 Size, void *Dest) 
 typedef PLATFORM_READ_DATA_FROM_FILE(platform_read_data_from_file);
@@ -299,7 +299,7 @@ typedef struct platform_api
 
 	platform_get_all_files_of_type_begin *GetAllFilesOfTypeBegin;
 	platform_get_all_files_of_type_end *GetAllFilesOfTypeEnd;
-	platform_open_file *OpenFile;
+	platform_open_next_file *OpenNextFile;
 	platform_read_data_from_file *ReadDataFromFile;
 	platform_file_error *FileError;
 
