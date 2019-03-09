@@ -220,6 +220,14 @@ struct ground_buffer
 	loaded_bitmap Bitmap;
 };
 
+struct particle
+{
+	v3 P;
+	v3 dP;
+	v4 dColor;
+	v4 Color;
+};
+
 struct game_state
 {
 	bool32 IsInitialized;
@@ -259,10 +267,14 @@ struct game_state
 	loaded_bitmap TestNormal;
 
 	random_series GeneralEntropy;
+	random_series EffectsEntropy; // NOTE: This is entropy that doesn't affect the gameplay
 	real32 tSine;
 
 	audio_state AudioState;
 	playing_sound *Music;
+
+	u32 NextParticle;
+	particle Particles[256];
 };
 
 struct task_with_memory

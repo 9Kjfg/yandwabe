@@ -624,7 +624,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		uint32 TilesPerWidth = 17;
 		uint32 TilesPerHeight = 9;
 		
-		GameState->GeneralEntropy = RandomSeed(1234);
+		GameState->EffectsEntropy = RandomSeed(1234);
 		GameState->TypicalFloorHeight = 3.0f;
 
 		// TODO: Remove this!
@@ -1204,7 +1204,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 									MakeEntitySpatial(Sword, Entity->P, V3(5.0f*ConHero->dSword, 0));
 									AddCollisionRule(GameState, Sword->StorageIndex, Entity->StorageIndex, false);
 
-									PlaySound(&GameState->AudioState, GetRandomSoundFrom(TranState->Assets, Asset_Bloop, &GameState->GeneralEntropy));
+									PlaySound(&GameState->AudioState, GetRandomSoundFrom(TranState->Assets, Asset_Bloop, &GameState->EffectsEntropy));
 								}
 							}
 						}
@@ -1279,6 +1279,54 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 					PushBitmap(RenderGroup, HeroBitmaps.Torso, HeroSizeC*1.2f, V3(0, 0, 0));
 					PushBitmap(RenderGroup, HeroBitmaps.Cape, HeroSizeC*1.2f, V3(0, 0, 0));
 					PushBitmap(RenderGroup, HeroBitmaps.Head, HeroSizeC*1.2f, V3(0, 0, 0));
+
+					for (u32 ParticleSpawnIndex = 0;
+						ParticleSpawnIndex < 4;
+						++ParticleSpawnIndex)
+					{
+						particle *Particle = GameState->Particles + GameState->NextParticle++;
+						if (GameState->NextParticle >= ArrayCount(GameState->Particles))
+						{
+							GameState->NextParticle = 0;
+						}
+
+						Particle->P = V3(RandomBetween(&GameState->EffectsEntropy, -0.25f, 0.25f), 0.0f, 0.0f);
+						Particle->dP = V3(RandomBetween(&GameState->EffectsEntropy, -0.5f, 0.5f),
+							RandomBetween(&GameState->EffectsEntropy, 0.7f, 1.0f), 1.0f);
+						Particle->Color = 
+							V4(RandomBetween(&GameState->EffectsEntropy, 0.75f, 1.0f),
+							RandomBetween(&GameState->EffectsEntropy, 0.75f, 1.0f),
+							RandomBetween(&GameState->EffectsEntropy, 0.75f, 1.0f),
+							1.0f);
+						Particle->dColor = V4(0, 0, 0, -0.5f);
+					}
+
+					// NOTE: Particle system test
+					for (u32 ParticleIndex = 0;
+						ParticleIndex < ArrayCount(GameState->Particles);
+						++ParticleIndex)
+					{
+						particle *Particle = GameState->Particles + ParticleIndex;
+
+						// NOTE: Simulate the particle forward in time
+						Particle->P += Input->dtForFrame * Particle->dP;
+						Particle->Color += Input->dtForFrame * Particle->dColor;
+
+						// TODO: Shouldn't we just clamp colors in the renderer???
+						v4 Color;
+						Color.r = Clamp01(Particle->Color.r);
+						Color.g = Clamp01(Particle->Color.g);
+						Color.b = Clamp01(Particle->Color.b);
+						Color.a = Clamp01(Particle->Color.a);
+
+						if (Color.a > 0.9)
+						{
+							Color.a = 0.9f * Clamp01MapToRange(1.0f, Color.a, 0.9);
+						}
+
+						// NOTE: Render the particle
+						PushBitmap(RenderGroup,GetFirstBitmapFrom(TranState->Assets, Asset_Head), 1.0f, Particle->P, Color);
+					}
 
 					DrawHitpoints(Entity, RenderGroup);
 				} break;
@@ -1433,6 +1481,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		MapP += YAxis + V2(0.0f, 6.0f);
 	}
 #endif
+
 	TileRenderGroupToOutput(TranState->HighPriorityQueue, RenderGroup, DrawBuffer);
 
 	// TODO: Make sure we hoist the camera update out to a place where the renderer
