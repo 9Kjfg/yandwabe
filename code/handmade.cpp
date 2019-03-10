@@ -848,7 +848,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		
 		TranState->Assets = AllocateGameAssets(&TranState->TranArena, TranState, Megabytes(20));
 
-		GameState->Music = PlaySound(&GameState->AudioState, GetFirstSoundFrom(TranState->Assets, Asset_Music));
+		GameState->Music = 0;//PlaySound(&GameState->AudioState, GetFirstSoundFrom(TranState->Assets, Asset_Music));
 
 		// TODO: Pick a real number here!
 		TranState->GroundBufferCount = 64;
@@ -1279,9 +1279,10 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 					PushBitmap(RenderGroup, HeroBitmaps.Torso, HeroSizeC*1.2f, V3(0, 0, 0));
 					PushBitmap(RenderGroup, HeroBitmaps.Cape, HeroSizeC*1.2f, V3(0, 0, 0));
 					PushBitmap(RenderGroup, HeroBitmaps.Head, HeroSizeC*1.2f, V3(0, 0, 0));
+					DrawHitpoints(Entity, RenderGroup);
 
 					for (u32 ParticleSpawnIndex = 0;
-						ParticleSpawnIndex < 4;
+						ParticleSpawnIndex < 2;
 						++ParticleSpawnIndex)
 					{
 						particle *Particle = GameState->Particles + GameState->NextParticle++;
@@ -1290,28 +1291,108 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 							GameState->NextParticle = 0;
 						}
 
-						Particle->P = V3(RandomBetween(&GameState->EffectsEntropy, -0.25f, 0.25f), 0.0f, 0.0f);
-						Particle->dP = V3(RandomBetween(&GameState->EffectsEntropy, -0.5f, 0.5f),
-							RandomBetween(&GameState->EffectsEntropy, 0.7f, 1.0f), 1.0f);
+						Particle->P = V3(RandomBetween(&GameState->EffectsEntropy, -0.05f, 0.05f), 0.0f, 0.0f);
+						Particle->dP = V3(RandomBetween(&GameState->EffectsEntropy, -0.01f, 0.01f),
+							7.0f*RandomBetween(&GameState->EffectsEntropy, 0.7f, 1.0f), 0.0f);
+						Particle->ddP = V3(0.0, -9.8f, 0.0f);
 						Particle->Color = 
 							V4(RandomBetween(&GameState->EffectsEntropy, 0.75f, 1.0f),
 							RandomBetween(&GameState->EffectsEntropy, 0.75f, 1.0f),
 							RandomBetween(&GameState->EffectsEntropy, 0.75f, 1.0f),
 							1.0f);
 						Particle->dColor = V4(0, 0, 0, -0.5f);
+						Particle->BitmapID = GetRandomBitmapFrom(TranState->Assets, Asset_Head, &GameState->EffectsEntropy);
 					}
 
 					// NOTE: Particle system test
+					ZeroStruct(GameState->ParticleCels);
+
+					r32 GridScale = 0.5f;
+					r32 InvGridScale = 1.0f / GridScale;
+					v3 GridOrigin = {-0.5f*GridScale*PARTICLE_CEL_DIM, 0.0f, 0.0f};
 					for (u32 ParticleIndex = 0;
 						ParticleIndex < ArrayCount(GameState->Particles);
 						++ParticleIndex)
 					{
 						particle *Particle = GameState->Particles + ParticleIndex;
 
+						v3 P = InvGridScale*(Particle->P - GridOrigin);
+
+						s32 X = TruncateReal32ToInt32(P.x);
+						s32 Y = TruncateReal32ToInt32(P.y);
+
+						if (X < 0) {X = 0;}
+						if (X > (PARTICLE_CEL_DIM - 1)) {X = (PARTICLE_CEL_DIM - 1);}
+						if (Y < 0) {Y = 0;}
+						if (Y > (PARTICLE_CEL_DIM - 1)) {Y = (PARTICLE_CEL_DIM - 1);}
+
+						particle_cel *Cel = &GameState->ParticleCels[Y][X];
+						real32 Density = Particle->Color.a;
+						Cel->Density += Density;
+						Cel->VelocityTimesDensity += Density*Particle->dP;
+					}
+
+#if 0
+					for (u32 Y = 0;
+						Y < PARTICLE_CEL_DIM;
+						++Y)
+					{
+						for (u32 X = 0;
+							X < PARTICLE_CEL_DIM;
+							++X)
+						{
+							particle_cel *Cel = &GameState->ParticleCels[Y][X];
+							r32 Alpha = Clamp01(0.1f*Cel->Density);
+							PushRect(RenderGroup, GridScale*V3((r32)X, (r32)Y, 0) + GridOrigin,
+								GridScale*V2(1.0f, 1.0f), V4(Alpha, Alpha, Alpha, 1.0f));
+						}
+					}
+#endif
+					for (u32 ParticleIndex = 0;
+						ParticleIndex < ArrayCount(GameState->Particles);
+						++ParticleIndex)
+					{
+						particle *Particle = GameState->Particles + ParticleIndex;
+
+						v3 P = InvGridScale*(Particle->P - GridOrigin);
+
+						s32 X = TruncateReal32ToInt32(P.x);
+						s32 Y = TruncateReal32ToInt32(P.y);
+
+						if (X < 1) {X = 1;}
+						if (X > (PARTICLE_CEL_DIM - 2)) {X = (PARTICLE_CEL_DIM - 2);}
+						if (Y < 1) {Y = 1;}
+						if (Y > (PARTICLE_CEL_DIM - 2)) {Y = (PARTICLE_CEL_DIM - 2);}
+
+						particle_cel *CelCenter = &GameState->ParticleCels[Y][X];
+						particle_cel *CelLeft = &GameState->ParticleCels[Y][X - 1];
+						particle_cel *CelRight = &GameState->ParticleCels[Y][X + 1];
+						particle_cel *CelDown = &GameState->ParticleCels[Y - 1][X];
+						particle_cel *CelUp = &GameState->ParticleCels[Y + 1][X];
+						
+						v3 Dispersion = {};
+						r32 Dc = 1.0f;
+						Dispersion += Dc*(CelCenter->Density - CelLeft->Density)*V3(-1.0f, 0.0f, 0.0f);
+						Dispersion += Dc*(CelCenter->Density - CelRight->Density)*V3(1.0f, 0.0f, 0.0f);
+						Dispersion += Dc*(CelCenter->Density - CelDown->Density)*V3(0.0f, -1.0f, 0.0f);
+						Dispersion += Dc*(CelCenter->Density - CelUp->Density)*V3(0.0f, 1.0f, 0.0f);
+
+						v3 ddP = Particle->ddP + Dispersion;
+						
 						// NOTE: Simulate the particle forward in time
-						Particle->P += Input->dtForFrame * Particle->dP;
+						Particle->P += (0.5f*Square(Input->dtForFrame) * Input->dtForFrame*ddP + 
+							Input->dtForFrame*Particle->dP);
+						Particle->dP += Input->dtForFrame * ddP;
 						Particle->Color += Input->dtForFrame * Particle->dColor;
 
+						if (Particle->P.y < 0.0f)
+						{
+							r32 CoefficientOfRestitution = 0.3f;
+							r32 CoefficientOfFriction = 0.7f;
+							Particle->P.y = -Particle->P.y;
+							Particle->dP.y = -CoefficientOfRestitution*Particle->dP.y;
+							Particle->dP.x = CoefficientOfFriction*Particle->dP.x;
+						}
 						// TODO: Shouldn't we just clamp colors in the renderer???
 						v4 Color;
 						Color.r = Clamp01(Particle->Color.r);
@@ -1325,10 +1406,9 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 						}
 
 						// NOTE: Render the particle
-						PushBitmap(RenderGroup,GetFirstBitmapFrom(TranState->Assets, Asset_Head), 1.0f, Particle->P, Color);
+						PushBitmap(RenderGroup, Particle->BitmapID, 1.0f, Particle->P, Color);
 					}
 
-					DrawHitpoints(Entity, RenderGroup);
 				} break;
 				
 				case EntityType_Wall:

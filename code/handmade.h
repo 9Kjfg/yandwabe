@@ -220,10 +220,18 @@ struct ground_buffer
 	loaded_bitmap Bitmap;
 };
 
+struct particle_cel
+{
+	real32 Density;
+	v3 VelocityTimesDensity;
+};
+
 struct particle
 {
+	bitmap_id BitmapID;
 	v3 P;
 	v3 dP;
+	v3 ddP;
 	v4 dColor;
 	v4 Color;
 };
@@ -273,8 +281,10 @@ struct game_state
 	audio_state AudioState;
 	playing_sound *Music;
 
+#define PARTICLE_CEL_DIM 16
 	u32 NextParticle;
 	particle Particles[256];
+	particle_cel ParticleCels[PARTICLE_CEL_DIM][PARTICLE_CEL_DIM];
 };
 
 struct task_with_memory
