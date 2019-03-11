@@ -2,9 +2,10 @@
 
 struct loaded_sound
 {
-	uint32 SampleCount; // NOTE: This is the sample count divided by 8
-	uint32 ChannelCount;
+	// TODO: This could be shrunk to 12 bytes if the loaded_bitmap
 	int16 *Samples[2];
+	u32 SampleCount; // NOTE: This is the sample count divided by 8
+	u32 ChannelCount;
 };
 
 enum asset_state
@@ -17,11 +18,11 @@ enum asset_state
 
 struct asset_slot
 {
-	asset_state State;
+	u32 State;
 	union
 	{
-		loaded_bitmap *Bitmap;
-		loaded_sound *Sound;
+		loaded_bitmap Bitmap;
+		loaded_sound Sound;
 	};
 };
 
@@ -124,7 +125,7 @@ GetBitmap(game_assets *Assets, bitmap_id ID)
 	if (Slot->State >= AssetState_Loaded)
 	{
 		CompletePreviousReadsBeforeFutureReads;
-		Result = Slot->Bitmap;
+		Result = &Slot->Bitmap;
 	}
 
 	return(Result);
@@ -140,7 +141,7 @@ GetSound(game_assets *Assets, sound_id ID)
 	if (Slot->State >= AssetState_Loaded)
 	{
 		CompletePreviousReadsBeforeFutureReads;
-		Result = Slot->Sound;
+		Result = &Slot->Sound;
 	}
 
 	return(Result);
