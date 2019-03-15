@@ -1163,49 +1163,50 @@ Win32MakeQueue(platform_work_queue *Queue, uint32 ThreadCount)
 
 struct win32_platform_file_handle
 {
-	platform_file_handle H;
 	HANDLE Win32Handle;
 };
 
 struct win32_platform_file_group
 {
-	platform_file_group H;
 	HANDLE FindHandle;
-	WIN32_FIND_DATAA FindData;
+	WIN32_FIND_DATAW FindData;
 };
 
 internal PLATFORM_GET_ALL_FILE_OF_TYPES_BEGIN(Win32GetAllFilesOfTypeBegin)
 {
+	platform_file_group Result = {};
+	
 	win32_platform_file_group *Win32FileGroup = 
 		(win32_platform_file_group * )VirtualAlloc(
 			0, sizeof(win32_platform_file_group),
 			MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	Result.Platform = Win32FileGroup;
 
-	char *TypeAt = Type;
-	char WildCard[32] = "*.";
-	for (u32 WildCardIndex = 2;	
-		WildCardIndex < sizeof(WildCard);
-		++WildCardIndex)
+	wchar_t *WildCard = L"*.*";
+	switch (Type)
 	{
-		WildCard[WildCardIndex] = *TypeAt;
-		if (*TypeAt == 0)
+		case PlatformFileType_AssetFile:
 		{
-			break;
-		}
-
-		++TypeAt;
-	}
-	WildCard[sizeof(WildCard) - 1] = 0;
+			WildCard = L"*.hha";
+		} break;
+		
+		case PlatformFileType_SaveGameFile:
+		{
+			WildCard = L"*.hhs";
+		} break;
 	
-	Win32FileGroup->H.FileCount = 0;
+		InvalidDefaultCase;
+	}
+	
+	Result.FileCount = 0;
 
-	WIN32_FIND_DATAA FindData;
-	HANDLE FindHandle = FindFirstFileA(WildCard, &FindData);
+	WIN32_FIND_DATAW FindData;
+	HANDLE FindHandle = FindFirstFileW(WildCard, &FindData);
 	while (FindHandle != INVALID_HANDLE_VALUE)
 	{
-		++Win32FileGroup->H.FileCount;
+		++Result.FileCount;
 
-		if (!FindNextFileA(FindHandle, &FindData))
+		if (!FindNextFileW(FindHandle, &FindData))
 		{
 			break;
 		}
@@ -1216,14 +1217,14 @@ internal PLATFORM_GET_ALL_FILE_OF_TYPES_BEGIN(Win32GetAllFilesOfTypeBegin)
 		FindClose(FindHandle);
 	}
 
-	Win32FileGroup->FindHandle = FindFirstFileA(WildCard, &Win32FileGroup->FindData);
+	Win32FileGroup->FindHandle = FindFirstFileW(WildCard, &Win32FileGroup->FindData);
 
-	return((platform_file_group *)Win32FileGroup);
+	return(Result);
 }
 
 internal PLATFORM_GET_ALL_FILE_OF_TYPES_END(Win32GetAllFilesOfTypeEnd)
 {
-	win32_platform_file_group *Win32FileGroup = (win32_platform_file_group *)FileGroup;
+	win32_platform_file_group *Win32FileGroup = (win32_platform_file_group *)FileGroup->Platform;
 	if (Win32FileGroup)
 	{
 		if (Win32FileGroup->FindHandle != INVALID_HANDLE_VALUE)
@@ -1237,32 +1238,33 @@ internal PLATFORM_GET_ALL_FILE_OF_TYPES_END(Win32GetAllFilesOfTypeEnd)
 
 internal PLATFORM_OPEN_NEXT_FILE(Win32OpenNextFile)
 {
-	win32_platform_file_group *Win32FileGroup = (win32_platform_file_group *)FileGroup;
-	win32_platform_file_handle *Result = 0;
+	win32_platform_file_group *Win32FileGroup = (win32_platform_file_group *)FileGroup->Platform;
+	platform_file_handle Result = {};
 
 	if (Win32FileGroup->FindHandle != INVALID_HANDLE_VALUE)
 	{
 
 		// TODO: If we want someday make an actual arena used be Win32
-		Result = (win32_platform_file_handle * )VirtualAlloc(
+		win32_platform_file_handle *Win32Handle = (win32_platform_file_handle * )VirtualAlloc(
 			0, sizeof(win32_platform_file_handle),
 			MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+		Result.Platform = (void *)Win32Handle;
 	
-		if (Result)
+		if (Win32Handle)
 		{
-			char *FileName = Win32FileGroup->FindData.cFileName;
-			Result->Win32Handle = CreateFileA(FileName, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
-			Result->H.NoErrors = (Result->Win32Handle != INVALID_HANDLE_VALUE);
+			wchar_t *FileName = Win32FileGroup->FindData.cFileName;
+			Win32Handle->Win32Handle = CreateFileW(FileName, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+			Result.NoErrors = (Win32Handle->Win32Handle != INVALID_HANDLE_VALUE);
 		}
 
-		if (!FindNextFileA(Win32FileGroup->FindHandle, &Win32FileGroup->FindData))
+		if (!FindNextFileW(Win32FileGroup->FindHandle, &Win32FileGroup->FindData))
 		{
 			FindClose(Win32FileGroup->FindHandle);
 			Win32FileGroup->FindHandle = INVALID_HANDLE_VALUE;
 		}
 	}
 	
-	return((platform_file_handle *)Result);
+	return(Result);
 }
 
 internal PLATFORM_FILE_ERROR(Win32FileError)
@@ -1279,7 +1281,7 @@ internal PLATFORM_READ_DATA_FROM_FILE(Win32ReadDataFromFile)
 {
 	if (PlatformNoFileErrors(Source))
 	{
-		win32_platform_file_handle *Handle = (win32_platform_file_handle *)Source;
+		win32_platform_file_handle *Handle = (win32_platform_file_handle *)Source->Platform;
 		OVERLAPPED Overlapped = {};
 		Overlapped.Offset = (u32)((Offset >> 0) & 0xFFFFFFFF);
 		Overlapped.OffsetHigh = (u32)((Offset >> 32) & 0xFFFFFFFF);
@@ -1294,7 +1296,7 @@ internal PLATFORM_READ_DATA_FROM_FILE(Win32ReadDataFromFile)
 		}
 		else
 		{
-			Win32FileError(&Handle->H, "Read file failed");
+			Win32FileError(Source, "Read file failed");
 		}
 	}
 }
