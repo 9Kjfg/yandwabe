@@ -1,5 +1,8 @@
 #include "test_asset_builder.h"
 
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+
 #pragma pack(push, 1)
 struct bitmap_header
 {
@@ -183,6 +186,55 @@ LoadBMP(char *FileName)
 	Result.Memory = (uint8 *)Result.Memory + Result.Pitch*(Result.Height - 1);
 	Result.Pitch = -Result.Pitch
 #endif
+	return(Result);
+}
+
+internal loaded_bitmap
+LoadGlyphBitmap(char *FileName, u32 Codepoint)
+{
+	loaded_bitmap Result = {};
+	entire_file TTFFile = ReadEntireFile(FileName);
+
+	if (TTFFile.ContentsSize != 0)
+	{
+		stbtt_fontinfo Font;
+		stbtt_InitFont(&Font, (u8 *)TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8 *)TTFFile.Contents, 0));
+	
+		int Width, Height, XOffset, YOffset;
+		u8 *MonoBitmap = stbtt_GetCodepointBitmap(&Font, 0, stbtt_ScaleForPixelHeight(&Font, 120.0f),
+			Codepoint, &Width, &Height, &XOffset, &YOffset);
+		
+		Result.Width = Width;
+		Result.Height = Height;
+		Result.Pitch = Result.Width*BITMAP_BYTES_PER_PIXEL;
+		Result.Memory = malloc(Result.Pitch*Height);
+		Result.Free = Result.Memory;
+	
+		u8 *Source = MonoBitmap;
+		u8 *DestRow = (u8 *)Result.Memory + (Height - 1)*Result.Pitch;
+		for (s32 Y = 0;
+			Y < Height;
+			++Y)
+		{
+			u32 *Dest = (u32 *)DestRow;
+			for (s32 X = 0;
+				X < Width;
+				++X)
+			{
+				u8 Alpha = *Source++;
+				*Dest++ = 
+					((Alpha << 24) |
+					(Alpha << 16) |
+					(Alpha << 8) |
+					(Alpha << 0));
+			}
+			DestRow -= Result.Pitch;
+		}
+
+		stbtt_FreeBitmap(MonoBitmap, 0);
+		free(TTFFile.Contents);
+	}
+
 	return(Result);
 }
 
@@ -387,7 +439,30 @@ AddBitmapAsset(game_assets *Assets, char *FileName, r32 AlignPercentageX = 0.5f,
 	HHA->Bitmap.AlignPercentage[1] = AlignPercentageY;
 
 	Source->Type = AssetType_Bitmap;
-	Source->Filename = FileName;
+	Source->FileName = FileName;
+	
+	Assets->AssetIndex = Result.Value;
+
+	return(Result);
+}
+
+internal bitmap_id
+AddCharacterAsset(game_assets *Assets, char *FontFile, u32 Codepoint, r32 AlignPercentageX = 0.5f, r32 AlignPercentageY = 0.5f)
+{
+	Assert(Assets->DEBUGAssetType);
+	Assert(Assets->DEBUGAssetType->OnePastLastAssetIndex < ArrayCount(Assets->Assets));
+
+	bitmap_id Result = {Assets->DEBUGAssetType->OnePastLastAssetIndex++};
+	asset_source *Source = Assets->AssetSources + Result.Value;
+	hha_asset *HHA = Assets->Assets + Result.Value;
+	HHA->FirstTagIndex = Assets->TagCount;
+	HHA->OnePastLastTagIndex = HHA->FirstTagIndex;
+	HHA->Bitmap.AlignPercentage[0] = AlignPercentageX;
+	HHA->Bitmap.AlignPercentage[1] = AlignPercentageY;
+
+	Source->Type = AssetType_Font;
+	Source->FileName = FontFile;
+	Source->Codepoint = Codepoint;
 	
 	Assets->AssetIndex = Result.Value;
 
@@ -409,7 +484,7 @@ AddSoundAsset(game_assets *Assets, char *FileName, u32 FirstSampleIndex = 0, u32
 	HHA->Sound.Chain = HHASoundChain_None;
 
 	Source->Type = AssetType_Sound;
-	Source->Filename = FileName;
+	Source->FileName = FileName;
 	Source->FirstSampleIndex = FirstSampleIndex;
 
 	Assets->AssetIndex = Result.Value;
@@ -475,7 +550,7 @@ WriteHHA(game_assets *Assets, char *FileName)
 
 			if (Source->Type == AssetType_Sound)
 			{
-				loaded_sound WAV = LoadWAV(Source->Filename, Source->FirstSampleIndex, Dest->Sound.SampleCount);
+				loaded_sound WAV = LoadWAV(Source->FileName, Source->FirstSampleIndex, Dest->Sound.SampleCount);
 				
 				Dest->Sound.SampleCount = WAV.SampleCount;
 				Dest->Sound.ChannelCount = WAV.ChannelCount;
@@ -491,9 +566,16 @@ WriteHHA(game_assets *Assets, char *FileName)
 			}
 			else
 			{
-				Assert(Source->Type == AssetType_Bitmap);
-
-				loaded_bitmap Bitmap = LoadBMP(Source->Filename);
+				loaded_bitmap Bitmap;
+				if (Source->Type == AssetType_Font)
+				{
+					Bitmap = LoadGlyphBitmap(Source->FileName, Source->Codepoint);
+				}
+				else
+				{
+					Assert(Source->Type == AssetType_Bitmap);
+					Bitmap = LoadBMP(Source->FileName);
+				}
 
 				Dest->Bitmap.Dim[0] = Bitmap.Width;
 				Dest->Bitmap.Dim[1] = Bitmap.Height;
@@ -612,6 +694,16 @@ WriteNonHero(void)
     AddBitmapAsset(Assets, "test/ground01.bmp");
     AddBitmapAsset(Assets, "test/ground00.bmp");
     AddBitmapAsset(Assets, "test/ground01.bmp");
+	EndAssetType(Assets);
+
+	BeginAssetType(Assets, Asset_Font);
+	for (u32 Character = 'A';
+		Character <= 'Z';
+		++Character)
+	{
+		AddCharacterAsset(Assets, "test/arial.ttf", Character);
+		AddTag(Assets, Tag_UnicodeCodepoint, (r32)Character);
+	}
 	EndAssetType(Assets);
 
 	WriteHHA(Assets, "test2.hha");
