@@ -41,7 +41,7 @@ PlaySound(audio_state *AudioState, sound_id SoundID)
 	AudioState->FirstFreePlayingSound = PlayingSound->Next;
 	
 	PlayingSound->SamplesPlayed = 0;
-	PlayingSound->CurrentVolume = PlayingSound->TargetVolume = V2(1.0f, 1.0f);
+	PlayingSound->CurrentVolume = PlayingSound->TargetVolume = V2(0.2f, 0.2f);
 	PlayingSound->dCurrentVolume = V2(0, 0);
 	PlayingSound->ID = SoundID;
 	PlayingSound->dSample = 1.0f;
