@@ -123,8 +123,6 @@ struct render_group
     uint8 *PushBufferBase;
 
 	uint32 MissingResourceCount;
-
-	b32 AssetsShouldBeLocked;
 };
 
 #define HANDMADE_RENDER_GROUP_H

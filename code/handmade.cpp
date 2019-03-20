@@ -378,7 +378,7 @@ FillGroundChunk(transient_state *TranState, game_state *GameState, ground_buffer
 
 		// TODO: Decide what our pushbuffer size is
 		// TODO: Safe cast form memory_index to uint32
-		render_group *RenderGroup = AllocateRenderGroup(TranState->Assets, &Task->Arena, 0, true);
+		render_group *RenderGroup = AllocateRenderGroup(TranState->Assets, &Task->Arena, 0);
 		Orthographic(RenderGroup, Buffer->Width, Buffer->Height, (Buffer->Width - 2) / Width);
 		Clear(RenderGroup, V4(1.0f, 0.0f, 1.0f, 1.0f));
 
@@ -1007,7 +1007,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	DrawBuffer->Pitch = SafeTruncateToUInt16(Buffer->Pitch);
 	DrawBuffer->Memory = Buffer->Memory;
 	
-	render_group *RenderGroup = AllocateRenderGroup(TranState->Assets, &TranState->TranArena, Megabytes(4), false);
+	render_group *RenderGroup = AllocateRenderGroup(TranState->Assets, &TranState->TranArena, Megabytes(4));
 	real32 WidthOfMonitor = 0.635; // NOTE: Horizontal measurement of monitor in meters
 	real32 MetersToPixels = (real32)DrawBuffer->Width*WidthOfMonitor;
 	real32 FocalLength = 0.6;
