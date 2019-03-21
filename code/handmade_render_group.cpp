@@ -1072,10 +1072,13 @@ TileRenderGroupToOutput(platform_work_queue *RenderQueue,
 }
 
 internal render_group *
-AllocateRenderGroup(game_assets *Assets, memory_arena *Arena, uint32 MaxPushBufferSize)
+AllocateRenderGroup(game_assets *Assets, memory_arena *Arena, uint32 MaxPushBufferSize,
+	b32 RendersInBackground)
 {
     render_group *Result = PushStruct(Arena, render_group);
     
+	Result->GenerationID = BeginGeneration(Assets);
+	
 	if (MaxPushBufferSize == 0)
 	{
 		MaxPushBufferSize = (uint32)GetArenaSizeRemaining(Arena);
@@ -1094,8 +1097,18 @@ AllocateRenderGroup(game_assets *Assets, memory_arena *Arena, uint32 MaxPushBuff
 	Result->Transform.Scale = 1.0f;
 
 	Result->MissingResourceCount = 0;
+	Result->RendersInBackground = RendersInBackground;
 
 	return(Result);
+}
+
+internal void
+FinishRenderGroup(render_group *Group)
+{
+	if (Group)
+	{
+		EndGeneration(Group->Assets, Group->GenerationID);
+	}
 }
 
 inline void
@@ -1227,7 +1240,13 @@ PushBitmap(render_group *Group, loaded_bitmap *Bitmap, real32 Height, v3 Offset,
 internal inline void
 PushBitmap(render_group *Group, bitmap_id ID, real32 Height, v3 Offset, v4 Color = V4(1, 1, 1, 1))
 {
-	loaded_bitmap *Bitmap = GetBitmap(Group->Assets, ID);
+	loaded_bitmap *Bitmap = GetBitmap(Group->Assets, ID, Group->GenerationID);
+
+	if (Group->RendersInBackground && !Bitmap)
+	{
+		LoadBitmap(Group->Assets, ID, true);
+		Bitmap = GetBitmap(Group->Assets, ID, Group->GenerationID);
+	}
 	
 	if (Bitmap && Bitmap->Memory)
 	{
@@ -1235,7 +1254,8 @@ PushBitmap(render_group *Group, bitmap_id ID, real32 Height, v3 Offset, v4 Color
 	}
 	else
 	{
-		LoadBitmap(Group->Assets, ID);
+		Assert(!Group->RendersInBackground);
+		LoadBitmap(Group->Assets, ID, false);
 		++Group->MissingResourceCount;
 	}
 }

@@ -14,6 +14,7 @@ AtomicCompareExchangeUInt32(uint32 volatile *Value, uint32 New, uint32 Expected)
 	uint32 Result = _InterlockedCompareExchange((long *)Value, New, Expected);
 	return(Result);
 }
+
 #elif COMPILER_LLVM
 // TODO: Not sure
 #define CompletePreviousReadsBeforeFutureReads asm volatile("" ::: "memory")
@@ -24,6 +25,7 @@ AtomicCompareExchangeUInt32(uint32 volatile *Value, uint32 New, uint32 Expected)
 	uint32 Result = __sync_val_compare_and_swap((long *)Value, Expected, New);
 	return(Result);
 }
+
 #else
 // TODO: Other compilers/platfoorm??
 #define
