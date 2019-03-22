@@ -284,7 +284,7 @@ LoadBitmap(game_assets *Assets, bitmap_id ID, b32 Immediate)
 				Asset->State = AssetState_Unloaded;
 			}
 		}
-		else
+		else if (Immediate)
 		{
 			asset_state volatile *State = (asset_state volatile *)&Asset->State;
 			while (*State == AssetState_Queued){}

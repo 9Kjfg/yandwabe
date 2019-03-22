@@ -201,6 +201,9 @@ LoadGlyphBitmap(char *FileName, char *FontName, u32 Codepoint)
 	loaded_bitmap Result = {};
 
 #if USE_FONTS_FROM_WINDOWS
+	int MaxWidth = 1024;
+	int MaxHeight = 1024;
+	static VOID *Bits;
 	static HDC DeviceContext = 0;
 	if (!DeviceContext)
 	{
@@ -219,8 +222,21 @@ LoadGlyphBitmap(char *FileName, char *FontName, u32 Codepoint)
 			FontName
 		);
 
-		DeviceContext = CreateCompatibleDC(0);
-		HBITMAP Bitmap = CreateCompatibleBitmap(DeviceContext, 1024, 1024);
+		DeviceContext = CreateCompatibleDC(GetDC(0));
+
+		BITMAPINFO Info = {};
+		Info.bmiHeader.biSize = sizeof(Info.bmiHeader);
+		Info.bmiHeader.biWidth = MaxWidth;
+		Info.bmiHeader.biHeight = MaxHeight;
+		Info.bmiHeader.biPlanes = 1;
+		Info.bmiHeader.biBitCount = 32;
+		Info.bmiHeader.biCompression = BI_RGB;
+		Info.bmiHeader.biSizeImage = 0;
+		Info.bmiHeader.biXPelsPerMeter = 0;
+		Info.bmiHeader.biYPelsPerMeter = 0;
+		Info.bmiHeader.biClrUsed = 0;
+		Info.bmiHeader.biClrImportant = 0;
+		HBITMAP Bitmap = CreateDIBSection(DeviceContext, &Info, DIB_RGB_COLORS, &Bits, 0, 0);
 		SelectObject(DeviceContext, Bitmap);
 		SelectObject(DeviceContext, Font);
 		SetBkColor(DeviceContext, RGB(0, 0, 0));
@@ -245,16 +261,17 @@ LoadGlyphBitmap(char *FileName, char *FontName, u32 Codepoint)
 	s32 MaxX = -10000;
 	s32 MaxY = -10000;
 
+	u32 *Row = (u32 *)Bits + (MaxHeight - 1)*MaxWidth;
 	for (s32 Y = 0;
 		Y < Height;
 		++Y)
 	{
+		u32 *Pixel = Row;
 		for (s32 X = 0;
 			X < Width;
 			++X)
 		{
-			COLORREF Pixel = GetPixel(DeviceContext, X, Y);
-			if (Pixel != 0)
+			if (*Pixel != 0)
 			{
 				if (MinX > X)
 				{
@@ -264,54 +281,70 @@ LoadGlyphBitmap(char *FileName, char *FontName, u32 Codepoint)
 				{
 					MinY = Y;
 				}
-				if (MinX < X)
+				if (MaxX < X)
 				{
-					MinX = X;
+					MaxX = X;
 				}
 				if (MaxY < Y)
 				{
 					MaxY = Y;
 				}
 			}
+			++Pixel;
 		}
+		Row -= MaxWidth;
 	}
 
 	if (MinX <= MaxX)
 	{
+#if 0
+		// TODO: Apron
 		--MinX;
 		--MinY;
 		++MaxX;
 		++MaxY;
-
+#endif
 		Width = (MaxX - MinX) + 1;
 		Height = (MaxY - MinY) + 1;
 
-		Result.Width = Width;
-		Result.Height = Height;
+		Result.Width = Width + 2;
+		Result.Height = Height + 2;
 		Result.Pitch = Result.Width*BITMAP_BYTES_PER_PIXEL;
-		Result.Memory = malloc(Result.Pitch*Height);
+		Result.Memory = malloc(Result.Height*Result.Pitch);
 		Result.Free = Result.Memory;
+		
+		memset(Result.Memory, 0, Result.Height*Result.Pitch);
 
-		u8 *DestRow = (u8 *)Result.Memory + (Height - 1)*Result.Pitch;
+		u8 *DestRow = (u8 *)Result.Memory + (Result.Height - 1 - 1)*Result.Pitch;
+		u32 *SourceRow = (u32 *)Bits + (MaxHeight - 1 - MinY)*MaxWidth;
 		for (s32 Y = MinY;
-			Y < MaxY;
+			Y <= MaxY;
 			++Y)
 		{
-			u32 *Dest = (u32 *)DestRow;
+			u32 *Source = (u32 *)SourceRow + MinX;
+			u32 *Dest = (u32 *)DestRow + 1;
 			for (s32 X = MinX;
-				X < MaxX;
+				X <= MaxX;
 				++X)
 			{
+#if 0
 				COLORREF Pixel = GetPixel(DeviceContext, X, Y);
+				Assert(Pixel == *Source);
+#else
+				u32 Pixel = *Source;
+#endif
 				u8 Alpha = (u32)(Pixel & 0xFF);
 				*Dest++ = 
 					((Alpha << 24) |
 					(Alpha << 16) |
 					(Alpha << 8) |
 					(Alpha << 0));
+
+				++Source;
 			}
 
 			DestRow -= Result.Pitch;
+			SourceRow -= MaxWidth;
 		}
 	}
 
