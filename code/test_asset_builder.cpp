@@ -855,11 +855,11 @@ WriteNonHero(void)
 	EndAssetType(Assets);
 
 	BeginAssetType(Assets, Asset_Font);
-	for (u32 Character = 'A';
-		Character <= 'Z';
+	for (u32 Character = '!';
+		Character <= '~';
 		++Character)
 	{
-		AddCharacterAsset(Assets, "test/arial.ttf", "Arial", Character);
+		AddCharacterAsset(Assets, "C:/Windows/Fonts/cour.ttf", "Courier New", Character);
 		AddTag(Assets, Tag_UnicodeCodepoint, (r32)Character);
 	}
 	EndAssetType(Assets);

@@ -126,6 +126,8 @@ struct render_group
 
 	uint32 MissingResourceCount;
 	b32 RendersInBackground;
+
+	b32 InsideRender;
 };
 
 #define HANDMADE_RENDER_GROUP_H

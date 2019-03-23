@@ -998,6 +998,8 @@ PLATFORM_WORK_QUEUE_CALLBACK(DoTileRenderWork)
 internal void
 RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget)
 {
+	Assert(RenderGroup->InsideRender);
+
 	Assert(((uintptr)OutputTarget->Memory & 15) == 0);
 
 	rectangle2i ClipRect;
@@ -1018,6 +1020,8 @@ internal void
 TileRenderGroupToOutput(platform_work_queue *RenderQueue,
 	render_group *RenderGroup, loaded_bitmap *OutputTarget)
 {
+	Assert(RenderGroup->InsideRender);
+
 	int const TileCountX = 4;
 	int const TileCountY = 4;
 	tile_render_work WorkArray[TileCountX*TileCountY];
@@ -1076,8 +1080,6 @@ AllocateRenderGroup(game_assets *Assets, memory_arena *Arena, uint32 MaxPushBuff
 	b32 RendersInBackground)
 {
     render_group *Result = PushStruct(Arena, render_group);
-    
-	Result->GenerationID = BeginGeneration(Assets);
 	
 	if (MaxPushBufferSize == 0)
 	{
@@ -1099,15 +1101,33 @@ AllocateRenderGroup(game_assets *Assets, memory_arena *Arena, uint32 MaxPushBuff
 	Result->MissingResourceCount = 0;
 	Result->RendersInBackground = RendersInBackground;
 
+	Result->InsideRender = false;
+
 	return(Result);
 }
 
 internal void
-FinishRenderGroup(render_group *Group)
+BeginRender(render_group *Group)
 {
 	if (Group)
 	{
+		Assert(!Group->InsideRender);
+		Group->InsideRender = true;
+		Group->GenerationID = BeginGeneration(Group->Assets);
+	}
+}
+
+internal void
+EndRenderGroup(render_group *Group)
+{
+	if (Group)
+	{
+		Assert(Group->InsideRender);
+		Group->InsideRender = false;
+		
 		EndGeneration(Group->Assets, Group->GenerationID);
+		Group->GenerationID = 0;
+		Group->PushBufferSize = 0;
 	}
 }
 
@@ -1197,6 +1217,8 @@ GetRenderEntityBasisP(render_transform *Transform, v3 OriginalP)
 inline void *
 PushRenderElement_(render_group *Group, uint32 Size, render_group_entry_type Type)
 {
+	Assert(Group->InsideRender);
+
     void *Result = 0;
 
 	Size += sizeof(render_group_entry_header);
