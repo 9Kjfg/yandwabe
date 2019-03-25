@@ -34,6 +34,7 @@ enum asset_type_id
 	Asset_Torso,
 
     Asset_Font,
+	Asset_FontGlyph,
 
 	//
 	//NOTE: Sounds!
@@ -67,6 +68,10 @@ struct sound_id
     uint32 Value;
 };
 
+struct font_id
+{
+	u32 Value;
+};
 
 struct hha_header
 {
@@ -109,6 +114,11 @@ struct hha_bitmap
 {
     u32 Dim[2];
 	r32 AlignPercentage[2];
+
+	/* Data is
+		
+		s16 Pixels[Dim(1)][Dim(0)]
+	*/
 };
 
 struct hha_sound
@@ -116,6 +126,21 @@ struct hha_sound
 	uint32 SampleCount;
 	u32 ChannelCount;
     u32 Chain; // NOTE: hha_sound_chain
+	/* Data is
+		
+		s16 Channels[ChannelCount][SampleCount]
+	*/
+};
+
+struct hha_font
+{
+	u32 CodePointCount;
+	r32 LineAdvance;
+	/* NOTE: Data is
+
+		bitmap_id CodePoints[CodePointCount];
+		r32 HorizontalAdvance[CodePointCount];
+	*/
 };
 
 struct hha_asset
@@ -127,6 +152,7 @@ struct hha_asset
     {
         hha_bitmap Bitmap;
         hha_sound Sound;
+		hha_font Font;
     };
 };
 

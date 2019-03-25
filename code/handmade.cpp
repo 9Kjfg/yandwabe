@@ -620,34 +620,68 @@ DEBUGTextLine(char *String)
 	if (DEBUGRenderGroup)
 	{
 		render_group *RenderGroup = DEBUGRenderGroup;
-
 		asset_vector MatchVector = {};
 		asset_vector WeightVector = {};
-		WeightVector.E[Tag_UnicodeCodepoint] = 1.0f;
-		r32 CharScale = FontScale;
 
-		r32 AtX = LeftEdge;
-		for (char *At = String;
-			*At;
-			++At)
+		font_id FontID = GetBestMatchFontFrom(RenderGroup->Assets, Asset_Font,
+			&MatchVector, &WeightVector);
+
+		loaded_font *Font = GetFont(RenderGroup->Assets, FontID, RenderGroup->GenerationID);
+		if (Font)
 		{
-			r32 CharDim = CharScale*8.0f;
-			if (*At != ' ')
+			hha_font *Info = GetFontInfo(RenderGroup->Assets, FontID);
+
+			u32 PrevCodePoint = 0;
+			r32 CharScale = FontScale;
+			v4 Color = V4(1, 1, 1, 1);
+			r32 AtX = LeftEdge;
+			for (char *At = String;
+				*At;)
 			{
-				MatchVector.E[Tag_UnicodeCodepoint] = *At;
-				// TODO: This is too slow for text, at the moment!
-				bitmap_id BitmapID = GetBestMatchBitmapFrom(RenderGroup->Assets, Asset_Font,
-					&MatchVector, &WeightVector);
-				
-				hha_bitmap *Info = GetBitmapInfo(RenderGroup->Assets, BitmapID);
+				if ((At[0] == '\\') &&
+					(At[1] == '#') &&
+					(At[2] != 0) &&
+					(At[3] != 0) &&
+					(At[4] != 0))
+				{
+					r32 CScale = 1.0f / 9.0f;
+					Color = V4(Clamp01(CScale*(r32)(At[2] - '0')),
+						Clamp01(CScale*(r32)(At[3] - '0')),
+						Clamp01(CScale*(r32)(At[4] - '0')),
+						1.0f);
 
-				CharDim = CharScale*(r32)(Info->Dim[0] + 2);
-				PushBitmap(RenderGroup, BitmapID, CharScale*(r32)Info->Dim[1], V3(AtX, AtY, 0), V4(1, 1, 1, 1));
+					At += 5;
+				}
+				else if ((At[0] == '\\') &&
+					(At[1] == '^') &&
+					(At[2] == 0))
+				{
+					r32 CScale = 1.0f / 9.0f;
+					CharScale = FontScale*Clamp01(CScale*(r32)(At[2] - '0'));
+					At += 4;
+				}
+				else
+				{
+					u32 CodePoint = *At;
+					r32 AdvanceX = CharScale*GetHorizontalAdvanceForPair(Info, Font, PrevCodePoint, CodePoint);
+					AtX += AdvanceX;
+
+					if (CodePoint != ' ')
+					{
+						bitmap_id BitmapID = GetBitmapForGlyph(RenderGroup->Assets, Info, Font, CodePoint);
+						hha_bitmap *Info = GetBitmapInfo(RenderGroup->Assets, BitmapID);
+
+						PushBitmap(RenderGroup, BitmapID, CharScale*(r32)Info->Dim[1], V3(AtX, AtY, 0), V4(1, 1, 1, 1));
+					}
+
+					PrevCodePoint = CodePoint;
+
+					++At;
+				}
 			}
-			AtX += CharDim;
-		}
 
-		AtY -= 1.2f*80.0f*FontScale;
+			AtY -= GetLineAdvanceFor(Info, Font)*FontScale;
+		}
 	}
 }
 
