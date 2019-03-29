@@ -135,7 +135,9 @@ struct hha_sound
 struct hha_font
 {
 	u32 CodePointCount;
-	r32 LineAdvance;
+	r32 AscenderHeight;
+	r32 DescenderHeight;
+	r32 ExternalLeading;
 	/* NOTE: Data is
 
 		bitmap_id CodePoints[CodePointCount];

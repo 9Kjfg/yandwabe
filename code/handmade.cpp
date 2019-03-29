@@ -604,14 +604,22 @@ global_variable render_group *DEBUGRenderGroup;
 global_variable r32 LeftEdge;
 global_variable r32 AtY;
 global_variable r32 FontScale;
+global_variable font_id FontID;
 
 internal void
-DEBUGReset(u32 Width, u32 Height)
+DEBUGReset(game_assets *Assets, u32 Width, u32 Height)
 {
+	asset_vector MatchVector = {};
+	asset_vector WeightVector = {};
+	FontID = GetBestMatchFontFrom(Assets, Asset_Font,
+		&MatchVector, &WeightVector);
+
 	FontScale = 1.0f;
 	Orthographic(DEBUGRenderGroup, Width, Height, 1.0f);
-	AtY = 0.5f*(r32)Height - 0.5f*FontScale;
-	LeftEdge = -0.5f*(r32)Width - 0.5f*FontScale;
+	LeftEdge = -0.5f*(r32)Width;
+	
+	hha_font *Info = GetFontInfo(Assets, FontID);
+	AtY = 0.5f*Height - FontScale*GetStartingBaselineY(Info);
 }
 
 internal void
@@ -620,12 +628,7 @@ DEBUGTextLine(char *String)
 	if (DEBUGRenderGroup)
 	{
 		render_group *RenderGroup = DEBUGRenderGroup;
-		asset_vector MatchVector = {};
-		asset_vector WeightVector = {};
-
-		font_id FontID = GetBestMatchFontFrom(RenderGroup->Assets, Asset_Font,
-			&MatchVector, &WeightVector);
-
+		
 		loaded_font *Font = PushFont(RenderGroup, FontID);
 		if (Font)
 		{
@@ -680,7 +683,7 @@ DEBUGTextLine(char *String)
 				}
 			}
 
-			AtY -= GetLineAdvanceFor(Info, Font)*FontScale;
+			AtY -= GetLineAdvanceFor(Info)*FontScale;
 		}
 	}
 }
@@ -1024,7 +1027,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	if (DEBUGRenderGroup)
 	{
 		BeginRender(DEBUGRenderGroup);
-		DEBUGReset(Buffer->Width, Buffer->Height);
+		DEBUGReset(TranState->Assets, Buffer->Width, Buffer->Height);
 	}
 
 #if 0
