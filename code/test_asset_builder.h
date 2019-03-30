@@ -8,6 +8,52 @@
 #include "handmade_intrinsics.h"
 #include "handmade_math.h"
 
+#define USE_FONTS_FROM_WINDOWS 1
+
+#if USE_FONTS_FROM_WINDOWS
+#include <windows.h>
+
+#define ONE_PAST_MAX_FONT_CODEPOINT_COUNT (0x10FFFF - 1)
+#define MAX_FONT_WIDTH 1024
+#define MAX_FONT_HEIGHT 1024
+
+global_variable VOID *GlobalFontBits;
+global_variable HDC GlobalFontDeviceContext;
+
+#else
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+#endif
+
+
+struct loaded_bitmap
+{
+	int32 Width;
+	int32 Height;
+	int32 Pitch;
+	void *Memory;
+
+	void *Free;
+};
+
+struct loaded_font
+{
+	HFONT Win32Handle;
+	TEXTMETRIC TextMetric;
+	r32 LineAdvance;
+
+	hha_font_glyph *Glyphs;
+	r32 *HorizontalAdvance;
+
+	u32 MinCodePoint;
+	u32 MaxCodePoint;
+
+	u32 MaxGlyphCount;
+	u32 GlyphCount;
+
+	u32 *GlyphIndexFromCodePoint;
+};
+
 enum asset_type
 {
 	AssetType_Sound,
@@ -16,7 +62,6 @@ enum asset_type
 	AssetType_FontGlyph
 };
 
-struct loaded_font;
 struct asset_source_font
 {
 	loaded_font *Font;

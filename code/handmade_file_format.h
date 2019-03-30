@@ -103,7 +103,7 @@ struct hha_asset_type
     u32 OnePastLastAssetIndex;
 };
 
-enum hha_osund_chain
+enum hha_sound_chain
 {
     HHASoundChain_None,
     HHASoundChain_Loop,
@@ -132,16 +132,22 @@ struct hha_sound
 	*/
 };
 
+struct hha_font_glyph
+{
+	u32 UnicodeCodePoint;
+	bitmap_id BitmapID;
+};
+
 struct hha_font
 {
-	u32 CodePointCount;
+	u32 GlyphCount;
 	r32 AscenderHeight;
 	r32 DescenderHeight;
 	r32 ExternalLeading;
 	/* NOTE: Data is
 
-		bitmap_id CodePoints[CodePointCount];
-		r32 HorizontalAdvance[CodePointCount];
+		hha_font_glyph CodePoints[GlyphCount];
+		r32 HorizontalAdvance[GlyphCount][GlyphCount];
 	*/
 };
 
