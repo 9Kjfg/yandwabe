@@ -207,7 +207,7 @@ LoadFont(char *FileName, char *FontName)
 	Font->MaxGlyphCount = 5000;
 	Font->GlyphCount = 0;
 
-	u32 GlyphIndexFromCodePointSize = ONE_PAST_MAX_FONT_CODEPOINT_COUNT*sizeof(loaded_font);
+	u32 GlyphIndexFromCodePointSize = ONE_PAST_MAX_FONT_CODEPOINT_COUNT*sizeof(u32);
 	Font->GlyphIndexFromCodePoint = (u32 *)malloc(GlyphIndexFromCodePointSize);
 	memset(Font->GlyphIndexFromCodePoint, 0, GlyphIndexFromCodePointSize);
 
@@ -215,6 +215,13 @@ LoadFont(char *FileName, char *FontName)
 	size_t HorizontalAdvanceSize = sizeof(r32)*Font->MaxGlyphCount*Font->MaxGlyphCount;
 	Font->HorizontalAdvance = (r32 *)malloc(HorizontalAdvanceSize);
 	memset(Font->HorizontalAdvance, 0, HorizontalAdvanceSize);
+
+	Font->OnePastHighestCodepoint = 0;
+
+	// NOTE: Reserve space for the null glyph
+	Font->GlyphCount = 1;
+	Font->Glyphs[0].UnicodeCodePoint = 0;
+	Font->Glyphs[0].BitmapID.Value = 0;
 
 	return(Font);
 }
@@ -237,7 +244,10 @@ FinalizeFontKerning(loaded_font *Font)
 		{
 			u32 First = Font->GlyphIndexFromCodePoint[Pair->wFirst];
 			u32 Second = Font->GlyphIndexFromCodePoint[Pair->wSecond];
-			Font->HorizontalAdvance[First*Font->MaxGlyphCount + Second] += (r32)Pair->iKernAmount;
+			if ((First != 0) && (Second != 0))
+			{
+				Font->HorizontalAdvance[First*Font->MaxGlyphCount + Second] += (r32)Pair->iKernAmount;
+			}
 		}
 	}
 
@@ -285,6 +295,7 @@ LoadGlyphBitmap(loaded_font *Font, u32 CodePoint, hha_asset *Asset)
 	loaded_bitmap Result = {};
 
 	u32 GlyphIndex = Font->GlyphIndexFromCodePoint[CodePoint];
+
 #if USE_FONTS_FROM_WINDOWS
 
 	SelectObject(GlobalFontDeviceContext, Font->Win32Handle);
@@ -298,7 +309,7 @@ LoadGlyphBitmap(loaded_font *Font, u32 CodePoint, hha_asset *Asset)
 
 	int PreStepX = 128;
 
-	int BoundWidth = Size.cx + PreStepX;
+	int BoundWidth = Size.cx + 2*PreStepX;
 	if (BoundWidth > MAX_FONT_WIDTH)
 	{
 		BoundWidth = MAX_FONT_WIDTH;
@@ -718,10 +729,15 @@ AddCharacterAsset(game_assets *Assets, loaded_font *Font, u32 CodePoint)
 
 	Assert(Font->GlyphCount < Font->MaxGlyphCount);
 	u32 GlyphIndex = Font->GlyphCount++;
-	hha_font_glyph *Glyph = Font->Glyphs + Font->GlyphCount++;
+	hha_font_glyph *Glyph = Font->Glyphs + GlyphIndex;
 	Glyph->UnicodeCodePoint = CodePoint;
 	Glyph->BitmapID = Result;
 	Font->GlyphIndexFromCodePoint[CodePoint] = GlyphIndex;
+
+	if (Font->OnePastHighestCodepoint <= CodePoint)
+	{
+		Font->OnePastHighestCodepoint = CodePoint + 1;
+	}
 
 	return(Result);
 }
@@ -744,6 +760,7 @@ internal font_id
 AddFontAsset(game_assets *Assets, loaded_font *Font)
 {
 	added_asset Asset = AddAsset(Assets);
+	Asset.HHA->Font.OnePastHighestCodepoint = Font->OnePastHighestCodepoint;
 	Asset.HHA->Font.GlyphCount = Font->GlyphCount;
 	Asset.HHA->Font.AscenderHeight = (r32)Font->TextMetric.tmAscent;
 	Asset.HHA->Font.DescenderHeight = (r32)Font->TextMetric.tmDescent;
@@ -835,6 +852,7 @@ WriteHHA(game_assets *Assets, char *FileName)
 				
 				u32 GlyphsSize = Font->GlyphCount*sizeof(hha_font_glyph);
 				fwrite(Font->Glyphs, GlyphsSize, 1, Out);
+
 				u8 *HorizontalAdvance = (u8 *)Font->HorizontalAdvance;
 				for (u32 GlyphIndex = 0;
 					GlyphIndex < Font->GlyphCount;
@@ -912,7 +930,7 @@ WriteFonts(void)
 	AddCharacterAsset(Assets, DebugFont, 0x5c0f);
 	AddCharacterAsset(Assets, DebugFont, 0x8033);
 	AddCharacterAsset(Assets, DebugFont, 0x6728);
-	AddCharacterAsset(Assets, DebugFont, 0x514c);
+	AddCharacterAsset(Assets, DebugFont, 0x514e);
 
 	EndAssetType(Assets);
 

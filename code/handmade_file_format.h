@@ -1,6 +1,5 @@
 #if !defined(HANDMADE_FILE_FORMAT_H)
 
-
 enum asset_tag_id
 {
 	Tag_Smotheness,
@@ -140,6 +139,7 @@ struct hha_font_glyph
 
 struct hha_font
 {
+	u32 OnePastHighestCodepoint;
 	u32 GlyphCount;
 	r32 AscenderHeight;
 	r32 DescenderHeight;

@@ -102,6 +102,7 @@ PushString(memory_arena *Arena, char *Source)
 }
 
 #define ZeroStruct(Instance) ZeroSize(sizeof(Instance), &(Instance));
+#define ZeroSArra(Count, Pointer) ZeroSize(Count* sizeof((Pointer)[0]), Pointer);
 
 inline temporary_memory
 BeginTemporaryMemory(memory_arena *Arena)
