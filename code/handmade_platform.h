@@ -170,24 +170,9 @@ typedef DEBUG_PLATFORM_FREE_FILE_MEMORY(debug_platform_free_file_memory);
 #define DEBUG_PLATFORM_WRITE_ENTIRE_FILE(name) bool32 name(char *Filename, uint32 MemorySize, void *Memory)
 typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE(debug_platform_write_entire_file);
 
-// TODO: Give these things names soon!
-enum
-{
-	/* 0 */DebugCycleCounter_GameUpdateAndRender,
-	/* 1 */DebugCycleCounter_RenderGroupToOutput,
-	/* 2 */DebugCycleCounter_DrawRectangleSlowly,
-	/* 3 */DebugCycleCounter_ProcessPixel,
-	/* 4 */DebugCycleCounter_DrawRectangleQuickly,
-	DebugCycleCounter_Count,
-};
-
-typedef struct debug_cycle_counter
-{
-	uint64 CycleCount;
-	uint32 HitCount;
-} debug_cycle_counter;
-
 extern struct game_memory *DebugGlobalMemory;
+
+#if 0
 #if (COMPILER_MSVC | COMPILER_LLVM)
 	#define BEGIN_TIMED_BLOCK_(StartCycleCount) StartCycleCount = __rdtsc();
 	#define BEGIN_TIMED_BLOCK(ID) uint64 BEGIN_TIMED_BLOCK_(StartCycleCount##ID);
@@ -200,6 +185,7 @@ extern struct game_memory *DebugGlobalMemory;
 #else
 	#define BEGIN_TIMED_BLOCK(ID)
 	#define END_TIMED_BLOCK(ID)
+#endif
 #endif
 
 #endif
@@ -362,10 +348,6 @@ typedef struct game_memory
 	platform_work_queue *LowPriorityQueue;
 
 	platform_api PlatformAPI;
-
-#if HANDMADE_INTERNAL
-	debug_cycle_counter Counters[DebugCycleCounter_Count];
-#endif
 } game_memory;
 
 #define GAME_UPDATE_AND_RENDER(name) void name(game_memory *Memory, game_input *Input, game_offscreen_buffer *Buffer)
