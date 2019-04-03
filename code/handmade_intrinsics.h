@@ -8,10 +8,26 @@
 #if COMPILER_MSVC
 #define CompletePreviousReadsBeforeFutureReads _ReadBarrier()
 #define CompletePreviousWritesBeforeFutureWrites _WriteBarrier();
+
 inline uint32
 AtomicCompareExchangeUInt32(uint32 volatile *Value, uint32 New, uint32 Expected)
 {
 	uint32 Result = _InterlockedCompareExchange((long *)Value, New, Expected);
+	return(Result);
+}
+
+inline u64
+AtomicExchangeU64(u64 volatile *Value, u64 New)
+{
+	u64 Result = _InterlockedExchange64((__int64 *)Value, New);
+	return(Result);
+}
+
+inline u32
+AtomicAddU64(u64 volatile *Value, u64 Addend)
+{
+	// NOTE: Return the original value _prior_ to adding
+	u64 Result = _InterlockedExchangeAdd64((__int64 *)Value, Addend);
 	return(Result);
 }
 

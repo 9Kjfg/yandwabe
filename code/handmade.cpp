@@ -615,6 +615,8 @@ DEBUGReset(game_assets *Assets, u32 Width, u32 Height)
 
 	asset_vector MatchVector = {};
 	asset_vector WeightVector = {};
+	MatchVector.E[Tag_FontType] = (r32)FontType_Debug;
+	WeightVector.E[Tag_FontType] = 1.0f;
 	FontID = GetBestMatchFontFrom(Assets, Asset_Font,
 		&MatchVector, &WeightVector);
 
@@ -1755,32 +1757,40 @@ debug_record DebugRecords_Main[__COUNTER__];
 #include <stdio.h>
 
 internal void
-OverlayCycleCounters(game_memory *Memory)
+OutputDebugRecords(u32 CounterCount, debug_record *Counters)
 {
-#if HANDMADE_INTERNAL
-	//DEBUGTextLine("\\5C0F\\8033\\6728\\514E");
-	//DEBUGTextLine("DEBUG CYCLE COUNTS:");
-	for (int CounterIndex = 0;
-		CounterIndex < ArrayCount(DebugRecords_Main);
+	for (u32 CounterIndex = 0;
+		CounterIndex < CounterCount;
 		++CounterIndex)
 	{
-		debug_record *Counter = DebugRecords_Main + CounterIndex;
+		debug_record *Counter = Counters + CounterIndex;
 		
-		if (Counter->HitCount)
+		u64 HitCount_CycleCount = AtomicExchangeU64(&Counter->HitCount_CycleCount, 0);
+		u32 HitCount = (u32)(HitCount_CycleCount >> 32);
+		u32 CycleCount = (u32)(HitCount_CycleCount & 0xFFFFFFFF);
+
+		if (HitCount)
 		{
 #if 1
 			char TextBuffer[256];
 			_snprintf_s(TextBuffer, sizeof(TextBuffer),
-				"%s: %I64ucy %uh %I64ucy/h\n",
+				"%32s(%4d): %10ucy %8uh %10ucy/h",
 				Counter->FunctionName,
-				Counter->CycleCount,
-				Counter->HitCount,
-				Counter->CycleCount / Counter->HitCount);
-			DEBUGTextLine(Counter->FileName);
-			Counter->HitCount = 0;
-			Counter->CycleCount = 0;
+				Counter->LineNumber,
+				CycleCount,
+				HitCount,
+				CycleCount / HitCount);
+			DEBUGTextLine(TextBuffer);
 #endif
 		}
 	}
+}
+
+internal void
+OverlayCycleCounters(game_memory *Memory)
+{
+#if HANDMADE_INTERNAL
+	//DEBUGTextLine("\\5C0F\\8033\\6728\\514E");
+	OutputDebugRecords(ArrayCount(DebugRecords_Main), DebugRecords_Main);
 #endif
 }

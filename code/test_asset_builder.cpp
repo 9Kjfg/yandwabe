@@ -177,15 +177,14 @@ LoadBMP(char *FileName)
 }
 
 internal loaded_font *
-LoadFont(char *FileName, char *FontName)
+LoadFont(char *FileName, char *FontName, int PixelHeight)
 {
 
 	loaded_font *Font = (loaded_font *)malloc(sizeof(loaded_font));
 
 	AddFontResourceExA(FileName, FR_PRIVATE, 0);
-	int Height = 128; // TODO: Figure out how to specify pixels properly here
 	Font->Win32Handle = CreateFontA(
-		Height, 0, 0, 0,
+		PixelHeight, 0, 0, 0,
 		FW_NORMAL,// NOTE: Weight
 		FALSE, // NOTE: Italic
 		FALSE, // NOTE: Underline
@@ -915,29 +914,42 @@ WriteFonts(void)
 	game_assets *Assets = &Assets_;
 	Initialize(Assets);
 
-	loaded_font *DebugFont = LoadFont("C:/Windows/Fonts/arial.ttf", "Arial");
+	loaded_font *Fonts[] = 
+	{
+		LoadFont("C:/Windows/Fonts/arial.ttf", "Arial", 50),
+		LoadFont("C:/Windows/Fonts/LiberationMono-Regular.ttf", "Liberation Mono", 20)
+	};
 
 	BeginAssetType(Assets, Asset_FontGlyph);
-	AddCharacterAsset(Assets, DebugFont, ' ');
-	for (u32 Character = '!';
-		Character <= '~';
-		++Character)
+	for (u32 FontIndex = 0;
+		FontIndex < ArrayCount(Fonts);
+		++FontIndex)
 	{
-		AddCharacterAsset(Assets, DebugFont, Character);
+		loaded_font *Font = Fonts[FontIndex];
+
+		AddCharacterAsset(Assets, Font, ' ');
+		for (u32 Character = '!';
+			Character <= '~';
+			++Character)
+		{
+			AddCharacterAsset(Assets, Font, Character);
+		}
+
+		// NOTE: Kanji Owl
+		AddCharacterAsset(Assets, Font, 0x5c0f);
+		AddCharacterAsset(Assets, Font, 0x8033);
+		AddCharacterAsset(Assets, Font, 0x6728);
+		AddCharacterAsset(Assets, Font, 0x514e);
 	}
-
-	// NOTE: Kanji Owl
-	AddCharacterAsset(Assets, DebugFont, 0x5c0f);
-	AddCharacterAsset(Assets, DebugFont, 0x8033);
-	AddCharacterAsset(Assets, DebugFont, 0x6728);
-	AddCharacterAsset(Assets, DebugFont, 0x514e);
-
 	EndAssetType(Assets);
 
 	// TODO: This is kinda janky, because it means you have to get this
 	// order right always
 	BeginAssetType(Assets, Asset_Font);
-	AddFontAsset(Assets, DebugFont);
+	AddFontAsset(Assets, Fonts[0]);
+	AddTag(Assets, Tag_FontType, FontType_Default);
+	AddFontAsset(Assets, Fonts[1]);
+	AddTag(Assets, Tag_FontType, FontType_Debug);
 	EndAssetType(Assets);
 
 	WriteHHA(Assets, "testfonts.hha");
