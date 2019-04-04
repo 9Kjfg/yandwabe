@@ -916,7 +916,7 @@ WriteFonts(void)
 
 	loaded_font *Fonts[] = 
 	{
-		LoadFont("C:/Windows/Fonts/arial.ttf", "Arial", 50),
+		LoadFont("C:/Windows/Fonts/arial.ttf", "Arial", 20),
 		LoadFont("C:/Windows/Fonts/LiberationMono-Regular.ttf", "Liberation Mono", 20)
 	};
 

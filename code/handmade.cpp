@@ -7,8 +7,6 @@
 #include "handmade_asset.cpp"
 #include "handmade_audio.cpp"
 
-internal void OverlayCycleCounters(game_memory *Memory);
-
 struct add_low_entity_result
 {
 	low_entity *Low;
@@ -730,6 +728,108 @@ DEBUGTextLine(char *String)
 			}
 
 			AtY -= GetLineAdvanceFor(Info)*FontScale;
+		}
+	}
+}
+
+#include <stdio.h>
+
+struct debug_statistic
+{
+	r64 Min;
+	r64 Max;
+	r64 Avg;
+	u32 Count;
+};
+
+inline void
+BeginStatistic(debug_statistic *Stat)
+{
+	Stat->Min = Real32Maximum;
+	Stat->Max = -Real32Maximum;
+	Stat->Avg = 0.0;
+	Stat->Count = 0;
+}
+
+inline void
+AccumDebugStatistic(debug_statistic *Stat, r64 Value)
+{
+	++Stat->Count;
+	
+	if (Stat->Min > Value)
+	{
+		Stat->Min = Value;
+	}
+
+	if (Stat->Max < Value)
+	{
+		Stat->Max = Value;
+	}
+
+	Stat->Avg += Value;
+}
+
+inline void
+EndDebugStatisctic(debug_statistic *Stat)
+{
+	if (Stat->Count)
+	{
+		Stat->Avg /= Stat->Count;
+	}
+	else
+	{
+		Stat->Min = Stat->Max = 0.0;
+	}
+}
+
+internal void
+OverlayCycleCounters(game_memory *Memory)
+{
+	debug_state *DebugState = (debug_state *)Memory->DebugStorage;
+	if (DebugState)
+	{
+		for (u32 CounterIndex = 0;
+			CounterIndex < DebugState->CounterCount;
+			++CounterIndex)
+		{
+			debug_counter_state *Counter = DebugState->CounterStates + CounterIndex;
+			
+			debug_statistic HitCount, CycleCount, CycleOverHit;
+			BeginStatistic(&HitCount);
+			BeginStatistic(&CycleCount);
+			BeginStatistic(&CycleOverHit);
+			for (u32 SnapshotIndex = 0;
+				SnapshotIndex < DEBUG_SNAPSHOT_COUNT;
+				++SnapshotIndex)
+			{
+				AccumDebugStatistic(&HitCount, Counter->Snapshots[SnapshotIndex].HitCount);
+				AccumDebugStatistic(&CycleCount, Counter->Snapshots[SnapshotIndex].CycleCount);
+				
+				r64 HOC = 0.0;
+				if (Counter->Snapshots[SnapshotIndex].HitCount)
+				{
+					HOC = ((r64)Counter->Snapshots[SnapshotIndex].CycleCount /
+						(r64)Counter->Snapshots[SnapshotIndex].HitCount);
+				}
+				AccumDebugStatistic(&CycleOverHit, HOC);
+			}
+			EndDebugStatisctic(&HitCount);
+			EndDebugStatisctic(&CycleCount);
+			EndDebugStatisctic(&CycleOverHit);
+			if (HitCount.Max > 0.0)
+			{
+#if 1
+				char TextBuffer[256];
+				_snprintf_s(TextBuffer, sizeof(TextBuffer),
+					"%32s(%4d): %10ucy %8uh %10ucy/h",
+					Counter->FunctionName,
+					Counter->LineNumber,
+					(u32)CycleCount.Avg,
+					(u32)HitCount.Avg,
+					(u32)CycleOverHit.Avg);
+				DEBUGTextLine(TextBuffer);
+#endif
+			}
 		}
 	}
 }
@@ -1754,43 +1854,37 @@ extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
 
 debug_record DebugRecords_Main[__COUNTER__];
 
-#include <stdio.h>
-
 internal void
-OutputDebugRecords(u32 CounterCount, debug_record *Counters)
+UpdateDebugRecords(debug_state *DebugState, u32 CounterCount, debug_record *Counters)
 {
 	for (u32 CounterIndex = 0;
 		CounterIndex < CounterCount;
 		++CounterIndex)
 	{
-		debug_record *Counter = Counters + CounterIndex;
+		debug_record *Source = Counters + CounterIndex;
+		debug_counter_state *Dest = DebugState->CounterStates + DebugState->CounterCount++;
 		
-		u64 HitCount_CycleCount = AtomicExchangeU64(&Counter->HitCount_CycleCount, 0);
-		u32 HitCount = (u32)(HitCount_CycleCount >> 32);
-		u32 CycleCount = (u32)(HitCount_CycleCount & 0xFFFFFFFF);
-
-		if (HitCount)
-		{
-#if 1
-			char TextBuffer[256];
-			_snprintf_s(TextBuffer, sizeof(TextBuffer),
-				"%32s(%4d): %10ucy %8uh %10ucy/h",
-				Counter->FunctionName,
-				Counter->LineNumber,
-				CycleCount,
-				HitCount,
-				CycleCount / HitCount);
-			DEBUGTextLine(TextBuffer);
-#endif
-		}
+		u64 HitCount_CycleCount = AtomicExchangeU64(&Source->HitCount_CycleCount, 0);
+		Dest->FileName = Source->FileName;
+		Dest->FunctionName = Source->FunctionName;
+		Dest->LineNumber = Source->LineNumber;
+		Dest->Snapshots[DebugState->SnapshotIndex].HitCount = (u32)(HitCount_CycleCount >> 32);
+		Dest->Snapshots[DebugState->SnapshotIndex].CycleCount = (u32)(HitCount_CycleCount & 0xFFFFFFFF);
 	}
 }
 
-internal void
-OverlayCycleCounters(game_memory *Memory)
+extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 {
-#if HANDMADE_INTERNAL
-	//DEBUGTextLine("\\5C0F\\8033\\6728\\514E");
-	OutputDebugRecords(ArrayCount(DebugRecords_Main), DebugRecords_Main);
-#endif
+	debug_state *DebugState = (debug_state *)Memory->DebugStorage;
+	if (DebugState)
+	{
+		DebugState->CounterCount = 0;
+		UpdateDebugRecords(DebugState, ArrayCount(DebugRecords_Main), DebugRecords_Main);
+
+		++DebugState->SnapshotIndex;
+		if (DebugState->SnapshotIndex >= DEBUG_SNAPSHOT_COUNT)
+		{
+			DebugState->SnapshotIndex = 0;
+		}
+	}
 }

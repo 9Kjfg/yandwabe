@@ -46,6 +46,7 @@ struct win32_game_code
 	FILETIME DLLLastWriteTime;
 	game_update_and_render *UpdateAndRender;
 	game_get_sound_samples *GetSoundSamples;
+	debug_game_frame_end *DEBUGFrameEnd;
 
 	bool32 IsValid;
 };
