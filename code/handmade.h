@@ -310,7 +310,7 @@ struct transient_state
 
 	platform_work_queue *HighPriorityQueue;
 	platform_work_queue *LowPriorityQueue;
-	uint64 Pad; 
+	uint64 Pad;
 
 	uint32 EnvMapWidth;
 	uint32 EnvMapHeight;

@@ -89,7 +89,9 @@ typedef double real64;
 
 #define Real32Maximum FLT_MAX
 
+#if !defined(internal)
 #define internal static
+#endif
 #define local_persist static
 #define global_variable static
 
@@ -363,14 +365,16 @@ typedef GAME_UPDATE_AND_RENDER(game_update_and_render);
 #define GAME_GET_SOUND_SAMPLES(name) void name(game_memory *Memory, game_sound_output_buffer *SoundBuffer)
 typedef GAME_GET_SOUND_SAMPLES(game_get_sound_samples);
 
+struct debug_frame_timestamp
+{
+	char *Name;
+	r32 Seconds;
+};
+
 struct debug_frame_end_info
 {
-	r32 ExecutableReady;
-	r32 InputProcessed;
-	r32 GameUpdated;
-	r32 AudioUpdated;
-	r32 FrameWaitComplete;
-	r32 EndOfFrame;
+	u32 TimestampCount;
+	debug_frame_timestamp Timestamps[64];
 };
 #define DEBUG_GAME_FRAME_END(name) void name(game_memory *Memory, debug_frame_end_info *Info)
 typedef DEBUG_GAME_FRAME_END(debug_game_frame_end);

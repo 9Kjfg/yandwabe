@@ -439,6 +439,8 @@ SpeculativeCollide(sim_entity *Mover, sim_entity *Region, v3 TestP)
 internal bool32
 EntitiesOverlapped(sim_entity *Entity, sim_entity *TestEntity, v3 Epsilon = V3(0, 0, 0))
 {
+	TIMED_BLOCK();
+	
 	bool32 Result = false;
 	
 	for (uint32 VolumeIndex = 0;

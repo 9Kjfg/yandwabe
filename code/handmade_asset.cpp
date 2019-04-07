@@ -267,6 +267,8 @@ AcquireAssetMemory(game_assets *Assets, u32 Size, u32 AssetIndex)
 internal void
 LoadBitmap(game_assets *Assets, bitmap_id ID, b32 Immediate)
 {
+	TIMED_BLOCK();
+
 	asset *Asset = Assets->Assets + ID.Value;
 	if (ID.Value)
 	{
@@ -339,6 +341,8 @@ LoadBitmap(game_assets *Assets, bitmap_id ID, b32 Immediate)
 internal void
 LoadFont(game_assets *Assets, font_id ID, b32 Immediate)
 {
+	TIMED_BLOCK();
+	
 	// TODO: Merge this boilerplate
 	asset *Asset = Assets->Assets + ID.Value;
 	if (ID.Value)
@@ -466,6 +470,8 @@ internal uint32
 GetBestMatchAssetFrom(game_assets *Assets, asset_type_id TypeID,
 	asset_vector *MatchVector, asset_vector *WeightVector)
 {
+	TIMED_BLOCK();
+
 	uint32 Result = 0;
 
 	real32 BestDiff = Real32Maximum;

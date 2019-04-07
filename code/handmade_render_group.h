@@ -130,5 +130,10 @@ struct render_group
 	b32 InsideRender;
 };
 
+void DrawRectangleQuickly(loaded_bitmap *Buffer,
+	v2 Origin, v2 XAxis, v2 YAxis, v4 Color,
+	loaded_bitmap *Texture,	real32 PixelsToMeters,
+	rectangle2i ClipRect, bool32 Even);
+
 #define HANDMADE_RENDER_GROUP_H
 #endif

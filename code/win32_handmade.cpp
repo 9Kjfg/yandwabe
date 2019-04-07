@@ -1328,6 +1328,16 @@ PLATFORM_DEALLOCATE_MEMORY(Win32DeallocateMemory)
 	}
 }
 
+inline void
+Win32RecordTimestamp(debug_frame_end_info *Info, char *Name, r32 Seconds)
+{
+	Assert(Info->TimestampCount < ArrayCount(Info->Timestamps));
+
+	debug_frame_timestamp *Timestamp = Info->Timestamps + Info->TimestampCount++;
+	Timestamp->Name = Name;
+	Timestamp->Seconds = Seconds;
+}
+
 int CALLBACK 
 WinMain(
 	HINSTANCE Instance,
@@ -1375,7 +1385,7 @@ WinMain(
 	WNDCLASSA WindowClass = {};
 
 	// NOTE: 1080p display mode is  1920x1080 -> Half of that is 960x540
-	Win32ResizeDIBSection(&GlobalBackBaffer, 960, 540);
+	Win32ResizeDIBSection(&GlobalBackBaffer, 1920, 1080);
 	
 	WindowClass.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;
 	WindowClass.lpfnWndProc = Win32MainWindowCallback;
@@ -1565,7 +1575,8 @@ WinMain(
 						NewInput->ExecutableReloaded = true;
 					}
 
-					FrameEndInfo.ExecutableReady = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
+					Win32RecordTimestamp(&FrameEndInfo, "ExecutableReady",
+						Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
 
 					// TODO: Zeroing macro
 					// TODO: We can't zero everuthing because the up/down state will
@@ -1720,7 +1731,8 @@ WinMain(
 						}
 					}
 
-					FrameEndInfo.InputProcessed = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
+					Win32RecordTimestamp(&FrameEndInfo, "InputProcessed",
+						Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
 
 					if (!GlobalPause)
 					{
@@ -1747,7 +1759,8 @@ WinMain(
 						}
 					}
 
-					FrameEndInfo.GameUpdated = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
+					Win32RecordTimestamp(&FrameEndInfo, "GameUpdated",
+						Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
 					
 					if (!GlobalPause)
 					{
@@ -1877,7 +1890,8 @@ WinMain(
 						}
 					}
 
-					FrameEndInfo.AudioUpdated = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
+					Win32RecordTimestamp(&FrameEndInfo, "AudioUpdated",
+						Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
 					
 					if (!GlobalPause)
 					{
@@ -1915,7 +1929,8 @@ WinMain(
 						}
 					}
 
-					FrameEndInfo.FrameWaitComplete = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
+					Win32RecordTimestamp(&FrameEndInfo, "FrameWaitComplete",
+						Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
 
 					win32_window_dimension Dimension = Win32GetWindowDimension(Window);
 
@@ -1934,7 +1949,8 @@ WinMain(
 					LARGE_INTEGER EndCounter = Win32GetWallClock();
 					LastCounter = EndCounter;
 #if HANDMADE_INTERNAL
-					FrameEndInfo.EndOfFrame = Win32GetSecondsElapsed(LastCounter, EndCounter);
+					Win32RecordTimestamp(&FrameEndInfo, "EndOfFrame",
+						Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
 
 					uint64 EndCycleCount = __rdtsc();
 					uint64 CycleElapsed = EndCycleCount - LastCycleCount;
