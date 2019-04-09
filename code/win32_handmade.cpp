@@ -158,7 +158,6 @@ Win32LoadGameCode(char *SourceDLLName, char *TempDLLName, char *LockFileName)
 	WIN32_FILE_ATTRIBUTE_DATA Ignored;
 	if (!GetFileAttributesEx(LockFileName, GetFileExInfoStandard, &Ignored))
 	{
-		
 		Result.DLLLastWriteTime = Win32GetLastWriteTime(SourceDLLName);
 		
 		CopyFile(SourceDLLName, TempDLLName, FALSE);
