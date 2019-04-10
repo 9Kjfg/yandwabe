@@ -11,7 +11,7 @@ pushd ..\..\build
 del *.pdb > NUL 2> NUL
 
 REM Asset file builder build
-cl %CommonCompilerFlags% -D_CRT_SECURE_NO_WARNINGS=1 ..\handmade\code\test_asset_builder.cpp /link %CommonLinkerFlags%
+cl %CommonCompilerFlags% -DTRANSLATION_UNIT_INDEX=0 -D_CRT_SECURE_NO_WARNINGS=1 ..\handmade\code\test_asset_builder.cpp /link %CommonLinkerFlags%
 
 REM 32-bit build
 REM cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp /link -suvsystem:windows,5.1 %CommonLinkerFlags
@@ -19,8 +19,8 @@ REM cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp /link -suvsyste
 REM 64-bit build
 REM Optimization switches /O2
 echo WAITING FOR PDB > lock.tmp
-cl %CommonCompilerFlags% -O2 -DDebugRecordsArrayIndexConstant=1 -DDebugRecordsArray=DebugRecords_Optimized -I..\..\iaca-win64 -c ..\handmade\code\handmade_optimized.cpp -Fohandmade_optimized.obj -LD
-cl %CommonCompilerFlags% -DDebugRecordsArrayIndexConstant=0 -DDebugRecordsArray=DebugRecords_Main -I..\..\iaca-win64 ..\handmade\code\handmade.cpp handmade_optimized.obj -Fmhandmade.map -LD /link -incremental:no -PDB:handmade_%random%.pdb -EXPORT:GameGetSoundSamples -EXPORT:GameUpdateAndRender -EXPORT:DEBUGGameFrameEnd
+cl %CommonCompilerFlags% -O2 -DTRANSLATION_UNIT_INDEX=1 -I..\..\iaca-win64 -c ..\handmade\code\handmade_optimized.cpp -Fohandmade_optimized.obj -LD
+cl %CommonCompilerFlags% -DTRANSLATION_UNIT_INDEX=0 -I..\..\iaca-win64 ..\handmade\code\handmade.cpp handmade_optimized.obj -Fmhandmade.map -LD /link -incremental:no -PDB:handmade_%random%.pdb -EXPORT:GameGetSoundSamples -EXPORT:GameUpdateAndRender -EXPORT:DEBUGGameFrameEnd
 del lock.tmp
-cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp -Fmwin32_handmade.map /link %CommonLinkerFlags%
+cl %CommonCompilerFlags% -DTRANSLATION_UNIT_INDEX=2 ..\handmade\code\win32_handmade.cpp -Fmwin32_handmade.map /link %CommonLinkerFlags%
 popd

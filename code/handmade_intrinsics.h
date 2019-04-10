@@ -5,56 +5,6 @@
 
 #include <math.h>
 
-#if COMPILER_MSVC
-#define CompletePreviousReadsBeforeFutureReads _ReadBarrier()
-#define CompletePreviousWritesBeforeFutureWrites _WriteBarrier();
-
-inline uint32
-AtomicCompareExchangeUInt32(uint32 volatile *Value, uint32 New, uint32 Expected)
-{
-	uint32 Result = _InterlockedCompareExchange((long *)Value, New, Expected);
-	return(Result);
-}
-
-inline u64
-AtomicExchangeU64(u64 volatile *Value, u64 New)
-{
-	u64 Result = _InterlockedExchange64((__int64 *)Value, New);
-	return(Result);
-}
-
-inline u64
-AtomicAddU64(u64 volatile *Value, u64 Addend)
-{
-	// NOTE: Return the original value _prior_ to adding
-	u64 Result = _InterlockedExchangeAdd64((__int64 *)Value, Addend);
-	return(Result);
-}
-
-inline u32
-AtomicAddU32(u32 volatile *Value, u32 Addend)
-{
-	// NOTE: Return the original value _prior_ to adding
-	long Result = _InterlockedExchangeAdd((long *)Value, Addend);
-	return(Result);
-}
-
-#elif COMPILER_LLVM
-// TODO: Not sure
-#define CompletePreviousReadsBeforeFutureReads asm volatile("" ::: "memory")
-#define CompletePreviousWritesBeforeFutureWrites asm volatile("" ::: "memory")
-inline uint32
-AtomicCompareExchangeUInt32(uint32 volatile *Value, uint32 New, uint32 Expected)
-{
-	uint32 Result = __sync_val_compare_and_swap((long *)Value, Expected, New);
-	return(Result);
-}
-
-#else
-// TODO: Other compilers/platfoorm??
-#define
-#endif
-
 inline int32
 SignOf(int32 Value)
 {

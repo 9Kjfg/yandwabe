@@ -1346,6 +1346,9 @@ WinMain(
 {
 	win32_state Win32State = {};
 
+
+	u32 ID = GetCurrentThreadId();
+
 	platform_work_queue HighPriorityQueue = {};
 	Win32MakeQueue(&HighPriorityQueue, 2);
 

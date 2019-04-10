@@ -365,6 +365,56 @@ typedef GAME_UPDATE_AND_RENDER(game_update_and_render);
 #define GAME_GET_SOUND_SAMPLES(name) void name(game_memory *Memory, game_sound_output_buffer *SoundBuffer)
 typedef GAME_GET_SOUND_SAMPLES(game_get_sound_samples);
 
+#if COMPILER_MSVC
+#define CompletePreviousReadsBeforeFutureReads _ReadBarrier()
+#define CompletePreviousWritesBeforeFutureWrites _WriteBarrier();
+
+inline uint32
+AtomicCompareExchangeUInt32(uint32 volatile *Value, uint32 New, uint32 Expected)
+{
+	uint32 Result = _InterlockedCompareExchange((long *)Value, New, Expected);
+	return(Result);
+}
+
+inline u64
+AtomicExchangeU64(u64 volatile *Value, u64 New)
+{
+	u64 Result = _InterlockedExchange64((__int64 *)Value, New);
+	return(Result);
+}
+
+inline u64
+AtomicAddU64(u64 volatile *Value, u64 Addend)
+{
+	// NOTE: Return the original value _prior_ to adding
+	u64 Result = _InterlockedExchangeAdd64((__int64 *)Value, Addend);
+	return(Result);
+}
+
+inline u32 GetThreadID(void)
+{
+	u8 *ThreadLocalStorage = (u8 *)__readgsqword(0x30);
+	u32 ThreadID = *(u32 *)(ThreadLocalStorage + 0x48);
+	
+	return(ThreadID);
+}
+
+#elif COMPILER_LLVM
+// TODO: Not sure
+#define CompletePreviousReadsBeforeFutureReads asm volatile("" ::: "memory")
+#define CompletePreviousWritesBeforeFutureWrites asm volatile("" ::: "memory")
+inline uint32
+AtomicCompareExchangeUInt32(uint32 volatile *Value, uint32 New, uint32 Expected)
+{
+	uint32 Result = __sync_val_compare_and_swap((long *)Value, Expected, New);
+	return(Result);
+}
+
+#else
+// TODO: Other compilers/platfoorm??
+#define
+#endif
+
 struct debug_frame_timestamp
 {
 	char *Name;
@@ -386,6 +436,91 @@ inline game_controller_input *GetController(game_input *Input, int ControllerInd
 	game_controller_input *Result = &Input->Controllers[ControllerIndex];
 	return(Result);
 }
+
+struct debug_record
+{
+    char *FileName;
+    char *FunctionName;
+
+    int LineNumber;
+    u32 Reserved;
+
+    u64 HitCount_CycleCount;
+};
+
+enum debug_event_type
+{
+    DebugEvent_BeginBlock,
+    DebugEvent_EndBlock
+};
+
+struct debug_event
+{
+    u64 Clock;
+    u16 ThreadIndex;
+    u16 CoreIndex;
+    u16 DebugRecordIndex;
+    u8 TranslationUnit;
+    u8 Type;
+}; 
+
+#define MAX_DEBUG_TRANSLATION_UNITS 3
+#define MAX_DEBUG_EVENT_COUNT (16*65536)
+#define MAX_DEBUG_RECORD_COUNT (65536)
+struct debug_table
+{
+    // TODO: No attempt is currently made to ensure that the final
+    // debug records being writen to the event array actually complete
+    // their ouput prior in the swap of the event array index.
+    u32 CurrentEventArrayIndex;
+    u64 volatile EventArrayIndex_EventIndex;
+    debug_event Events[2][MAX_DEBUG_EVENT_COUNT];
+    debug_record Records[MAX_DEBUG_TRANSLATION_UNITS][MAX_DEBUG_RECORD_COUNT];
+};
+
+extern debug_table GlobalDebugTable;
+
+inline void
+RecordDebugEvent(int RecordIndex, debug_event_type EventType)
+{
+    u64 ArrayIndex_EventIndex = AtomicAddU64(&GlobalDebugTable.EventArrayIndex_EventIndex, 1);
+    u32 EventIndex = ArrayIndex_EventIndex & 0xFFFFFFFF;
+    Assert(EventIndex < MAX_DEBUG_EVENT_COUNT);
+    debug_event *Event = GlobalDebugTable.Events[ArrayIndex_EventIndex >> 32LL] + EventIndex;
+    Event->Clock = __rdtsc();
+    Event->ThreadIndex = (u16)GetThreadID();
+    Event->CoreIndex = 0;
+    Event->DebugRecordIndex = RecordIndex;
+    Event->TranslationUnit = TRANSLATION_UNIT_INDEX;
+    Event->Type = (u8)EventType;
+}
+
+
+#define TIMED_BLOCK__(Number, ...) timed_block TimedBlock_##Number(__COUNTER__, __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__)
+#define TIMED_BLOCK_(Number, ...) TIMED_BLOCK__(Number, ##__VA_ARGS__)
+#define TIMED_BLOCK(...) TIMED_BLOCK_(__LINE__, ##__VA_ARGS__)
+struct timed_block
+{
+    int Counter;
+
+    timed_block(int CounterInit, char *FileName, int LineNumber, char *FunctionName, int HitCountInit = 1)
+    {
+		//TODO: Record the hit count value here?
+
+        Counter = CounterInit;
+    	debug_record *Record = GlobalDebugTable.Records[TRANSLATION_UNIT_INDEX] + Counter;
+        Record->FileName = FileName;
+        Record->LineNumber = LineNumber;
+        Record->FunctionName = FunctionName;
+
+        RecordDebugEvent(Counter, DebugEvent_BeginBlock);
+    }
+
+    ~timed_block()
+    {
+        RecordDebugEvent(Counter, DebugEvent_EndBlock);
+    }
+};
 
 #ifdef __cplusplus
 }
