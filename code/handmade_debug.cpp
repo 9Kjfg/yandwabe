@@ -9,7 +9,7 @@ global_variable font_id FontID;
 internal void
 DEBUGReset(game_assets *Assets, u32 Width, u32 Height)
 {
-	TIMED_BLOCK();
+	TIMED_FUNCTION();
 
 	asset_vector MatchVector = {};
 	asset_vector WeightVector = {};
@@ -223,7 +223,7 @@ DEBUGOverlay(game_memory *Memory)
                 EndDebugStatisctic(&CycleCount);
                 EndDebugStatisctic(&CycleOverHit);
                 
-				if (Counter->FunctionName)
+				if (Counter->BlockName)
 				{
 					if (CycleCount.Max > 0.0f)
 					{
@@ -245,7 +245,7 @@ DEBUGOverlay(game_memory *Memory)
 					char TextBuffer[256];
 					_snprintf_s(TextBuffer, sizeof(TextBuffer),
 						"%32s(%4d): %10ucy %8uh %10ucy/h",
-						Counter->FunctionName,
+						Counter->BlockName,
 						Counter->LineNumber,
 						(u32)CycleCount.Avg,
 						(u32)HitCount.Avg,
@@ -278,7 +278,7 @@ DEBUGOverlay(game_memory *Memory)
 				{0.5f, 0, 1},
 				{0, 0.5f, 1},
 			};
-
+#if 0
 			for (u32 SnapshotIndex = 0;
 				SnapshotIndex < DEBUG_SNAPSHOT_COUNT;
 				++SnapshotIndex)
@@ -302,7 +302,7 @@ DEBUGOverlay(game_memory *Memory)
 					SrackY += ThisHeight;
 				}
 			}
-
+#endif
 			PushRect(RenderGroup, V3(ChartLeft + 0.5f*ChartWidth, ChartMinY + ChartHeight, 0),
 				V2(ChartWidth, 1.0f), V4(1, 1, 1, 1));
         }
@@ -312,7 +312,8 @@ DEBUGOverlay(game_memory *Memory)
 #define DebugRecords_Main_Count __COUNTER__
 extern u32 DebugRecords_Optimized_Count;
 
-debug_table GlobalDebugTable;
+global_variable debug_table GlobalDebugTable_;
+debug_table *GlobalDebugTable = &GlobalDebugTable_;
 
 internal void
 UpdateDebugRecords(debug_state *DebugState, u32 CounterCount, debug_record *Counters)
@@ -326,7 +327,7 @@ UpdateDebugRecords(debug_state *DebugState, u32 CounterCount, debug_record *Coun
 		
 		u64 HitCount_CycleCount = AtomicExchangeU64(&Source->HitCount_CycleCount, 0);
 		Dest->FileName = Source->FileName;
-		Dest->FunctionName = Source->FunctionName;
+		Dest->BlockName = Source->BlockName;
 		Dest->LineNumber = Source->LineNumber;
 		Dest->Snapshots[DebugState->SnapshotIndex].HitCount = (u32)(HitCount_CycleCount >> 32);
 		Dest->Snapshots[DebugState->SnapshotIndex].CycleCount = (u32)(HitCount_CycleCount & 0xFFFFFFFF);
@@ -336,9 +337,19 @@ UpdateDebugRecords(debug_state *DebugState, u32 CounterCount, debug_record *Coun
 internal void
 CollateDebugRecords(debug_state *DebugState, u32 EventCount, debug_event *Events)
 {
-#define DebugRecords_Platform_Count 0
-	DebugState->CounterCount = (DebugRecords_Main_Count + DebugRecords_Optimized_Count + 
-		DebugRecords_Platform_Count);
+	u32 TotalRecordCount = 0;
+	debug_counter_state *CounterArray[MAX_DEBUG_TRANSLATION_UNITS];
+	debug_counter_state *CurrentCounter = DebugState->CounterStates;
+	for (u32 UnitIndex = 0;
+		UnitIndex < MAX_DEBUG_TRANSLATION_UNITS;
+		++UnitIndex)
+	{
+		CounterArray[UnitIndex] = CurrentCounter;
+		TotalRecordCount += GlobalDebugTable->RecordCount[UnitIndex];
+
+		CurrentCounter += GlobalDebugTable->RecordCount[UnitIndex];
+	}
+	DebugState->CounterCount = TotalRecordCount;
 	
 	for (u32 CounterIndex = 0;
 		CounterIndex < DebugState->CounterCount;
@@ -349,13 +360,6 @@ CollateDebugRecords(debug_state *DebugState, u32 EventCount, debug_event *Events
 		Dest->Snapshots[DebugState->SnapshotIndex].CycleCount = 0;
 	}
 
-	debug_counter_state *CounterArray[3] = 
-	{
-		DebugState->CounterStates,
-		DebugState->CounterStates + DebugRecords_Main_Count,
-		DebugState->CounterStates + DebugRecords_Main_Count + DebugRecords_Optimized_Count,
-	};
-
 	for (u32 EventIndex = 0;
 		EventIndex < EventCount;
 		++EventIndex)
@@ -364,9 +368,9 @@ CollateDebugRecords(debug_state *DebugState, u32 EventCount, debug_event *Events
 
 		debug_counter_state *Dest = CounterArray[Event->TranslationUnit] + Event->DebugRecordIndex;
 		
-		debug_record *Source = GlobalDebugTable.Records[Event->TranslationUnit] + Event->DebugRecordIndex;
+		debug_record *Source = GlobalDebugTable->Records[Event->TranslationUnit] + Event->DebugRecordIndex;
 		Dest->FileName = Source->FileName;
-		Dest->FunctionName = Source->FunctionName;
+		Dest->BlockName = Source->BlockName;
 		Dest->LineNumber = Source->LineNumber;
 
 		if (Event->Type == DebugEvent_BeginBlock)
@@ -374,9 +378,8 @@ CollateDebugRecords(debug_state *DebugState, u32 EventCount, debug_event *Events
 			++Dest->Snapshots[DebugState->SnapshotIndex].HitCount;
 			Dest->Snapshots[DebugState->SnapshotIndex].CycleCount -= Event->Clock;
 		}
-		else
+		else if (Event->Type == DebugEvent_EndBlock)
 		{
-			Assert(Event->Type == DebugEvent_EndBlock);
 			Dest->Snapshots[DebugState->SnapshotIndex].CycleCount += Event->Clock;
 		}
 	}
@@ -384,10 +387,18 @@ CollateDebugRecords(debug_state *DebugState, u32 EventCount, debug_event *Events
 
 extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 {
-	GlobalDebugTable.CurrentEventArrayIndex = !GlobalDebugTable.CurrentEventArrayIndex;
+	GlobalDebugTable->RecordCount[0] = DebugRecords_Main_Count;
+	GlobalDebugTable->RecordCount[1] = DebugRecords_Optimized_Count;
+
+	++GlobalDebugTable->CurrentEventArrayIndex;
+	if (GlobalDebugTable->CurrentEventArrayIndex >= ArrayCount(GlobalDebugTable->Events))
+	{
+		GlobalDebugTable->CurrentEventArrayIndex = 0;
+	}
+
 	u64 ArrayIndex_EventIndex = AtomicExchangeU64(
-		&GlobalDebugTable.EventArrayIndex_EventIndex,
-		(u64)GlobalDebugTable.CurrentEventArrayIndex << 32);
+		&GlobalDebugTable->EventArrayIndex_EventIndex,
+		(u64)GlobalDebugTable->CurrentEventArrayIndex << 32);
 
 	u32 EventArrayIndex = ArrayIndex_EventIndex >> 32;
 	u32 EventCount = ArrayIndex_EventIndex & 0xFFFFFFFF;
@@ -396,9 +407,7 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 	if (DebugState)
 	{
 		DebugState->CounterCount = 0;
-		CollateDebugRecords(DebugState, EventCount, GlobalDebugTable.Events[EventArrayIndex]);
-
-		DebugState->FrameEndInfos[DebugState->SnapshotIndex] = *Info;
+		CollateDebugRecords(DebugState, EventCount, GlobalDebugTable->Events[EventArrayIndex]);
 
 		++DebugState->SnapshotIndex;
 		if (DebugState->SnapshotIndex >= DEBUG_SNAPSHOT_COUNT)
@@ -406,4 +415,6 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 			DebugState->SnapshotIndex = 0;
 		}
 	}
+
+	return(GlobalDebugTable);
 }

@@ -180,7 +180,7 @@ DrawRectangleSlowly(loaded_bitmap *Buffer,
 	environment_map *Top, environment_map *Middle, environment_map *Bottom,
 	real32 PixelsToMeters)
 {
-	TIMED_BLOCK();
+	TIMED_FUNCTION();
 	
 	// NOTE: Premultiply color up front
 	Color.rgb *= Color.a;
@@ -250,7 +250,7 @@ DrawRectangleSlowly(loaded_bitmap *Buffer,
 		XMin*BITMAP_BYTES_PER_PIXEL +
 		YMin*Buffer->Pitch);
 
-	TIMED_BLOCK((XMax - XMin + 1)*(YMax - YMin + 1));
+	TIMED_BLOCK(PixelFill, (XMax - XMin + 1)*(YMax - YMin + 1));
 	for (int Y = YMin;
 		Y < YMax;
 		++Y)
@@ -494,7 +494,7 @@ internal void
 RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget,
 	rectangle2i ClipRect, bool Even)
 {
-	TIMED_BLOCK();
+	TIMED_FUNCTION();
 
 	real32 NullPixelsToMeters = 1.0f;
 

@@ -15,7 +15,7 @@ DrawRectangleQuickly(loaded_bitmap *Buffer,
 	loaded_bitmap *Texture,	real32 PixelsToMeters,
 	rectangle2i ClipRect, bool32 Even)
 {
-	TIMED_BLOCK();
+	TIMED_FUNCTION();
 	
 	// NOTE: Premultiply color up front
 	Color.rgb *= Color.a;
@@ -151,7 +151,7 @@ DrawRectangleQuickly(loaded_bitmap *Buffer,
 		int MinX = FillRect.MinX;
 		int MaxX = FillRect.MaxX;
 
-		TIMED_BLOCK(GetClampedRectArea(FillRect) / 2);
+		TIMED_BLOCK(PixelFill, GetClampedRectArea(FillRect) / 2);
 		for (int Y = MinY;
 			Y < MaxY;
 			Y += 2)

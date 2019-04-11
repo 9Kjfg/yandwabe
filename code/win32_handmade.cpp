@@ -1327,15 +1327,8 @@ PLATFORM_DEALLOCATE_MEMORY(Win32DeallocateMemory)
 	}
 }
 
-inline void
-Win32RecordTimestamp(debug_frame_end_info *Info, char *Name, r32 Seconds)
-{
-	Assert(Info->TimestampCount < ArrayCount(Info->Timestamps));
-
-	debug_frame_timestamp *Timestamp = Info->Timestamps + Info->TimestampCount++;
-	Timestamp->Name = Name;
-	Timestamp->Seconds = Seconds;
-}
+global_variable debug_table GlobalDebugTable_;
+debug_table *GlobalDebugTable = &GlobalDebugTable_;
 
 int CALLBACK 
 WinMain(
@@ -1557,8 +1550,13 @@ WinMain(
 				int64 LastCycleCount = __rdtsc();
 				while (GlobalRunning)
 				{
-					debug_frame_end_info FrameEndInfo = {};
+					FRAME_MARKER();
+					
+					//
+					//
+					//
 
+					BEGIN_BLOCK(ExecutableRefesh);
 					NewInput->dtForFrame = TargetSecondPerFrame;
 					
 					NewInput->ExecutableReloaded = false;
@@ -1568,6 +1566,7 @@ WinMain(
 						Win32CompleteAllWork(&HighPriorityQueue);
 						Win32CompleteAllWork(&LowPriorityQueue);
 
+						GlobalDebugTable = &GlobalDebugTable_;
 						Win32UnloadGameCode(&Game);
 						Game = Win32LoadGameCode(
 							SourceGameCodeDLLFullPath,
@@ -1577,9 +1576,14 @@ WinMain(
 						NewInput->ExecutableReloaded = true;
 					}
 
-					Win32RecordTimestamp(&FrameEndInfo, "ExecutableReady",
-						Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
+					END_BLOCK(ExecutableRefesh);
 
+					//
+					//
+					//
+
+					BEGIN_BLOCK(InputProcessed);
+					
 					// TODO: Zeroing macro
 					// TODO: We can't zero everuthing because the up/down state will
 					// be wrong!!!
@@ -1733,8 +1737,12 @@ WinMain(
 						}
 					}
 
-					Win32RecordTimestamp(&FrameEndInfo, "InputProcessed",
-						Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
+					END_BLOCK(InputProcessed);
+					//
+					//
+					//
+
+					BEGIN_BLOCK(GameUpdate);
 
 					if (!GlobalPause)
 					{
@@ -1761,8 +1769,13 @@ WinMain(
 						}
 					}
 
-					Win32RecordTimestamp(&FrameEndInfo, "GameUpdated",
-						Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
+					END_BLOCK(GameUpdate);
+
+					//
+					//
+					//
+					
+					BEGIN_BLOCK(AudioUpdated);
 					
 					if (!GlobalPause)
 					{
@@ -1892,9 +1905,14 @@ WinMain(
 						}
 					}
 
-					Win32RecordTimestamp(&FrameEndInfo, "AudioUpdated",
-						Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
-					
+					END_BLOCK(AudioUpdated);
+			
+					//
+					//
+					//
+
+					BEGIN_BLOCK(FrameWaitComplete);
+
 					if (!GlobalPause)
 					{
 						LARGE_INTEGER WorkCounter = Win32GetWallClock();
@@ -1931,8 +1949,13 @@ WinMain(
 						}
 					}
 
-					Win32RecordTimestamp(&FrameEndInfo, "FrameWaitComplete",
-						Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
+					END_BLOCK(FrameWaitComplete);
+					
+					//
+					//
+					//
+
+					BEGIN_BLOCK(FrameDisplay);
 
 					win32_window_dimension Dimension = Win32GetWindowDimension(Window);
 
@@ -1950,18 +1973,22 @@ WinMain(
 
 					LARGE_INTEGER EndCounter = Win32GetWallClock();
 					LastCounter = EndCounter;
-#if HANDMADE_INTERNAL
-					Win32RecordTimestamp(&FrameEndInfo, "EndOfFrame",
-						Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
 
+					END_BLOCK(FrameDisplay);
+
+#if HANDMADE_INTERNAL
 					uint64 EndCycleCount = __rdtsc();
 					uint64 CycleElapsed = EndCycleCount - LastCycleCount;
 					LastCycleCount = EndCycleCount;
 
 					if (Game.DEBUGFrameEnd)
 					{
-						Game.DEBUGFrameEnd(&GameMemory, &FrameEndInfo);
+						GlobalDebugTable = Game.DEBUGFrameEnd(&GameMemory);
+						// TODO: Move this to a global variable so that
+						// there can be timers below this one?
+						GlobalDebugTable->RecordCount[TRANSLATION_UNIT_INDEX] = __COUNTER__;
 					}
+					GlobalDebugTable_.EventArrayIndex_EventIndex = 0;
 #endif
 				}
 			}
