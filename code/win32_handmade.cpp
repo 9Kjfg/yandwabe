@@ -174,15 +174,17 @@ Win32LoadGameCode(char *SourceDLLName, char *TempDLLName, char *LockFileName)
 			Result.DEBUGFrameEnd = (debug_game_frame_end *)
 				GetProcAddress(Result.GameCodeDLL, "DEBUGGameFrameEnd");
 
-			Result.IsValid = (Result.UpdateAndRender && Result.GetSoundSamples);
+			Result.IsValid = (Result.UpdateAndRender && Result.GetSoundSamples && Result.DEBUGFrameEnd);
 		}
 
 	}
 
 	if (!Result.IsValid)
 	{
+		DWORD Error = GetLastError();
 		Result.UpdateAndRender = 0;
 		Result.GetSoundSamples = 0;
+		Result.DEBUGFrameEnd = 0;
 	}
 
 	return(Result);
@@ -1541,7 +1543,7 @@ WinMain(
 				bool32 SoundIsValid = false;
 				DWORD AudioLatencyBytes = 0;	
 				real32 AudioLatencySeconds = 0;
-
+				
 				win32_game_code Game = Win32LoadGameCode(
 					SourceGameCodeDLLFullPath,
 					TempGameCodeDLLFullPath,
