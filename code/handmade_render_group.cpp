@@ -589,6 +589,8 @@ struct tile_render_work
 internal
 PLATFORM_WORK_QUEUE_CALLBACK(DoTileRenderWork)
 {
+	TIMED_FUNCTION();
+	
 	tile_render_work *Work = (tile_render_work *)Data;
 
 	RenderGroupToOutput(Work->RenderGroup, Work->OutputTarget, Work->ClipRect, false);
@@ -598,6 +600,8 @@ PLATFORM_WORK_QUEUE_CALLBACK(DoTileRenderWork)
 internal void
 RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget)
 {
+	TIMED_FUNCTION();
+
 	Assert(RenderGroup->InsideRender);
 
 	Assert(((uintptr)OutputTarget->Memory & 15) == 0);

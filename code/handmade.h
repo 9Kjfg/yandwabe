@@ -24,6 +24,25 @@ struct temporary_memory
 #define Minimum(A, B) ((A < B) ? (A) : (B))
 #define Maximum(A, B) ((A > B) ? (A) : (B))
 
+inline b32
+StringAreEqual(char *A, char *B)
+{
+	b32 Result = (A == B);
+
+	if (A && B)
+	{
+		while (*A && *B && (*A == *B))
+		{
+			++A;
+			++B;
+		}
+		
+		Result = ((*A == 0) && (*B == 0));
+	}
+
+	return(Result);
+}
+
 //
 //
 //

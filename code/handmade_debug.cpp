@@ -256,6 +256,14 @@ DEBUGOverlay(game_memory *Memory)
 				}
             }
 #endif
+
+			char TextBuffer[256];
+			_snprintf_s(TextBuffer, sizeof(TextBuffer),
+				"Last frame time: %.02fms", DebugState->Frames[0].WallSecondsElapsed * 1000.0f);
+			DEBUGTextLine(TextBuffer);
+
+			AtY -= 300.0f;
+
 			r32 LaneWidth = 8.0f;
 			u32 LaneCount = DebugState->FrameBarLaneCount;
 			r32 BarWidth = LaneWidth*LaneCount;
@@ -282,11 +290,17 @@ DEBUGOverlay(game_memory *Memory)
 				{0, 0.5f, 1},
 			};
 
+			u32 MaxFrame = DebugState->FrameCount;
+			if (MaxFrame > 10)
+			{
+				MaxFrame = 10;
+			}
+
 			for (u32 FrameIndex = 0;
-				FrameIndex < DebugState->FrameCount;
+				FrameIndex < MaxFrame;
 				++FrameIndex)
 			{
-				debug_frame *Frame = DebugState->Frames + FrameIndex;
+				debug_frame *Frame = DebugState->Frames + DebugState->FrameCount - (FrameIndex + 1);
 				r32 StackX = ChartLeft + BarSpacing*(r32)FrameIndex;
 				r32 StackY = ChartMinY;
 				for (u32 RegionIndex = 0;
@@ -395,7 +409,7 @@ CollateDebugRecords(debug_state *DebugState, u32 InvalidEventArrayIndex)
 				if (CurrentFrame)
 				{
 					CurrentFrame->EndClock = Event->Clock;
-
+					CurrentFrame->WallSecondsElapsed = Event->SecondsElapsed;
 #if 0
 					r32 ClockRange = (r32)(CurrentFrame->EndClock - CurrentFrame->BeginClock);
 
@@ -415,11 +429,12 @@ CollateDebugRecords(debug_state *DebugState, u32 InvalidEventArrayIndex)
 				CurrentFrame->EndClock = 0;
 				CurrentFrame->RegionCount = 0;
 				CurrentFrame->Regions = PushArray(&DebugState->CollateArena, MAX_REGION_PER_FRAME, debug_frame_region);
+				CurrentFrame->WallSecondsElapsed = 0;
 			}
 			else if (CurrentFrame)
 			{
 				u32 FrameIndex = DebugState->FrameCount - 1;
-				debug_thread *Thread = GetDebugThread(DebugState, Event->ThreadID);
+				debug_thread *Thread = GetDebugThread(DebugState, Event->TC.ThreadID);
 				u32 RelativeClock = Event->Clock -CurrentFrame->BeginClock;
 				if (Event->Type == DebugEvent_BeginBlock)
 				{
@@ -445,7 +460,7 @@ CollateDebugRecords(debug_state *DebugState, u32 InvalidEventArrayIndex)
 					{
 						open_debug_block *MatchingBlock = Thread->FirstOpenBlock;
 						debug_event *OpeningEvent = MatchingBlock->OpeningEvent;
-						if ((OpeningEvent->ThreadID == Event->ThreadID) &&
+						if ((OpeningEvent->TC.ThreadID == Event->TC.ThreadID) &&
 							(OpeningEvent->DebugRecordIndex == Event->DebugRecordIndex) && 
 							(OpeningEvent->TranslationUnit == Event->TranslationUnit))
 						{
@@ -453,10 +468,16 @@ CollateDebugRecords(debug_state *DebugState, u32 InvalidEventArrayIndex)
 							{
 								if (Thread->FirstOpenBlock->Parent == 0)
 								{
-									debug_frame_region *Region = AddRegion(DebugState, CurrentFrame);
-									Region->LaneIndex = Thread->LaneIndex;
-									Region->MinT = (r32)(OpeningEvent->Clock - CurrentFrame->BeginClock);
-									Region->MaxT = (r32)(Event->Clock - CurrentFrame->BeginClock);
+									r32 MinT = (r32)(OpeningEvent->Clock - CurrentFrame->BeginClock);
+									r32 MaxT = (r32)(Event->Clock - CurrentFrame->BeginClock);
+									r32 ThresholdT = 0.01;
+									if ((MaxT - MinT) > ThresholdT)
+									{
+										debug_frame_region *Region = AddRegion(DebugState, CurrentFrame);
+										Region->LaneIndex = Thread->LaneIndex;
+										Region->MinT = (r32)(OpeningEvent->Clock - CurrentFrame->BeginClock);
+										Region->MaxT = (r32)(Event->Clock - CurrentFrame->BeginClock);
+									}
 								}
 							}
 							else

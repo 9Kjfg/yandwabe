@@ -21,11 +21,12 @@ struct debug_frame_region
     r32 MaxT;
 };
 
-#define MAX_REGION_PER_FRAME 256
+#define MAX_REGION_PER_FRAME 4096
 struct debug_frame
 {
     u64 BeginClock;
     u64 EndClock;
+    r32 WallSecondsElapsed;
 
     u32 RegionCount;
     debug_frame_region *Regions;

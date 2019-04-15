@@ -27,7 +27,7 @@ global_variable bool GlobalRunning;
 global_variable bool GlobalPause;
 global_variable win32_offscreen_buffer GlobalBackBaffer;
 global_variable LPDIRECTSOUNDBUFFER GlobalSecondaryBuffer;
-global_variable int64 GlobalPerCountFrequency;
+global_variable int64 GlobalPerfCountFrequency;
 global_variable bool32 DEBUGGlobalShowCursor;
 global_variable WINDOWPLACEMENT GlobalWindowPosition = {sizeof(GlobalWindowPosition)};
 
@@ -886,10 +886,17 @@ Win32GetWallClock(void)
 	return(Result);
 }
 
+inline r32
+Win32GetWallClockSeconds()
+{
+	r32 Result = (r64)Win32GetWallClock().QuadPart / (r64)GlobalPerfCountFrequency;
+	return(Result);
+}
+
 inline real32
 Win32GetSecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End)
 {
-	real32 Result = (((real32)(End.QuadPart - Start.QuadPart)) / (real32)GlobalPerCountFrequency);
+	real32 Result = (((real32)(End.QuadPart - Start.QuadPart)) / (real32)GlobalPerfCountFrequency);
 
 	return(Result);
 }
@@ -1352,7 +1359,7 @@ WinMain(
 
 	LARGE_INTEGER PerCountFrequencyResult;
 	QueryPerformanceFrequency(&PerCountFrequencyResult);
-	GlobalPerCountFrequency = PerCountFrequencyResult.QuadPart;
+	GlobalPerfCountFrequency = PerCountFrequencyResult.QuadPart;
 
 	Win32GetEXEFileName(&Win32State);
 
@@ -1549,10 +1556,9 @@ WinMain(
 					TempGameCodeDLLFullPath,
 					GameCodeLockFullPath);
 
-				int64 LastCycleCount = __rdtsc();
+				LARGE_INTEGER FrameMarker = {};
 				while (GlobalRunning)
 				{
-					FRAME_MARKER();
 					
 					//
 					//
@@ -1973,25 +1979,30 @@ WinMain(
 					NewInput = OldInput;
 					OldInput = Temp;
 
-					LARGE_INTEGER EndCounter = Win32GetWallClock();
-					LastCounter = EndCounter;
 
 					END_BLOCK(FrameDisplay);
 
 #if HANDMADE_INTERNAL
-					uint64 EndCycleCount = __rdtsc();
-					uint64 CycleElapsed = EndCycleCount - LastCycleCount;
-					LastCycleCount = EndCycleCount;
+					BEGIN_BLOCK(DebugCollating)
 
 					if (Game.DEBUGFrameEnd)
 					{
 						GlobalDebugTable = Game.DEBUGFrameEnd(&GameMemory);
+					}
+					GlobalDebugTable_.EventArrayIndex_EventIndex = 0;
+
+					END_BLOCK(DebugCollating);
+#endif
+					LARGE_INTEGER EndCounter = Win32GetWallClock();
+					FRAME_MARKER(Win32GetSecondsElapsed(LastCounter, EndCounter));
+					LastCounter = EndCounter;
+
+					if (GlobalDebugTable)
+					{
 						// TODO: Move this to a global variable so that
 						// there can be timers below this one?
 						GlobalDebugTable->RecordCount[TRANSLATION_UNIT_INDEX] = __COUNTER__;
 					}
-					GlobalDebugTable_.EventArrayIndex_EventIndex = 0;
-#endif
 				}
 			}
 			else

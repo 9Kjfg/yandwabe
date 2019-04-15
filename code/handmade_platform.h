@@ -357,14 +357,14 @@ typedef GAME_GET_SOUND_SAMPLES(game_get_sound_samples);
 inline uint32
 AtomicCompareExchangeUInt32(uint32 volatile *Value, uint32 New, uint32 Expected)
 {
-	uint32 Result = _InterlockedCompareExchange((long *)Value, New, Expected);
+	uint32 Result = _InterlockedCompareExchange((long volatile *)Value, New, Expected);
 	return(Result);
 }
 
 inline u64
 AtomicExchangeU64(u64 volatile *Value, u64 New)
 {
-	u64 Result = _InterlockedExchange64((__int64 *)Value, New);
+	u64 Result = _InterlockedExchange64((__int64 volatile *)Value, New);
 	return(Result);
 }
 
@@ -372,7 +372,7 @@ inline u64
 AtomicAddU64(u64 volatile *Value, u64 Addend)
 {
 	// NOTE: Return the original value _prior_ to adding
-	u64 Result = _InterlockedExchangeAdd64((__int64 *)Value, Addend);
+	u64 Result = _InterlockedExchangeAdd64((__int64 volatile *)Value, Addend);
 	return(Result);
 }
 
@@ -427,14 +427,23 @@ enum debug_event_type
 	DebugEvent_EndBlock,
 };
 
+struct threadid_coreindex
+{
+	u16 ThreadID;
+	u16 CoreIndex;
+};
+
 struct debug_event
 {
-    u64 Clock;
-    u16 ThreadID;
-    u16 CoreIndex;
-    u16 DebugRecordIndex;
-    u8 TranslationUnit;
-    u8 Type;
+	u64 Clock;
+	union
+	{
+		threadid_coreindex TC;
+		r32 SecondsElapsed;
+	};
+	u16 DebugRecordIndex;
+	u8 TranslationUnit;
+	u8 Type;
 }; 
 
 #define MAX_DEBUG_THREAD_COUNT 256
@@ -458,30 +467,38 @@ struct debug_table
 
 extern debug_table *GlobalDebugTable;
 
-inline void
-RecordDebugEvent(int RecordIndex, debug_event_type EventType)
-{
-    u64 ArrayIndex_EventIndex = AtomicAddU64(&GlobalDebugTable->EventArrayIndex_EventIndex, 1);
-    u32 EventIndex = ArrayIndex_EventIndex & 0xFFFFFFFF;
-    Assert(EventIndex < MAX_DEBUG_EVENT_COUNT);
-    debug_event *Event = GlobalDebugTable->Events[ArrayIndex_EventIndex >> 32LL] + EventIndex;
-    Event->Clock = __rdtsc();
-    Event->ThreadID = (u16)GetThreadID();
-    Event->CoreIndex = 0;
-    Event->DebugRecordIndex = RecordIndex;
-    Event->TranslationUnit = TRANSLATION_UNIT_INDEX;
-    Event->Type = (u8)EventType;
+// TODO: I would like to switch away from the translation unit indexing
+// and just go to a more standart one-time hash table because the complexity
+// seems to be causing problems
+#define RecordDebugEventCommon(RecordIndex, EventType) \
+	u64 ArrayIndex_EventIndex = AtomicAddU64(&GlobalDebugTable->EventArrayIndex_EventIndex, 1); \
+	u32 EventIndex = ArrayIndex_EventIndex & 0xFFFFFFFF; \
+	Assert(EventIndex < MAX_DEBUG_EVENT_COUNT); \
+	debug_event *Event = GlobalDebugTable->Events[ArrayIndex_EventIndex >> 32] + EventIndex; \
+	Event->Clock = __rdtsc(); \
+	Event->DebugRecordIndex = (u16)RecordIndex; \
+	Event->TranslationUnit = TRANSLATION_UNIT_INDEX; \
+	Event->Type = (u8)EventType; \
+
+#define RecordDebugEvent(RecordIndex, EventType) \
+{ \
+	RecordDebugEventCommon(RecordIndex, EventType) \
+	Event->TC.CoreIndex = 0; \
+	Event->TC.ThreadID = (u16)GetThreadID(); \
 }
 
-#define FRAME_MARKER() \
+#define FRAME_MARKER(SecondsElapsedInit) \
 { \
 	int Counter = __COUNTER__; \
-	RecordDebugEvent(Counter, DebugEvent_FrameMarker); \
+	RecordDebugEventCommon(Counter, DebugEvent_FrameMarker) \
+	Event->SecondsElapsed = SecondsElapsedInit; \
 	debug_record *Record = GlobalDebugTable->Records[TRANSLATION_UNIT_INDEX] + Counter; \
 	Record->FileName = __FILE__; \
 	Record->LineNumber = __LINE__; \
 	Record->BlockName = "Frame Marker"; \
 }
+
+#if HANDMADE_PROFILE
 
 #define TIMED_BLOCK__(BlockName, Number, ...) timed_block TimedBlock_##Number(__COUNTER__, __FILE__, __LINE__, BlockName, ##__VA_ARGS__)
 #define TIMED_BLOCK_(BlockName, Number, ...) TIMED_BLOCK__(BlockName, Number, ##__VA_ARGS__)
@@ -525,6 +542,17 @@ struct timed_block
         END_BLOCK_(Counter);
     }
 };
+
+#else
+
+#define TIMED_BLOCK(BlockName, ...)
+#define TIMED_FUNCTION(...)
+#define BEGIN_BLOCK_(Counter, FileNameInit, LineNumberInit, BlockNameInit)
+#define END_BLOCK_(Counter)
+#define BEGIN_BLOCK(Name)
+#define END_BLOCK(Name)
+
+#endif
 
 #ifdef __cplusplus
 }
