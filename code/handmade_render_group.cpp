@@ -904,7 +904,7 @@ PushFont(render_group *Group, font_id ID)
 	return(Font);
 }
 
-internal inline void
+inline void
 PushRect(render_group *Group, v3 Offset, v2 Dim, v4 Color = V4(1, 1, 1, 1))
 {
 	v3 P = Offset - V3(0.5f*Dim, 0);
@@ -919,6 +919,12 @@ PushRect(render_group *Group, v3 Offset, v2 Dim, v4 Color = V4(1, 1, 1, 1))
 			Rect->Dim = Basis.Scale*Dim;
 		}
 	}
+}
+
+inline void
+PushRect(render_group *Group, rectangle2 Rectangle, r32 Z, v4 Color = V4(1, 1, 1, 1))
+{
+	PushRect(Group, V3(GetCenter(Rectangle), Z), GetDim(Rectangle), Color);
 }
 
 internal inline void

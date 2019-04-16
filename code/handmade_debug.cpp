@@ -5,11 +5,16 @@ global_variable r32 LeftEdge;
 global_variable r32 AtY;
 global_variable r32 FontScale;
 global_variable font_id FontID;
+global_variable r32 GlobalWidth;
+global_variable r32 GlobalHeight;
 
 internal void
 DEBUGReset(game_assets *Assets, u32 Width, u32 Height)
 {
 	TIMED_FUNCTION();
+
+	GlobalWidth = (r32)Width;
+	GlobalHeight = (r32)Height;
 
 	asset_vector MatchVector = {};
 	asset_vector WeightVector = {};
@@ -181,12 +186,18 @@ EndDebugStatisctic(debug_statistic *Stat)
 }
 
 internal void
-DEBUGOverlay(game_memory *Memory)
+DEBUGOverlay(game_memory *Memory, game_input *Input)
 {
 	debug_state *DebugState = (debug_state *)Memory->DebugStorage;
 	if (DebugState && DEBUGRenderGroup)
 	{
         render_group *RenderGroup = DEBUGRenderGroup;
+
+		v2 MauseP = V2(Input->MouseX, Input->MouseY);
+		if (WasPressed(Input->MouseButtons[PlatformMouseBotton_Right]))
+		{
+			DebugState->Paused = !DebugState->Paused;
+		}
 
         // TODO: Layout/ cached font info / etc. for real debug display
         loaded_font *Font = PushFont(RenderGroup, FontID);
@@ -257,12 +268,14 @@ DEBUGOverlay(game_memory *Memory)
             }
 #endif
 
-			char TextBuffer[256];
-			_snprintf_s(TextBuffer, sizeof(TextBuffer),
-				"Last frame time: %.02fms", DebugState->Frames[0].WallSecondsElapsed * 1000.0f);
-			DEBUGTextLine(TextBuffer);
-
-			AtY -= 300.0f;
+			if (DebugState->FrameCount)
+			{
+				char TextBuffer[256];
+					_snprintf_s(TextBuffer, sizeof(TextBuffer),
+						"Last frame time: %.02fms",
+						DebugState->Frames[DebugState->FrameCount - 1].WallSecondsElapsed * 1000.0f);
+					DEBUGTextLine(TextBuffer);
+			}
 
 			r32 LaneWidth = 8.0f;
 			u32 LaneCount = DebugState->FrameBarLaneCount;
@@ -271,7 +284,7 @@ DEBUGOverlay(game_memory *Memory)
 			r32 ChartLeft = LeftEdge + 10.0f;
 			r32 ChartHeight = 300.0f;
 			r32 ChartWidth = BarSpacing*(r32)DebugState->FrameCount;
-			r32 ChartMinY = AtY - (ChartHeight + 10.0f);
+			r32 ChartMinY = -0.5f*GlobalHeight + 10;
 			r32 Scale = ChartHeight*DebugState->FrameBarScale;
 
 			v3 Colors[]
@@ -312,8 +325,23 @@ DEBUGOverlay(game_memory *Memory)
 					v3 Color = Colors[RegionIndex % ArrayCount(Colors)];
 					r32 ThisMinY = StackY + Scale*Region->MinT;
 					r32 ThisMaxY = StackY + Scale*Region->MaxT;
-					PushRect(RenderGroup, V3(StackX + 0.5f*LaneWidth + LaneWidth*Region->LaneIndex, 
-						0.5f*(ThisMinY + ThisMaxY), 0), V2(LaneWidth, ThisMaxY - ThisMinY), V4(Color, 1));
+					
+					rectangle2 RegionRect = RectMinMax(V2(StackX + LaneWidth*Region->LaneIndex, ThisMinY),
+						V2(StackX + LaneWidth*(Region->LaneIndex + 1), ThisMaxY));
+					PushRect(RenderGroup, RegionRect, 0, V4(Color, 1));
+
+					if (IsInRectangle(RegionRect, MauseP))
+					{
+						debug_record *Record = Region->Record;
+						char TextBuffer[256];
+						_snprintf_s(TextBuffer, sizeof(TextBuffer),
+							"%32s(%4d): [%s(%d)]",
+							Record->BlockName,
+							Region->CycleCount,
+							Record->FileName,
+							Record->LineNumber);
+						DEBUGTextLine(TextBuffer);
+					}
 				}
 			}
 
@@ -410,6 +438,7 @@ CollateDebugRecords(debug_state *DebugState, u32 InvalidEventArrayIndex)
 				{
 					CurrentFrame->EndClock = Event->Clock;
 					CurrentFrame->WallSecondsElapsed = Event->SecondsElapsed;
+					++DebugState->FrameCount;
 #if 0
 					r32 ClockRange = (r32)(CurrentFrame->EndClock - CurrentFrame->BeginClock);
 
@@ -424,7 +453,7 @@ CollateDebugRecords(debug_state *DebugState, u32 InvalidEventArrayIndex)
 #endif
 			}
 
-				CurrentFrame = DebugState->Frames + DebugState->FrameCount++;
+				CurrentFrame = DebugState->Frames + DebugState->FrameCount;
 				CurrentFrame->BeginClock = Event->Clock;
 				CurrentFrame->EndClock = 0;
 				CurrentFrame->RegionCount = 0;
@@ -474,6 +503,8 @@ CollateDebugRecords(debug_state *DebugState, u32 InvalidEventArrayIndex)
 									if ((MaxT - MinT) > ThresholdT)
 									{
 										debug_frame_region *Region = AddRegion(DebugState, CurrentFrame);
+										Region->Record = Source;
+										Region->CycleCount = (Event->Clock - OpeningEvent->Clock);
 										Region->LaneIndex = Thread->LaneIndex;
 										Region->MinT = (r32)(OpeningEvent->Clock - CurrentFrame->BeginClock);
 										Region->MaxT = (r32)(Event->Clock - CurrentFrame->BeginClock);
@@ -581,13 +612,16 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 			DebugState->CollateTemp = BeginTemporaryMemory(&DebugState->CollateArena);
 		}
 
-		EndTemporaryMemory(DebugState->CollateTemp);
-		DebugState->CollateTemp = BeginTemporaryMemory(&DebugState->CollateArena);
-		
-		DebugState->FirstThread = 0;
-		DebugState->FirstFreeBlock = 0;
+		if (!DebugState->Paused)
+		{
+			EndTemporaryMemory(DebugState->CollateTemp);
+			DebugState->CollateTemp = BeginTemporaryMemory(&DebugState->CollateArena);
+			
+			DebugState->FirstThread = 0;
+			DebugState->FirstFreeBlock = 0;
 
-		CollateDebugRecords(DebugState, GlobalDebugTable->CurrentEventArrayIndex);
+			CollateDebugRecords(DebugState, GlobalDebugTable->CurrentEventArrayIndex);
+		}
 	}
 
 	return(GlobalDebugTable);

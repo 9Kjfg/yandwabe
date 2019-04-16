@@ -1614,21 +1614,28 @@ WinMain(
 						POINT MouseP;
 						GetCursorPos(&MouseP);
 						ScreenToClient(Window, &MouseP);
-						NewInput->MouseX = MouseP.x;
-						NewInput->MouseY = MouseP.y;
+						NewInput->MouseX = (-0.5f*GlobalBackBaffer.Width + 0.5f) + (r32)MouseP.x;
+						NewInput->MouseY = (0.5f*GlobalBackBaffer.Height - 0.5f) - (r32)MouseP.y;
 						NewInput->MouseZ = 0; // TODO: Support mousewheel?
 
-						Win32ProcessKeyboardMessage(&NewInput->MouseButton[0],
-							GetKeyState(VK_LBUTTON) & (1 << 15));
-						Win32ProcessKeyboardMessage(&NewInput->MouseButton[1],
-							GetKeyState(VK_MBUTTON) & (1 << 15));
-						Win32ProcessKeyboardMessage(&NewInput->MouseButton[2],
-							GetKeyState(VK_RBUTTON) & (1 << 15));
-						Win32ProcessKeyboardMessage(&NewInput->MouseButton[3],
-							GetKeyState(VK_XBUTTON1) & (1 << 15));
-						Win32ProcessKeyboardMessage(&NewInput->MouseButton[4],
-							GetKeyState(VK_XBUTTON2) & (1 << 15));
-
+						DWORD WindButtonID[PlatformMouseBotton_Count] =
+						{
+							VK_LBUTTON,
+							VK_MBUTTON,
+							VK_RBUTTON,
+							VK_XBUTTON1,
+							VK_XBUTTON2,
+						};
+						for (u32 ButtonIndex = 0;
+							ButtonIndex < PlatformMouseBotton_Count;
+							++ButtonIndex)
+						{
+							NewInput->MouseButtons[ButtonIndex] = OldInput->MouseButtons[ButtonIndex];	
+							NewInput->MouseButtons[ButtonIndex].HalfTransitionCount = 0;	
+							Win32ProcessKeyboardMessage(&NewInput->MouseButtons[ButtonIndex],
+								GetKeyState(WindButtonID[ButtonIndex]) & (1 << 15));
+						}
+						
 						//TODO: should we pull this more frequenly
 						DWORD MaxControllerCount = XUSER_MAX_COUNT;
 						if (MaxControllerCount > (ArrayCount(NewInput->Controllers) - 1))
