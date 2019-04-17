@@ -1925,7 +1925,9 @@ WinMain(
 					//
 					//
 					//
-
+				
+					//TODO: Leave this off until we have actual vblank support?
+#if 0
 					BEGIN_BLOCK(FrameWaitComplete);
 
 					if (!GlobalPause)
@@ -1965,7 +1967,7 @@ WinMain(
 					}
 
 					END_BLOCK(FrameWaitComplete);
-					
+#endif					
 					//
 					//
 					//
