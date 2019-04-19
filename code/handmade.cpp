@@ -852,9 +852,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		}
 		
 		TranState->Assets = AllocateGameAssets(&TranState->TranArena, TranState, Megabytes(15));
-		
-		DEBUGRenderGroup = AllocateRenderGroup(TranState->Assets, &TranState->TranArena, 
-			Megabytes(1), false);
 
 		GameState->Music = 0;//PlaySound(&GameState->AudioState, GetFirstSoundFrom(TranState->Assets, Asset_Music));
 
@@ -899,11 +896,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		TranState->IsInitialized = true;
 	}
 
-	if (DEBUGRenderGroup)
-	{
-		BeginRender(DEBUGRenderGroup);
-		DEBUGReset(TranState->Assets, Buffer->Width, Buffer->Height);
-	}
+	DEBUGStart(TranState->Assets, Buffer->Width, Buffer->Height);
 
 #if 0
 	if (Input->ExecutableReloaded)
@@ -1601,14 +1594,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	CheckArena(&GameState->WorldArena);
 	CheckArena(&TranState->TranArena);
 
-	
-	if (DEBUGRenderGroup)
-	{
-		TIMED_BLOCK(DEBUGRenderGroup);
-		DEBUGOverlay(Memory, Input);
-		TileRenderGroupToOutput(TranState->HighPriorityQueue, DEBUGRenderGroup, DrawBuffer);
-		EndRenderGroup(DEBUGRenderGroup);
-	}
+	DEBUGEnd(Input, DrawBuffer);
 }
 
 extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)

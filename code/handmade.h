@@ -3,6 +3,7 @@
 #include "handmade_platform.h"
 #include "handmade_intrinsics.h"
 #include "handmade_math.h"
+#include "handmade_file_format.h"
 
 struct memory_arena
 {
@@ -184,7 +185,6 @@ Copy(memory_index Size, void *SourceInit, void *DestInit)
 	while(Size--) {*Dest++ = *Source++;}
 }
 
-#include "handmade_file_format.h"
 #include "handmade_world.h"
 #include "handmade_sim_region.h"
 #include "handmade_entity.h"
