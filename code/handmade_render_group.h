@@ -130,6 +130,21 @@ struct render_group
 	b32 InsideRender;
 };
 
+struct entity_basis_p_result
+{
+	v2 P;
+	real32 Scale;
+	bool32 Valid;
+};
+
+struct used_bitmap_dim
+{
+	entity_basis_p_result Basis;
+	v2 Size;
+	v2 Align;
+	v3 P;
+};
+
 void DrawRectangleQuickly(loaded_bitmap *Buffer,
 	v2 Origin, v2 XAxis, v2 YAxis, v4 Color,
 	loaded_bitmap *Texture,	real32 PixelsToMeters,
