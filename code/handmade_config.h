@@ -1,0 +1,1 @@
+#define DEBUGUI_UsedDebugCamera 1 // b32
