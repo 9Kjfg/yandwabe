@@ -1832,7 +1832,17 @@ WinMain(
 
 						if (Win32State.InputPlayingIndex)
 						{
+							game_input Temp = *NewInput;
 							Win32PlayBackInput(&Win32State, NewInput);
+							for (u32 MouseBottonIndex = 0;
+								MouseBottonIndex < PlatformMouseBotton_Count;
+								++MouseBottonIndex)
+							{
+								NewInput->MouseButtons[MouseBottonIndex] = Temp.MouseButtons[MouseBottonIndex];
+							}
+							NewInput->MouseX = Temp.MouseX;
+							NewInput->MouseY = Temp.MouseY;
+							NewInput->MouseZ = Temp.MouseZ;
 						}
 
 						if (Game.UpdateAndRender)

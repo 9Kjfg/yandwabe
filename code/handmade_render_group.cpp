@@ -162,8 +162,8 @@ SampleEnvironmentMap(v2 ScreenSpaceUV, v3 SampleDirection, real32 Roughness, env
 
 	Assert((X >= 0) && (X < LOD->Width));
 	Assert((Y >= 0) && (Y < LOD->Height));
-#if 0
-	
+
+#if DEBUGUI_ShowLightingSamples
 	uint8 *TexelPtr = (uint8 *)LOD->Memory + Y*LOD->Pitch + X*BITMAP_BYTES_PER_PIXEL;
 	*(uint32 *)TexelPtr = 0xFFFFFFFF;
 #endif

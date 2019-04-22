@@ -12,7 +12,7 @@ pushd ..\..\build
 del *.pdb > NUL 2> NUL
 
 REM Asset file builder build
-cl %CommonCompilerFlags% -DTRANSLATION_UNIT_INDEX=0 -D_CRT_SECURE_NO_WARNINGS=1 ..\handmade\code\test_asset_builder.cpp /link %CommonLinkerFlags%
+REM cl %CommonCompilerFlags% -DTRANSLATION_UNIT_INDEX=0 -D_CRT_SECURE_NO_WARNINGS=1 ..\handmade\code\test_asset_builder.cpp /link %CommonLinkerFlags%
 
 REM 32-bit build
 REM cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp /link -suvsystem:windows,5.1 %CommonLinkerFlags

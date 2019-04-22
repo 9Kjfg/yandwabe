@@ -1,0 +1,21 @@
+#if !defined(HANDMADE_DEBUG_VARIABLES_H)
+
+#define DEBUG_VARIABLE_LESTING(Name) DebugVariableType_Boolean, #Name, Name 
+
+debug_variable DebugVariableList[] =
+{
+	DEBUG_VARIABLE_LESTING(DEBUGUI_UsedDebugCamera),
+	DEBUG_VARIABLE_LESTING(DEBUGUI_GroundChunkOutline),
+	DEBUG_VARIABLE_LESTING(DEBUGUI_ParticleTest),
+	DEBUG_VARIABLE_LESTING(DEBUGUI_ParitcleGrid),
+	DEBUG_VARIABLE_LESTING(DEBUGUI_UseSpacesOutline),
+	DEBUG_VARIABLE_LESTING(DEBUGUI_GroundCheckChekerboards),
+	DEBUG_VARIABLE_LESTING(DEBUGUI_RecomputeGroundChunksOnEXEChange),
+	DEBUG_VARIABLE_LESTING(DEBUGUI_TestWeirdDrawBufferSize),
+	DEBUG_VARIABLE_LESTING(DEBUGUI_FamiliarFollowsHero),
+	DEBUG_VARIABLE_LESTING(DEBUGUI_ShowLightingSamples),
+	DEBUG_VARIABLE_LESTING(DEBUGUI_UseRoomBasedCamera),
+};
+
+#define HANDMADE_DEBUG_VARIABLES_H
+#endif

@@ -389,7 +389,7 @@ PLATFORM_WORK_QUEUE_CALLBACK(FillGroundChunkWork)
 			// TODO: MakeRandom number generation more systemic
 			// TODO: Look into wang hashing or some other spatial seed generation "thing"
 			random_series Series = RandomSeed(139*ChunkX + 593*ChunkX + 329*ChunkZ);
-#if 0
+#if DEBUGUI_GroundCheckChekerboards
 			v4 Color = V4(1, 0, 0, 1);
 			if ((ChunkX % 2) == (ChunkY % 2))
 			{
@@ -898,8 +898,8 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
 	DEBUGStart(TranState->Assets, Buffer->Width, Buffer->Height);
 
-#if 0
-	if (Input->ExecutableReloaded)
+#if DEBUGUI_RecomputeGroundChunksOnEXEChange
+	if (Memory->ExecutableReloaded)
 	{
 		for (uint32 GroundBufferIndex = 0;
 			GroundBufferIndex < TranState->GroundBufferCount;
@@ -1009,7 +1009,13 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	DrawBuffer->Height = SafeTruncateToUInt16(Buffer->Height);
 	DrawBuffer->Pitch = SafeTruncateToUInt16(Buffer->Pitch);
 	DrawBuffer->Memory = Buffer->Memory;
-	
+
+#if DEUGUI_TestWeirdDrawBufferSize
+	// NOTE: Enable this to test weird buffer sizes to the renderer
+	DrawBuffer->Width = 1279;
+	DrawBuffer->Height = 719;
+#endif	
+
 	render_group *RenderGroup = AllocateRenderGroup(TranState->Assets, &TranState->TranArena, Megabytes(4), false);
 	BeginRender(RenderGroup);
 	real32 WidthOfMonitor = 0.635; // NOTE: Horizontal measurement of monitor in meters
@@ -1043,7 +1049,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			{
 				real32 GroundSideInMeters = World->ChunkDimInMeters.x;
 				PushBitmap(RenderGroup, Bitmap, GroundSideInMeters, Delta);
-#if 1
+#if DEBUGUI_GroundChunkOutline
 				PushRectOutline(RenderGroup, Delta, V2(GroundSideInMeters, GroundSideInMeters), V4(1.0f, 1.0f, 0.0f, 1.0f));
 #endif
 			}
@@ -1235,7 +1241,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 				{
 					sim_entity *ClosestHero = 0;
 					real32 ClosestHeroDSq = Square(10.0f); // NOTE: Ten meter maximum search
-#if 0
+#if DEBUGUI_FamiliarFollowsHero
 					// TODO: Make spation queries easy for things
 					sim_entity *TestEntity = SimRegion->Entities;
 					for (uint32 TestEntityIndex = 0;
@@ -1289,7 +1295,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 					PushBitmap(RenderGroup, HeroBitmaps.Cape, HeroSizeC*1.2f, V3(0, 0, 0));
 					PushBitmap(RenderGroup, HeroBitmaps.Head, HeroSizeC*1.2f, V3(0, 0, 0));
 					DrawHitpoints(Entity, RenderGroup);
-#if 0
+#if DEBUGUI_ParticleTest
 					for (u32 ParticleSpawnIndex = 0;
 						ParticleSpawnIndex < 2;
 						++ParticleSpawnIndex)
@@ -1317,8 +1323,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 						MatchVector.E[Tag_UnicodeCodepoint] = (r32)Nothings[RandomChoice(&GameState->EffectsEntropy, ArrayCount(Nothings) - 1)];
 						WeightVector.E[Tag_UnicodeCodepoint] = 1.0f;
 						
-						Particle->BitmapID = GetBestMatchBitmapFrom(TranState->Assets, Asset_Font,
-							&MatchVector, &WeightVector);
+						Particle->BitmapID = HeroBitmaps.Head;
 						//Particle->BitmapID = GetRandomBitmapFrom(TranState->Assets, Asset_Font, &GameState->EffectsEntropy);
 					}
 
@@ -1350,7 +1355,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 						Cel->VelocityTimesDensity += Density*Particle->dP;
 					}
 
-#if 0
+#if DEBUGUI_ParitcleGrid
 					for (u32 Y = 0;
 						Y < PARTICLE_CEL_DIM;
 						++Y)
@@ -1474,7 +1479,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 				} break;
 				case EntityType_Space:
 				{
-#if 0
+#if DEBUGUI_Spaces
 					for (uint32 VolumeIndex = 0;
 						VolumeIndex < Entity->Collision->VolumeCount;
 						++VolumeIndex)
