@@ -437,6 +437,37 @@ AtomicCompareExchangeUInt32(uint32 volatile *Value, uint32 New, uint32 Expected)
 	return(Result);
 }
 
+inline u64
+AtomicExchangeU64(u64 volatile *Value, u64 New)
+{
+	u64 Result = __sync_lock_test_and_set(Value, New);
+	return(Result);
+}
+
+inline u64
+AtomicAddU64(u64 volatile *Value, u64 Addend)
+{
+	// NOTE: Return the original value _prior_ to adding
+	u64 Result = __sync_fetch_and_add(Value, Addend);
+	return(Result);
+}
+
+inline u32 GetThreadID(void)
+{
+	u32 ThreadID;
+#if defined(__APPLE__) && defined(__x86_64__)
+	asm("mov %%gs:0x00, %0" : "=r"(ThreadID))
+#elif defined (__i386__)
+	asm("mov %%gs:0x08, %0" : "=r"(ThreadID))
+#elif defined (__x86_64__)
+	asm("mov %%gs:0x10, %0" : "=r"(ThreadID))
+#else
+#error Unsupported architecture
+#endif
+	
+	return(ThreadID);
+}
+
 #else
 // TODO: Other compilers/platfoorm??
 #endif
@@ -545,7 +576,7 @@ extern debug_table *GlobalDebugTable;
 #define TIMED_BLOCK__(BlockName, Number, ...) timed_block TimedBlock_##Number(__COUNTER__, __FILE__, __LINE__, BlockName, ##__VA_ARGS__)
 #define TIMED_BLOCK_(BlockName, Number, ...) TIMED_BLOCK__(BlockName, Number, ##__VA_ARGS__)
 #define TIMED_BLOCK(BlockName, ...) TIMED_BLOCK_(#BlockName, __LINE__, ##__VA_ARGS__)
-#define TIMED_FUNCTION(...) TIMED_BLOCK_(__FUNCTION__, __LINE__, ##__VA_ARGS__)
+#define TIMED_FUNCTION(...) TIMED_BLOCK_((char *)__FUNCTION__, __LINE__, ##__VA_ARGS__)
 
 #define BEGIN_BLOCK_(Counter, FileNameInit, LineNumberInit, BlockNameInit) \
 	{debug_record *Record = GlobalDebugTable->Records[TRANSLATION_UNIT_INDEX] + Counter; \
