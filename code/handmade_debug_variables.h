@@ -14,7 +14,7 @@ DEBUGAddVariable(debug_variable_definition_context *Context, debug_variable_type
 {
 	debug_variable *Var = PushStruct(Context->Arena, debug_variable);
 	Var->Type = Type;
-	Var->Name = Name;
+	Var->Name = (char *)PushCopy(Context->Arena, StringLength(Name) + 1, Name);
 	Var->Next = 0;
 
 	debug_variable *Group = Context->Group;
@@ -50,11 +50,21 @@ DEBUGBeginVariableGroup(debug_variable_definition_context *Context, char *Name)
 internal debug_variable *
 DEBUGAddVariable(debug_variable_definition_context *Context, char *Name, b32 Value)
 {
-	debug_variable *Var = DEBUGAddVariable(Context, DebugVariableType_Boolean, Name);
+	debug_variable *Var = DEBUGAddVariable(Context, DebugVariableType_Bool32, Name);
 	Var->Bool32 = Value;
 
 	return(Var);
 }
+
+internal debug_variable *
+DEBUGAddVariable(debug_variable_definition_context *Context, char *Name, r32 Value)
+{
+	debug_variable *Var = DEBUGAddVariable(Context, DebugVariableType_Real32, Name);
+	Var->Real32 = Value;
+
+	return(Var);
+}
+
 
 internal void
 DEBUGEndVariableGroup(debug_variable_definition_context *Context)
@@ -93,9 +103,10 @@ DEBUGCreateVariables(debug_state *State)
 		DEBUG_VARIABLE_LESTING(TestWeirdDrawBufferSize);
 		DEBUG_VARIABLE_LESTING(ShowLightingSamples);
 	
+		DEBUGBeginVariableGroup(&Context, "Camera");
 		{
-			DEBUGBeginVariableGroup(&Context, "Camera");
 			DEBUG_VARIABLE_LESTING(UsedDebugCamera);
+			DEBUG_VARIABLE_LESTING(DebugCameraDistance);
 			DEBUG_VARIABLE_LESTING(UseRoomBasedCamera);
 		}
 		DEBUGEndVariableGroup(&Context);

@@ -633,18 +633,6 @@ Win32ProcessXInputStickValue(SHORT Value, SHORT DeadZoneThreshold)
 	return(Result);
 }
 
-internal int
-StringLength(char *String)
-{
-	int Count = 0;
-
-	while (*String++)
-	{
-		++Count;
-	}
-	return(Count);
-}
-
 void
 CatStrings(
 	size_t SourceACount, char *SourceA,
