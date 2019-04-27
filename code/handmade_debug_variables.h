@@ -75,51 +75,43 @@ DEBUGEndVariableGroup(debug_variable_definition_context *Context)
 }
 
 internal void
-DEBUGCreateVariables(debug_state *State)
+DEBUGCreateVariables(debug_variable_definition_context *Context)
 {
-// TODO: Add _distance_ for the debug camera, so we gave a float example
 // TODO: Parameterize the fountain?
 
-	debug_variable_definition_context Context = {};
-	Context.State = State;
-	Context.Arena = &State->DebugArena;
-	Context.Group = DEBUGBeginVariableGroup(&Context, "Root");
+#define DEBUG_VARIABLE_LESTING(Name) DEBUGAddVariable(Context, #Name, DEBUGUI_##Name)
 
-#define DEBUG_VARIABLE_LESTING(Name) DEBUGAddVariable(&Context, #Name, DEBUGUI_##Name)
-
-	DEBUGBeginVariableGroup(&Context, "Group Chunks");
+	DEBUGBeginVariableGroup(Context, "Group Chunks");
 	DEBUG_VARIABLE_LESTING(GroundChunkOutline);
 	DEBUG_VARIABLE_LESTING(GroundCheckChekerboards);
 	DEBUG_VARIABLE_LESTING(RecomputeGroundChunksOnEXEChange);
-	DEBUGEndVariableGroup(&Context);
+	DEBUGEndVariableGroup(Context);
 
-	DEBUGBeginVariableGroup(&Context, "Particles");
+	DEBUGBeginVariableGroup(Context, "Particles");
 	DEBUG_VARIABLE_LESTING(ParticleTest);
 	DEBUG_VARIABLE_LESTING(ParitcleGrid);
-	DEBUGEndVariableGroup(&Context);
+	DEBUGEndVariableGroup(Context);
 
-	DEBUGBeginVariableGroup(&Context, "Renderer");
+	DEBUGBeginVariableGroup(Context, "Renderer");
 	{
 		DEBUG_VARIABLE_LESTING(TestWeirdDrawBufferSize);
 		DEBUG_VARIABLE_LESTING(ShowLightingSamples);
 	
-		DEBUGBeginVariableGroup(&Context, "Camera");
+		DEBUGBeginVariableGroup(Context, "Camera");
 		{
 			DEBUG_VARIABLE_LESTING(UsedDebugCamera);
 			DEBUG_VARIABLE_LESTING(DebugCameraDistance);
 			DEBUG_VARIABLE_LESTING(UseRoomBasedCamera);
 		}
-		DEBUGEndVariableGroup(&Context);
+		DEBUGEndVariableGroup(Context);
 	
-		DEBUGEndVariableGroup(&Context);
+		DEBUGEndVariableGroup(Context);
 	}
 
 	DEBUG_VARIABLE_LESTING(UseSpacesOutline);
 	DEBUG_VARIABLE_LESTING(FamiliarFollowsHero);
 
 #undef DEBUG_VARIABLE_LESTING
-
-	State->RootGroup = Context.Group;
 }
 
 #define HANDMADE_DEBUG_VARIABLES_H

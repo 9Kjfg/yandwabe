@@ -178,7 +178,7 @@ DEBUG_PLATFORM_GET_SYSTEM_PROCESS_STATE(DEBUGGetProcessState)
 	if (hProcess != INVALID_HANDLE_VALUE)
 	{
 		Result.StartedSuccessfully = true;
-		if (WaitForSingleObject(hProcess, 0) == WAIT_OBJECT_0)
+		if (WaitForSingleObject(hProcess, INFINITE) == WAIT_OBJECT_0)
 		{
 			DWORD ReturnCode = 0;
 			GetExitCodeProcess(hProcess, &ReturnCode);

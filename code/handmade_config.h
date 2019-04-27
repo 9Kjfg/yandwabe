@@ -1,5 +1,5 @@
 //#define DEBUGUI_Group Chunks 
-    #define DEBUGUI_GroundChunkOutline 1
+    #define DEBUGUI_GroundChunkOutline 0
     #define DEBUGUI_GroundCheckChekerboards 0
     #define DEBUGUI_RecomputeGroundChunksOnEXEChange 0
 //#define DEBUGUI_Particles 
@@ -10,7 +10,10 @@
     #define DEBUGUI_ShowLightingSamples 0
     //#define DEBUGUI_Camera 
         #define DEBUGUI_UsedDebugCamera 0
-        #define DEBUGUI_DebugCameraDistance 59.099304f
+        #define DEBUGUI_DebugCameraDistance 43.599983f
         #define DEBUGUI_UseRoomBasedCamera 0
-#define DEBUGUI_UseSpacesOutline 1
+#define DEBUGUI_UseSpacesOutline 0
 #define DEBUGUI_FamiliarFollowsHero 0
+//#define DEBUGUI_Profile 
+    //#define DEBUGUI_By Thread 
+    //#define DEBUGUI_By Function 
