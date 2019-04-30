@@ -11,7 +11,7 @@
         #define DEBUGUI_ShowLightingSamples 0
         //#define DEBUGUI_Camera 
             #define DEBUGUI_UsedDebugCamera 1
-            #define DEBUGUI_DebugCameraDistance 43.599983f
+            #define DEBUGUI_DebugCameraDistance 16.299999f
             #define DEBUGUI_UseRoomBasedCamera 0
     #define DEBUGUI_UseSpacesOutline 0
     #define DEBUGUI_FamiliarFollowsHero 0
