@@ -358,12 +358,13 @@ typedef struct platform_api
 
 	platform_allocate_memory *AllocateMemory;
 	platform_deallocate_memory *DeallocateMemory;
-
+#if HANDMADE_INTERNAL
 	debug_platform_free_file_memory *DEBUGFreeFileMemory;
 	debug_platform_read_entire_file *DEBUGReadEntireFile;
 	debug_platform_write_entire_file *DEBUGWriteEntireFile;
 	debug_platform_execute_system_command *DEBUGExecuteSystemCommand;
 	debug_platform_get_system_process_state *DEBUGGetProcessState;
+#endif
 } platform_api;
 typedef struct game_memory
 {
@@ -473,7 +474,7 @@ inline u32 GetThreadID(void)
 #endif
 
 struct debug_table;
-#define DEBUG_GAME_FRAME_END(name) debug_table* name(game_memory *Memory)
+#define DEBUG_GAME_FRAME_END(name) debug_table* name(game_memory *Memory, game_input *Input, game_offscreen_buffer *Buffer)
 typedef DEBUG_GAME_FRAME_END(debug_game_frame_end);
 
 inline game_controller_input *GetController(game_input *Input, int ControllerIndex)
@@ -484,6 +485,7 @@ inline game_controller_input *GetController(game_input *Input, int ControllerInd
 	return(Result);
 }
 
+#if HANDMADE_INTERNAL
 struct debug_record
 {
     char *FileName;
@@ -571,8 +573,6 @@ extern debug_table *GlobalDebugTable;
 	Record->BlockName = "Frame Marker"; \
 }
 
-#if HANDMADE_PROFILE
-
 #define TIMED_BLOCK__(BlockName, Number, ...) timed_block TimedBlock_##Number(__COUNTER__, __FILE__, __LINE__, BlockName, ##__VA_ARGS__)
 #define TIMED_BLOCK_(BlockName, Number, ...) TIMED_BLOCK__(BlockName, Number, ##__VA_ARGS__)
 #define TIMED_BLOCK(BlockName, ...) TIMED_BLOCK_(#BlockName, __LINE__, ##__VA_ARGS__)
@@ -618,12 +618,11 @@ struct timed_block
 
 #else
 
-#define TIMED_BLOCK(BlockName, ...)
+#define TIMED_BLOCK(...)
 #define TIMED_FUNCTION(...)
-#define BEGIN_BLOCK_(Counter, FileNameInit, LineNumberInit, BlockNameInit)
-#define END_BLOCK_(Counter)
-#define BEGIN_BLOCK(Name)
-#define END_BLOCK(Name)
+#define BEGIN_BLOCK(...)
+#define END_BLOCK(...)
+#define FRAME_MARKER(...)
 
 #endif
 

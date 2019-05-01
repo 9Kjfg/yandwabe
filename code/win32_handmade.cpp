@@ -54,6 +54,7 @@ global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
 #define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPGUID lpGuid, LPDIRECTSOUND * ppDS, LPUNKNOWN  pUnkOuter )
 typedef DIRECT_SOUND_CREATE(direct_sound_create);
 
+#if HANDMADE_INTERNAL
 DEBUG_PLATFORM_FREE_FILE_MEMORY(DEBUGPlatformFreeFileMemory)
 {
 	if (Memory)
@@ -193,6 +194,7 @@ DEBUG_PLATFORM_GET_SYSTEM_PROCESS_STATE(DEBUGGetProcessState)
 
 	return(Result);
 }
+#endif
 
 inline FILETIME
 Win32GetLastWriteTime(char *Filename)
@@ -1381,8 +1383,10 @@ PLATFORM_DEALLOCATE_MEMORY(Win32DeallocateMemory)
 	}
 }
 
+#if HANDMADE_INTERNAL
 global_variable debug_table GlobalDebugTable_;
 debug_table *GlobalDebugTable = &GlobalDebugTable_;
+#endif
 
 int CALLBACK 
 WinMain(
@@ -1528,12 +1532,13 @@ WinMain(
 			GameMemory.PlatformAPI.AllocateMemory = Win32AllocateMemory;
 			GameMemory.PlatformAPI.DeallocateMemory = Win32DeallocateMemory;
 
+#if HANDMADE_INTERNAL
 			GameMemory.PlatformAPI.DEBUGFreeFileMemory = DEBUGPlatformFreeFileMemory;
 			GameMemory.PlatformAPI.DEBUGReadEntireFile = DEBUGPlatformReadEntireFile;
 			GameMemory.PlatformAPI.DEBUGWriteEntireFile = DEBUGPlatformWriteEntireFile;
 			GameMemory.PlatformAPI.DEBUGExecuteSystemCommand = DEBUGExecuteSystemCommand;
 			GameMemory.PlatformAPI.DEBUGGetProcessState = DEBUGGetProcessState;
-
+#endif
 			// TODO: Handle memory footprints (USING SYSTEM METRICS)
 			//
 			// TODO: Use MEM_LARGE_PAGES and call adjust token
@@ -1615,12 +1620,14 @@ WinMain(
 					
 					GameMemory.ExecutableReloaded = false;
 					FILETIME NewDLLWriteTime = Win32GetLastWriteTime(SourceGameCodeDLLFullPath);
-					if (CompareFileTime(&NewDLLWriteTime, &Game.DLLLastWriteTime))
+					if (CompareFileTime(&NewDLLWriteTime, &Game.DLLLastWriteTime) != 0)
 					{
 						Win32CompleteAllWork(&HighPriorityQueue);
 						Win32CompleteAllWork(&LowPriorityQueue);
 
+#if HANDMADE_INTERNAL
 						GlobalDebugTable = &GlobalDebugTable_;
+#endif
 						Win32UnloadGameCode(&Game);
 						Game = Win32LoadGameCode(
 							SourceGameCodeDLLFullPath,
@@ -1805,14 +1812,13 @@ WinMain(
 
 					BEGIN_BLOCK(GameUpdate);
 
+					game_offscreen_buffer Buffer = {};
+					Buffer.Memory = GlobalBackBaffer.Memory;
+					Buffer.Height = GlobalBackBaffer.Height;
+					Buffer.Width = GlobalBackBaffer.Width;
+					Buffer.Pitch = GlobalBackBaffer.Pitch;
 					if (!GlobalPause)
 					{
-						game_offscreen_buffer Buffer = {};
-						Buffer.Memory = GlobalBackBaffer.Memory;
-						Buffer.Height = GlobalBackBaffer.Height;
-						Buffer.Width = GlobalBackBaffer.Width;
-						Buffer.Pitch = GlobalBackBaffer.Pitch;
-						
 						if (Win32State.InputRecordingIndex)
 						{
 							Win32RecordInput(&Win32State, NewInput);
@@ -1977,6 +1983,22 @@ WinMain(
 					}
 
 					END_BLOCK(AudioUpdated);
+
+					//
+					//
+					//
+	
+#if HANDMADE_INTERNAL
+					BEGIN_BLOCK(DebugCollating)
+
+					if (Game.DEBUGFrameEnd)
+					{
+						GlobalDebugTable = Game.DEBUGFrameEnd(&GameMemory, NewInput, &Buffer);
+					}
+					GlobalDebugTable_.EventArrayIndex_EventIndex = 0;
+
+					END_BLOCK(DebugCollating);
+#endif
 			
 					//
 					//
@@ -2044,30 +2066,19 @@ WinMain(
 					NewInput = OldInput;
 					OldInput = Temp;
 
-
 					END_BLOCK(FrameDisplay);
 
-#if HANDMADE_INTERNAL
-					BEGIN_BLOCK(DebugCollating)
-
-					if (Game.DEBUGFrameEnd)
-					{
-						GlobalDebugTable = Game.DEBUGFrameEnd(&GameMemory);
-					}
-					GlobalDebugTable_.EventArrayIndex_EventIndex = 0;
-
-					END_BLOCK(DebugCollating);
-#endif
 					LARGE_INTEGER EndCounter = Win32GetWallClock();
 					FRAME_MARKER(Win32GetSecondsElapsed(LastCounter, EndCounter));
 					LastCounter = EndCounter;
-
+#if HANDMADE_INTERNAL
 					if (GlobalDebugTable)
 					{
 						// TODO: Move this to a global variable so that
 						// there can be timers below this one?
 						GlobalDebugTable->RecordCount[TRANSLATION_UNIT_INDEX] = __COUNTER__;
 					}
+#endif
 				}
 			}
 			else

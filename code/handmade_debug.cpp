@@ -1,5 +1,7 @@
 // TODO: Stop using stdio
 #include <stdio.h>
+
+#include "handmade_debug.h"
 #include "handmade_debug_variables.h"
 
 internal void RestartCollation(debug_state *DebugState, u32 InvalidEventArrayIndex);
@@ -19,106 +21,19 @@ DEBUGGetState(void)
 	return(Result);
 }
 
-internal debug_variable_hierarchy *
-AddHierarchy(debug_state *DebugState, debug_variable_reference *Group, v2 AtP)
+internal debug_variable_Tree *
+AddTree(debug_state *DebugState, debug_variable_reference *Group, v2 AtP)
 {
-	debug_variable_hierarchy *Hierarchy = PushStruct(&DebugState->DebugArena, debug_variable_hierarchy);
-	Hierarchy->UIP = AtP;
-	Hierarchy->Group = Group;
-	Hierarchy->Next = DebugState->HierarchySentinel.Next;
-	Hierarchy->Prev = &DebugState->HierarchySentinel;
+	debug_variable_Tree *Tree = PushStruct(&DebugState->DebugArena, debug_variable_Tree);
+	Tree->UIP = AtP;
+	Tree->Group = Group;
+	Tree->Next = DebugState->TreeSentinel.Next;
+	Tree->Prev = &DebugState->TreeSentinel;
 
-	Hierarchy->Next->Prev = Hierarchy;
-	Hierarchy->Prev->Next = Hierarchy;
+	Tree->Next->Prev = Tree;
+	Tree->Prev->Next = Tree;
 
-	return(Hierarchy);
-}
-
-internal void
-DEBUGStart(game_assets *Assets, u32 Width, u32 Height)
-{
-	TIMED_FUNCTION();
-
-	debug_state *DebugState = (debug_state *)DebugGlobalMemory->DebugStorage;
-	if (DebugState)
-	{
-		if (!DebugState->Initialized)
-		{
-			DebugState->HighPriorityQueue = DebugGlobalMemory->HighPriorityQueue;
-			DebugState->HierarchySentinel.Next = &DebugState->HierarchySentinel;
-			DebugState->HierarchySentinel.Prev = &DebugState->HierarchySentinel;
-			DebugState->HierarchySentinel.Group = 0;
-
-			InitializeArena(&DebugState->DebugArena, DebugGlobalMemory->DebugStorageSize - sizeof(debug_state), DebugState + 1);
-
-			debug_variable_definition_context Context = {};
-			Context.State = DebugState;
-			Context.Arena = &DebugState->DebugArena;
-			Context.Group = DEBUGBeginVariableGroup(&Context, "Root");
-
-			DEBUGBeginVariableGroup(&Context, "Debugging");
-
-			DEBUGCreateVariables(&Context);
-			DEBUGBeginVariableGroup(&Context, "Profile");
-			DEBUGBeginVariableGroup(&Context, "By Thread");
-			debug_variable_reference *ThreadList =
-				DEBUGAddVariable(&Context, DebugVariableType_CounterThreadList, "");
-			ThreadList->Var->Profile.Dimension = V2(1024.0f, 100.0f);
-			DEBUGEndVariableGroup(&Context);
-			DEBUGBeginVariableGroup(&Context, "By Function");
-			debug_variable_reference *FunctionList =
-				DEBUGAddVariable(&Context, DebugVariableType_CounterThreadList, "");
-			FunctionList->Var->Profile.Dimension = V2(1024.0f, 200.0f);
-			DEBUGEndVariableGroup(&Context);
-			DEBUGEndVariableGroup(&Context);
-			
-			asset_vector MatchVector = {};
-			MatchVector.E[Tag_FacingDirection] = 0.0f;
-			asset_vector WeightVector = {};
-			WeightVector.E[Tag_FacingDirection] = 1.0f;
-			bitmap_id ID = GetBestMatchBitmapFrom(Assets, Asset_Head, &MatchVector, &WeightVector);			
-			DEBUGAddVariable(&Context, "TestBitmap", ID);
-
-			DEBUGEndVariableGroup(&Context);
-
-			DebugState->RootGroup = Context.Group;
-
-			DebugState->RenderGroup = AllocateRenderGroup(Assets, &DebugState->DebugArena, Megabytes(2), false);
-			
-			DebugState->Paused = false;
-			DebugState->ScopeToRecord = 0;
-
-			DebugState->Initialized = true;
-			
-			SubArena(&DebugState->CollateArena, &DebugState->DebugArena, Megabytes(32), 4);
-			DebugState->CollateTemp = BeginTemporaryMemory(&DebugState->CollateArena);
-			
-			RestartCollation(DebugState, 0);
-			
-			AddHierarchy(DebugState, DebugState->RootGroup, V2(-0.5f*Width, 0.5f*Height));
-		}
-
-		BeginRender(DebugState->RenderGroup);
-		DebugState->DebugFont = PushFont(DebugState->RenderGroup, DebugState->FontID);
-		DebugState->DebugFontInfo = GetFontInfo(DebugState->RenderGroup->Assets, DebugState->FontID);
-
-		DebugState->GlobalWidth = (r32)Width;
-		DebugState->GlobalHeight = (r32)Height;
-
-		asset_vector MatchVector = {};
-		asset_vector WeightVector = {};
-		MatchVector.E[Tag_FontType] = (r32)FontType_Debug;
-		WeightVector.E[Tag_FontType] = 1.0f;
-		DebugState->FontID = GetBestMatchFontFrom(Assets, Asset_Font,
-			&MatchVector, &WeightVector);
-
-		DebugState->FontScale = 1.0f;
-		Orthographic(DebugState->RenderGroup, Width, Height, 1.0f);
-		DebugState->LeftEdge = -0.5f*(r32)Width;
-		DebugState->RightEdge = 0.5f*(r32)Width;
-		
-		DebugState->AtY = 0.5f*Height;
-	}
+	return(Tree);
 }
 
 inline b32
@@ -711,19 +626,19 @@ EndElement(layout_element *Element)
 internal void
 DEBUGDrawMainMenu(debug_state *DebugState, render_group *RenderGroup, v2 MouseP)
 {
-	for (debug_variable_hierarchy *Hierarchy = DebugState->HierarchySentinel.Next;
-		Hierarchy != &DebugState->HierarchySentinel;
-		Hierarchy = Hierarchy->Next)
+	for (debug_variable_Tree *Tree = DebugState->TreeSentinel.Next;
+		Tree != &DebugState->TreeSentinel;
+		Tree = Tree->Next)
 	{
 		layout Layout = {};
 		Layout.DebugState = DebugState;
 		Layout.MouseP = MouseP;
-		Layout.At = Hierarchy->UIP;
+		Layout.At = Tree->UIP;
 		Layout.LineAdvance = DebugState->FontScale*GetLineAdvanceFor(DebugState->DebugFontInfo);
 		Layout.SpacingY = 4.0f;
 		Layout.Depth = 0;
 		
-		debug_variable_reference *Ref = Hierarchy->Group->Var->Group.FirstChild;
+		debug_variable_reference *Ref = Tree->Group->Var->Group.FirstChild;
 		while (Ref)
 		{
 			debug_variable *Var = Ref->Var;
@@ -821,9 +736,9 @@ DEBUGDrawMainMenu(debug_state *DebugState, render_group *RenderGroup, v2 MouseP)
 		{
 			debug_interaction MoveInteraction = {};
 			MoveInteraction.Type = DebugInteraction_Move;
-			MoveInteraction.P = &Hierarchy->UIP;
+			MoveInteraction.P = &Tree->UIP;
 
-			rectangle2 MoveBox = RectCenterHalfDim(Hierarchy->UIP - V2(4.0f, 4.0f), V2(4.0f, 4.0f));
+			rectangle2 MoveBox = RectCenterHalfDim(Tree->UIP - V2(4.0f, 4.0f), V2(4.0f, 4.0f));
 			PushRect(DebugState->RenderGroup, MoveBox, 0,
 				InteractionIsHot(DebugState, MoveInteraction) ? V4(1, 1, 0, 1) : V4(1, 1, 1, 1));
 
@@ -916,10 +831,10 @@ DEBUGBeginInteract(debug_state *DebugState, game_input *Input, v2 MouseP, b32 Al
 			{
 				debug_variable_reference *RootGroup = DEBUGAddRootGroup(DebugState, "NewUserGroup");
 				DEBUGAddVariableReference(DebugState, RootGroup, DebugState->HotInteraction.Var);
-				debug_variable_hierarchy *Hierarchy = AddHierarchy(DebugState, RootGroup, V2(0, 0));
-				Hierarchy->UIP = MouseP;
+				debug_variable_Tree *Tree = AddTree(DebugState, RootGroup, V2(0, 0));
+				Tree->UIP = MouseP;
 				DebugState->HotInteraction.Type = DebugInteraction_Move;
-				DebugState->HotInteraction.P = &Hierarchy->UIP;
+				DebugState->HotInteraction.P = &Tree->UIP;
 			} break;
 		}
 
@@ -979,7 +894,7 @@ DEBUGInteract(debug_state *DebugState, game_input *Input, v2 MouseP)
 	if (DebugState->Interaction.Type)
 	{
 		debug_variable *Var = DebugState->Interaction.Var;
-		debug_variable_hierarchy *Hierarchy = DebugState->Interaction.Hierarchy;
+		debug_variable_Tree *Tree = DebugState->Interaction.Tree;
 		v2 *P = DebugState->Interaction.P;
 		// Mouse move interaction
 		switch (DebugState->Interaction.Type)
@@ -1044,131 +959,6 @@ DEBUGInteract(debug_state *DebugState, game_input *Input, v2 MouseP)
 	}
 
 	DebugState->LastMouseP = MouseP;
-}
-
-internal void
-DEBUGEnd(game_input *Input, loaded_bitmap *DrawBuffer)
-{
-	TIMED_FUNCTION();
-
-	debug_state *DebugState = DEBUGGetState();
-	if (DebugState)
-	{
-        render_group *RenderGroup = DebugState->RenderGroup;
-
-		ZeroStruct(DebugState->NextHotInteraction);
-		debug_record *HotRecord = 0;
-
-		v2 MouseP = V2(Input->MouseX, Input->MouseY);
-		DEBUGDrawMainMenu(DebugState, RenderGroup, MouseP);
-		DEBUGInteract(DebugState, Input, MouseP);
-
-		if (DebugState->Compiling)
-		{
-			debug_process_state State = Platform.DEBUGGetProcessState(DebugState->Compiler);
-			if (State.IsRunning)
-			{
-				DEBUGTextLine("COMPILING");
-			}
-			else
-			{
-				DebugState->Compiling = false;
-			}
-		}
-
-        loaded_font *Font = DebugState->DebugFont;
-		hha_font *Info = DebugState->DebugFontInfo;
-		if (Font)
-		{
-#if 0
-            for (u32 CounterIndex = 0;
-                CounterIndex < DebugState->CounterCount;
-                ++CounterIndex)
-            {
-                debug_counter_state *Counter = DebugState->CounterStates + CounterIndex;
-                
-                debug_statistic HitCount, CycleCount, CycleOverHit;
-                BeginStatistic(&HitCount);
-                BeginStatistic(&CycleCount);
-                BeginStatistic(&CycleOverHit);
-                for (u32 SnapshotIndex = 0;
-                    SnapshotIndex < DEBUG_SNAPSHOT_COUNT;
-                    ++SnapshotIndex)
-                {
-                    AccumDebugStatistic(&HitCount, Counter->Snapshots[SnapshotIndex].HitCount);
-                    AccumDebugStatistic(&CycleCount, (u32)Counter->Snapshots[SnapshotIndex].CycleCount);
-                    
-                    r64 HOC = 0.0;
-                    if (Counter->Snapshots[SnapshotIndex].HitCount)
-                    {
-                        HOC = ((r64)Counter->Snapshots[SnapshotIndex].CycleCount /
-                            (r64)Counter->Snapshots[SnapshotIndex].HitCount);
-                    }
-                    AccumDebugStatistic(&CycleOverHit, HOC);
-                }
-                EndDebugStatisctic(&HitCount);
-                EndDebugStatisctic(&CycleCount);
-                EndDebugStatisctic(&CycleOverHit);
-                
-				if (Counter->BlockName)
-				{
-					if (CycleCount.Max > 0.0f)
-					{
-						r32 BarWidth = 4.0f;
-						r32 ChartLeft = 0;
-						r32 ChartMinY = AtY;
-						r32 ChartHeight = Info->AscenderHeight*FontScale;
-						r32 Scale = 1.0f / (r32)CycleCount.Max;
-						for (u32 SnapshotIndex = 0;
-							SnapshotIndex < DEBUG_SNAPSHOT_COUNT;
-							++SnapshotIndex)
-						{
-							r32 ThisProportion = Scale*(r32)Counter->Snapshots[SnapshotIndex].CycleCount;
-							r32 ThisHeight = ChartHeight*ThisProportion;
-							PushRect(RenderGroup, V3(ChartLeft + BarWidth*(r32)SnapshotIndex + 0.5f*BarWidth, ChartMinY + 0.5f*ThisHeight, 0), V2(BarWidth, ThisHeight), V4(ThisProportion, 1, 0, 1));
-						} 
-					}
-#if 1
-					char TextBuffer[256];
-					_snprintf_s(TextBuffer, sizeof(TextBuffer),
-						"%32s(%4d): %10ucy %8uh %10ucy/h",
-						Counter->BlockName,
-						Counter->LineNumber,
-						(u32)CycleCount.Avg,
-						(u32)HitCount.Avg,
-						(u32)CycleOverHit.Avg);
-					DEBUGTextLine(TextBuffer);
-#endif
-				}
-            }
-#endif
-		}
-
-		if (DebugState->FrameCount)
-		{
-			char TextBuffer[256];
-				_snprintf_s(TextBuffer, sizeof(TextBuffer),
-					"Last frame time: %.02fms",
-					DebugState->Frames[DebugState->FrameCount - 1].WallSecondsElapsed * 1000.0f);
-				DEBUGTextLine(TextBuffer);
-		}
-
-		if (WasPressed(Input->MouseButtons[PlatformMouseBotton_Left]))
-		{
-			if (HotRecord)
-			{
-				DebugState->ScopeToRecord = HotRecord;
-			}
-			else
-			{
-				DebugState->ScopeToRecord = 0;
-			}
-			RefreshCollation(DebugState);
-		}
-	
-		TileRenderGroupToOutput(DebugState->HighPriorityQueue, DebugState->RenderGroup, DrawBuffer);
-		EndRenderGroup(DebugState->RenderGroup);
-	}
 }
 
 #define DebugRecords_Main_Count __COUNTER__
@@ -1384,6 +1174,211 @@ RefreshCollation(debug_state *DebugState)
 	CollateDebugRecords(DebugState, GlobalDebugTable->CurrentEventArrayIndex);
 }
 
+internal void
+DEBUGStart(debug_state *DebugState, game_assets *Assets, u32 Width, u32 Height)
+{
+	TIMED_FUNCTION();
+
+	if (!DebugState->Initialized)
+	{
+		DebugState->HighPriorityQueue = DebugGlobalMemory->HighPriorityQueue;
+		DebugState->TreeSentinel.Next = &DebugState->TreeSentinel;
+		DebugState->TreeSentinel.Prev = &DebugState->TreeSentinel;
+		DebugState->TreeSentinel.Group = 0;
+
+		InitializeArena(&DebugState->DebugArena, DebugGlobalMemory->DebugStorageSize - sizeof(debug_state), DebugState + 1);
+
+		debug_variable_definition_context Context = {};
+		Context.State = DebugState;
+		Context.Arena = &DebugState->DebugArena;
+		Context.Group = DEBUGBeginVariableGroup(&Context, "Root");
+
+		DEBUGBeginVariableGroup(&Context, "Debugging");
+
+		DEBUGCreateVariables(&Context);
+		DEBUGBeginVariableGroup(&Context, "Profile");
+		DEBUGBeginVariableGroup(&Context, "By Thread");
+		debug_variable_reference *ThreadList =
+			DEBUGAddVariable(&Context, DebugVariableType_CounterThreadList, "");
+		ThreadList->Var->Profile.Dimension = V2(1024.0f, 100.0f);
+		DEBUGEndVariableGroup(&Context);
+		DEBUGBeginVariableGroup(&Context, "By Function");
+		debug_variable_reference *FunctionList =
+			DEBUGAddVariable(&Context, DebugVariableType_CounterThreadList, "");
+		FunctionList->Var->Profile.Dimension = V2(1024.0f, 200.0f);
+		DEBUGEndVariableGroup(&Context);
+		DEBUGEndVariableGroup(&Context);
+		
+		asset_vector MatchVector = {};
+		MatchVector.E[Tag_FacingDirection] = 0.0f;
+		asset_vector WeightVector = {};
+		WeightVector.E[Tag_FacingDirection] = 1.0f;
+		bitmap_id ID = GetBestMatchBitmapFrom(Assets, Asset_Head, &MatchVector, &WeightVector);			
+		DEBUGAddVariable(&Context, "TestBitmap", ID);
+
+		DEBUGEndVariableGroup(&Context);
+
+		DebugState->RootGroup = Context.Group;
+
+		DebugState->RenderGroup = AllocateRenderGroup(Assets, &DebugState->DebugArena, Megabytes(2), false);
+		
+		DebugState->Paused = false;
+		DebugState->ScopeToRecord = 0;
+
+		DebugState->Initialized = true;
+		
+		SubArena(&DebugState->CollateArena, &DebugState->DebugArena, Megabytes(32), 4);
+		DebugState->CollateTemp = BeginTemporaryMemory(&DebugState->CollateArena);
+		
+		RestartCollation(DebugState, 0);
+		
+		AddTree(DebugState, DebugState->RootGroup, V2(-0.5f*Width, 0.5f*Height));
+	}
+
+	BeginRender(DebugState->RenderGroup);
+	DebugState->DebugFont = PushFont(DebugState->RenderGroup, DebugState->FontID);
+	DebugState->DebugFontInfo = GetFontInfo(DebugState->RenderGroup->Assets, DebugState->FontID);
+
+	DebugState->GlobalWidth = (r32)Width;
+	DebugState->GlobalHeight = (r32)Height;
+
+	asset_vector MatchVector = {};
+	asset_vector WeightVector = {};
+	MatchVector.E[Tag_FontType] = (r32)FontType_Debug;
+	WeightVector.E[Tag_FontType] = 1.0f;
+	DebugState->FontID = GetBestMatchFontFrom(Assets, Asset_Font,
+		&MatchVector, &WeightVector);
+
+	DebugState->FontScale = 1.0f;
+	Orthographic(DebugState->RenderGroup, Width, Height, 1.0f);
+	DebugState->LeftEdge = -0.5f*(r32)Width;
+	DebugState->RightEdge = 0.5f*(r32)Width;
+	
+	DebugState->AtY = 0.5f*Height;
+}
+
+
+internal void
+DEBUGEnd(debug_state *DebugState, game_input *Input, loaded_bitmap *DrawBuffer)
+{
+	TIMED_FUNCTION();
+
+	render_group *RenderGroup = DebugState->RenderGroup;
+
+	ZeroStruct(DebugState->NextHotInteraction);
+	debug_record *HotRecord = 0;
+
+	v2 MouseP = V2(Input->MouseX, Input->MouseY);
+	DEBUGDrawMainMenu(DebugState, RenderGroup, MouseP);
+	DEBUGInteract(DebugState, Input, MouseP);
+
+	if (DebugState->Compiling)
+	{
+		debug_process_state State = Platform.DEBUGGetProcessState(DebugState->Compiler);
+		if (State.IsRunning)
+		{
+			DEBUGTextLine("COMPILING");
+		}
+		else
+		{
+			DebugState->Compiling = false;
+		}
+	}
+
+	loaded_font *Font = DebugState->DebugFont;
+	hha_font *Info = DebugState->DebugFontInfo;
+	if (Font)
+	{
+#if 0
+		for (u32 CounterIndex = 0;
+			CounterIndex < DebugState->CounterCount;
+			++CounterIndex)
+		{
+			debug_counter_state *Counter = DebugState->CounterStates + CounterIndex;
+			
+			debug_statistic HitCount, CycleCount, CycleOverHit;
+			BeginStatistic(&HitCount);
+			BeginStatistic(&CycleCount);
+			BeginStatistic(&CycleOverHit);
+			for (u32 SnapshotIndex = 0;
+				SnapshotIndex < DEBUG_SNAPSHOT_COUNT;
+				++SnapshotIndex)
+			{
+				AccumDebugStatistic(&HitCount, Counter->Snapshots[SnapshotIndex].HitCount);
+				AccumDebugStatistic(&CycleCount, (u32)Counter->Snapshots[SnapshotIndex].CycleCount);
+				
+				r64 HOC = 0.0;
+				if (Counter->Snapshots[SnapshotIndex].HitCount)
+				{
+					HOC = ((r64)Counter->Snapshots[SnapshotIndex].CycleCount /
+						(r64)Counter->Snapshots[SnapshotIndex].HitCount);
+				}
+				AccumDebugStatistic(&CycleOverHit, HOC);
+			}
+			EndDebugStatisctic(&HitCount);
+			EndDebugStatisctic(&CycleCount);
+			EndDebugStatisctic(&CycleOverHit);
+			
+			if (Counter->BlockName)
+			{
+				if (CycleCount.Max > 0.0f)
+				{
+					r32 BarWidth = 4.0f;
+					r32 ChartLeft = 0;
+					r32 ChartMinY = AtY;
+					r32 ChartHeight = Info->AscenderHeight*FontScale;
+					r32 Scale = 1.0f / (r32)CycleCount.Max;
+					for (u32 SnapshotIndex = 0;
+						SnapshotIndex < DEBUG_SNAPSHOT_COUNT;
+						++SnapshotIndex)
+					{
+						r32 ThisProportion = Scale*(r32)Counter->Snapshots[SnapshotIndex].CycleCount;
+						r32 ThisHeight = ChartHeight*ThisProportion;
+						PushRect(RenderGroup, V3(ChartLeft + BarWidth*(r32)SnapshotIndex + 0.5f*BarWidth, ChartMinY + 0.5f*ThisHeight, 0), V2(BarWidth, ThisHeight), V4(ThisProportion, 1, 0, 1));
+					} 
+				}
+#if 1
+				char TextBuffer[256];
+				_snprintf_s(TextBuffer, sizeof(TextBuffer),
+					"%32s(%4d): %10ucy %8uh %10ucy/h",
+					Counter->BlockName,
+					Counter->LineNumber,
+					(u32)CycleCount.Avg,
+					(u32)HitCount.Avg,
+					(u32)CycleOverHit.Avg);
+				DEBUGTextLine(TextBuffer);
+#endif
+			}
+		}
+#endif
+	}
+
+	if (DebugState->FrameCount)
+	{
+		char TextBuffer[256];
+			_snprintf_s(TextBuffer, sizeof(TextBuffer),
+				"Last frame time: %.02fms",
+				DebugState->Frames[DebugState->FrameCount - 1].WallSecondsElapsed * 1000.0f);
+			DEBUGTextLine(TextBuffer);
+	}
+
+	if (WasPressed(Input->MouseButtons[PlatformMouseBotton_Left]))
+	{
+		if (HotRecord)
+		{
+			DebugState->ScopeToRecord = HotRecord;
+		}
+		else
+		{
+			DebugState->ScopeToRecord = 0;
+		}
+		RefreshCollation(DebugState);
+	}
+
+	TileRenderGroupToOutput(DebugState->HighPriorityQueue, DebugState->RenderGroup, DrawBuffer);
+	EndRenderGroup(DebugState->RenderGroup);
+}
+
 extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 {
 	GlobalDebugTable->RecordCount[0] = DebugRecords_Main_Count;
@@ -1403,9 +1398,13 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 	u32 EventCount = ArrayIndex_EventIndex & 0xFFFFFFFF;
 	GlobalDebugTable->EventCount[EventArrayIndex] = EventCount;
 
-	debug_state *DebugState = DEBUGGetState(Memory);
+	debug_state *DebugState = (debug_state *)Memory->DebugStorage;
 	if (DebugState)
 	{
+		game_assets *Assets = DEBUGGetGameAssets(Memory);
+
+		DEBUGStart(DebugState, Assets, Buffer->Width, Buffer->Height);
+		
 		if (Memory->ExecutableReloaded)
 		{
 			RestartCollation(DebugState, GlobalDebugTable->CurrentEventArrayIndex);
@@ -1420,6 +1419,13 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 			
 			CollateDebugRecords(DebugState, GlobalDebugTable->CurrentEventArrayIndex);
 		}
+
+		loaded_bitmap DrawBuffer = {};
+		DrawBuffer.Width = Buffer->Width;
+		DrawBuffer.Height = Buffer->Height;
+		DrawBuffer.Pitch = Buffer->Pitch;
+		DrawBuffer.Memory = Buffer->Memory;
+		DEBUGEnd(DebugState, Input, &DrawBuffer);
 	}
 
 	return(GlobalDebugTable);
