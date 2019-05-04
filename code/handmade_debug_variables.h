@@ -1,12 +1,13 @@
 #if !defined(HANDMADE_DEBUG_VARIABLES_H)
 
-
+#define DEBUG_MAX_VARIABLE_STACK_DEPTH 64
 struct debug_variable_definition_context
 {
 	debug_state *State;
 	memory_arena *Arena;
 
-	debug_variable *Group;
+	u32 GroupDepth;
+	debug_variable *GroupStack[DEBUG_MAX_VARIABLE_STACK_DEPTH];
 };
 
 internal debug_variable *
@@ -19,24 +20,35 @@ DEBUGAddVariable(debug_state *State, debug_variable_type Type, char *Name)
 	return(Var);
 }
 
-internal debug_varialbe *
+internal void
+DEBUGAddVariableToGroup(debug_state *State, debug_variable *Group, debug_variable *Add)
+{
+	debug_variable_link *Link = PushStruct(&State->DebugArena, debug_variable_link);
+	DLIST_INSERT(&Group->VarGroup, Link);
+}
+
+internal debug_variable *
 DEBUGAddVariable(debug_variable_definition_context *Context, debug_variable_type Type, char *Name)
 {
-	Assert(Context->VarCount < ArrayCount(Context->Vars));
-
 	debug_variable *Var = DEBUGAddVariable(Context->State, Type, Name);
-	Context->Vars[Context->VarCount++] = Var;
-
+	debug_variable *Parent = Context->GroupStack[Context->GroupDepth];
+	if (Parent)
+	{
+		DEBUGAddVariableToGroup(Context->State, Parent, Var);
+	}
+	
 	return(Var);
 }
 
-internal debug_varialbe *
+
+internal debug_variable *
 DEBUGBeginVariableGroup(debug_variable_definition_context *Context, char *Name)
 {
-	debug_varialbe *Group = DEBUGAddVariable(Context->State, DebugVariableType_VarArray, Name);
-	Group->VarArray.Count = 0;
+	debug_variable *Group = DEBUGAddVariable(Context->State, DebugVariableType_VarGroup, Name);
+	DLIST_INIT(&Group->VarGroup);
 
-	xxx - you are here! 
+	Assert(Context->GroupDepth < (ArrayCount(Context->GroupStack) - 1));
+	Context->GroupStack[++Context->GroupDepth] = Group;
 
 	return(Group);
 }
@@ -80,9 +92,8 @@ DEBUGAddVariable(debug_variable_definition_context *Context, char *Name, bitmap_
 internal void
 DEBUGEndVariableGroup(debug_variable_definition_context *Context)
 {
-	Assert(Context->Group);
-
-	Context->Group = Context->Group->Parent;
+	Assert(Context->GroupDepth > 0);
+	--Context->GroupDepth;
 }
 
 internal void

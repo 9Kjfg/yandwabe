@@ -28,7 +28,7 @@ enum debug_variable_type
 
     DebugVariableType_BitmapDisplay,
 
-    DebugVariableType_VarArray,
+    DebugVariableType_VarGroup,
 };
 
 inline b32
@@ -85,7 +85,7 @@ struct debug_tree
 
 struct debug_profile_settings
 {
-    int Placeholder;
+    u32 Placeholder;
 };
 
 struct debug_bitmap_display
@@ -95,10 +95,11 @@ struct debug_bitmap_display
     b32 Alpha;
 };
 
-struct debug_variable_array
+struct debug_variable_link
 {
-    u32 Count;
-    debug_variable *Vars;
+    debug_variable_link *Next;
+    debug_variable_link *Prev;
+    debug_variable *Var;
 };
 
 struct debug_variable
@@ -115,9 +116,9 @@ struct debug_variable
         v2 Vector2;
         v3 Vector3;
         v4 Vector4;
-        debug_profie_settings Profile;
+        debug_profile_settings Profile;
         debug_bitmap_display BitmapDisplay;
-        debug_variable_array VarArray;
+        debug_variable_link VarGroup;
     };
 };
 

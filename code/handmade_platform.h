@@ -1,5 +1,16 @@
 #if !defined(HANDMADE_PLATFORM_H)
 
+#define DLIST_INSERT(Sentinel, Element) \
+	(Element)->Next = (Sentinel)->Next; \
+	(Element)->Prev = (Sentinel); \
+\
+	(Element)->Next->Prev = (Sentinel); \
+	(Element)->Prev->Next = (Sentinel);
+
+#define DLIST_INIT(Sentinel) \
+	(Sentinel)->Next = (Sentinel); \
+	(Sentinel)->Prev = (Sentinel);
+
 #include "handmade_config.h"
 
 /*
