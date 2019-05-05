@@ -4,8 +4,8 @@
 	(Element)->Next = (Sentinel)->Next; \
 	(Element)->Prev = (Sentinel); \
 \
-	(Element)->Next->Prev = (Sentinel); \
-	(Element)->Prev->Next = (Sentinel);
+	(Element)->Next->Prev = (Element); \
+	(Element)->Prev->Next = (Element);
 
 #define DLIST_INIT(Sentinel) \
 	(Sentinel)->Next = (Sentinel); \

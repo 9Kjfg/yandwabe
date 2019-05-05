@@ -6,6 +6,17 @@
 
 internal void RestartCollation(debug_state *DebugState, u32 InvalidEventArrayIndex);
 
+inline debug_id
+DebugIDFromLink(debug_tree *Tree, debug_variable_link *Link)
+{
+	debug_id Result = {};
+
+	Result.Value[0] = Tree;
+	Result.Value[1] = Link;
+
+	return(Result);
+}
+
 inline debug_state *
 DEBUGGetState(game_memory *Memory)
 {
@@ -626,14 +637,53 @@ EndElement(layout_element *Element)
 	Layout->At.y = GetMinCorner(TotalBounds).y - SpacingY;
 }
 
-internal debug_view *
-GetDebugViewFor(debug_state *DebugState, debug_variable *Var)
+inline b32
+DebugIDsAreEqual(debug_id A, debug_id B)
 {
-	debug_view *Result = 0;
+	b32 Result = (A.Value[0] == B.Value[0]) && (A.Value[1] == B.Value[1]);
+	return(Result);
+}
 
-	// NotImplemented
+internal debug_view *
+GetOrCreateDebugViewFor(debug_state *DebugState, debug_id ID)
+{
+	// TODO: Better hash function
+	u32 HashIndex = (((u32)ID.Value[0] >> 2) + ((u32)ID.Value[1] >> 2)) % ArrayCount(DebugState->ViewHash);
+	debug_view **HashSlot = DebugState->ViewHash + HashIndex;
+
+	debug_view *Result = 0;
+	for (debug_view *Search = *HashSlot;
+		Search;
+		Search = Search->NextInHash)
+	{
+		if (DebugIDsAreEqual(Search->ID, ID))
+		{
+			Result = Search;
+			break;
+		}
+	}
+
+	if (!Result)
+	{
+		Result = PushStruct(&DebugState->DebugArena, debug_view);
+		Result->ID = ID;
+		Result->Type = DebugViewType_Unknown;
+		Result->NextInHash = *HashSlot;
+		*HashSlot = Result;
+	}
 
 	return(Result);
+}
+
+inline debug_interaction
+VarLinkInteraction(debug_interaction_type Type, debug_tree *Tree, debug_variable_link *Link)
+{
+	debug_interaction ItemInteraction = {};
+	ItemInteraction.ID = DebugIDFromLink(Tree, Link);
+	ItemInteraction.Type = Type;
+	ItemInteraction.Var = Link->Var;
+
+	return(ItemInteraction);
 }
 
 internal void
@@ -649,13 +699,12 @@ DEBUGDrawMainMenu(debug_state *DebugState, render_group *RenderGroup, v2 MouseP)
 		Layout.At = Tree->UIP;
 		Layout.LineAdvance = DebugState->FontScale*GetLineAdvanceFor(DebugState->DebugFontInfo);
 		Layout.SpacingY = 4.0f;
-		Layout.Depth = 0;
 
 		int Depth = 0;
 		debug_variable_iterator Stack[DEBUG_MAX_VARIABLE_STACK_DEPTH];
 
-		Stack[Depth].Link = DebugState->RootGroup->VarGroup.Next;
-		Stack[Depth].Sentinel = &DebugState->RootGroup->VarGroup;
+		Stack[Depth].Link = Tree->Group->VarGroup.Next;
+		Stack[Depth].Sentinel = &Tree->Group->VarGroup;
 		++Depth;
 		while (Depth > 0)
 		{
@@ -666,17 +715,19 @@ DEBUGDrawMainMenu(debug_state *DebugState, render_group *RenderGroup, v2 MouseP)
 			}
 			else
 			{
+				Layout.Depth = Depth;
+
+				debug_variable_link *Link = Iter->Link;
 				debug_variable *Var = Iter->Link->Var;
 				Iter->Link = Iter->Link->Next;
 
-				debug_interaction ItemInteraction = {};
-				ItemInteraction.Type = DebugInteraction_AutoModifyVariable;
-				ItemInteraction.Var = Var;
-
+				debug_interaction ItemInteraction = 
+					VarLinkInteraction(DebugInteraction_AutoModifyVariable, Tree, Link);
+				
 				b32 IsHot = InteractionIsHot(DebugState, ItemInteraction);
 				v4 ItemColor = IsHot ? V4(1, 1, 0, 1) : V4(1, 1, 1, 1);
 				
-				debug_view *View = GetDebugViewFor(DebugState, Var);
+				debug_view *View = GetOrCreateDebugViewFor(DebugState, DebugIDFromLink(Tree, Link));
 				switch(Var->Type)
 				{
 					case DebugVariableType_CounterThreadList:
@@ -699,9 +750,7 @@ DEBUGDrawMainMenu(debug_state *DebugState, render_group *RenderGroup, v2 MouseP)
 							View->InlineBlock.Dim.x = Dim.Size.x;
 						}
 
-						debug_interaction TearInteraction = {};
-						TearInteraction.Type = DebugInteraction_TearValue;
-						TearInteraction.Var = Var;
+						debug_interaction TearInteraction = VarLinkInteraction(DebugInteraction_TearValue, Tree, Link);
 
 						layout_element Element = BeginElementRectangle(&Layout, &View->InlineBlock.Dim);
 						MakeElementSizable(&Element);
@@ -734,7 +783,8 @@ DEBUGDrawMainMenu(debug_state *DebugState, render_group *RenderGroup, v2 MouseP)
 					} break;
 				}
 
-				if (Var->Type == DebugVariableType_VarGroup)
+				if ((Var->Type == DebugVariableType_VarGroup) &&
+					View->Collapsible.ExpandedAlways)
 				{
 					Iter = Stack + Depth;
 					Iter->Link = Var->VarGroup.Next;
@@ -844,14 +894,12 @@ DEBUGBeginInteract(debug_state *DebugState, game_input *Input, v2 MouseP, b32 Al
 			case DebugInteraction_TearValue:
 			{
 				// TODO: Reimplement with new system
-#if 0
-				debug_variable_reference *RootGroup = DEBUGAddRootGroup(DebugState, "NewUserGroup");
-				DEBUGAddVariableReference(DebugState, RootGroup, DebugState->HotInteraction.Var);
-				debug_variable_Tree *Tree = AddTree(DebugState, RootGroup, V2(0, 0));
+				debug_variable *RootGroup = DEBUGAddRootGroup(DebugState, "NewUserGroup");
+				DEBUGAddVariableToGroup(DebugState, RootGroup, DebugState->HotInteraction.Var);
+				debug_tree *Tree = AddTree(DebugState, RootGroup, V2(0, 0));
 				Tree->UIP = MouseP;
 				DebugState->HotInteraction.Type = DebugInteraction_Move;
 				DebugState->HotInteraction.P = &Tree->UIP;
-#endif
 			} break;
 		}
 
@@ -881,7 +929,7 @@ DEBUGEndInteract(debug_state *DebugState, game_input *Input, v2 MouseP)
 
 				case DebugVariableType_VarGroup:
 				{
-					debug_view *View = GetDebugViewFor(DebugState, Var);
+					debug_view *View = GetOrCreateDebugViewFor(DebugState, DebugState->Interaction.ID);
 					View->Collapsible.ExpandedAlways = !View->Collapsible.ExpandedAlways;
 				} break;
 			}
@@ -923,7 +971,7 @@ DEBUGInteract(debug_state *DebugState, game_input *Input, v2 MouseP)
 				{
 					case DebugVariableType_Real32:
 					{
-						Var->Real32 += 9.1f*dMouseP.y;
+						Var->Real32 += 0.1f*dMouseP.y;
 					} break;
 				}
 			} break;
@@ -1228,9 +1276,11 @@ DEBUGStart(debug_state *DebugState, game_assets *Assets, u32 Width, u32 Height)
 		MatchVector.E[Tag_FacingDirection] = 0.0f;
 		asset_vector WeightVector = {};
 		WeightVector.E[Tag_FacingDirection] = 1.0f;
-		bitmap_id ID = GetBestMatchBitmapFrom(Assets, Asset_Head, &MatchVector, &WeightVector);			
+		bitmap_id ID = GetBestMatchBitmapFrom(Assets, Asset_Head, &MatchVector, &WeightVector);	
+				
 		DEBUGAddVariable(&Context, "TestBitmap", ID);
 
+		DEBUGEndVariableGroup(&Context);
 		DEBUGEndVariableGroup(&Context);
 		Assert(Context.GroupDepth == 0);
 

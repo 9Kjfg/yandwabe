@@ -54,14 +54,21 @@ struct debug_view_collapsible
 
 enum debug_view_type
 {
+    DebugViewType_Unknown,
+    
     DebugViewType_Basic,
     DebugViewType_InlineBlock,
+    DebugViewType_Collapsible,
+};
+
+struct debug_id
+{
+    void *Value[2];
 };
 
 struct debug_view
 {
-    debug_tree *Tree;
-    debug_variable *Var;
+    debug_id ID;
     debug_view *NextInHash;
     
     debug_view_type Type;
@@ -205,6 +212,7 @@ enum debug_interaction_type
 
 struct debug_interaction
 {
+    debug_id ID;
     debug_interaction_type Type;
     union
     {
@@ -265,6 +273,8 @@ struct debug_state
     debug_frame *Frames;
     debug_thread *FirstThread;
     open_debug_block *FirstFreeBlock;
+
+    debug_view Dummy;
 };
 
 #define HANDMADE_DEBUG_H
