@@ -8,7 +8,7 @@
             //#define DEBUGUI_Camera 
                 #define DEBUGUI_UseRoomBasedCamera 0
                 #define DEBUGUI_DebugCameraDistance 38.999989f
-                #define DEBUGUI_UsedDebugCamera 1
+                #define DEBUGUI_UsedDebugCamera 0
             #define DEBUGUI_ShowLightingSamples 0
             #define DEBUGUI_TestWeirdDrawBufferSize 0
         //#define DEBUGUI_Particles 
@@ -18,3 +18,5 @@
             #define DEBUGUI_RecomputeGroundChunksOnEXEChange 0
             #define DEBUGUI_GroundCheckChekerboards 0
             #define DEBUGUI_GroundChunkOutline 0
+        //#define DEBUGUI_Group Chunks 
+            #define DEBUGUI_DrawEntityOutlines 1

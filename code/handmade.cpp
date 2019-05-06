@@ -925,12 +925,14 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
 	world *World = GameState->World;
 
+#if 0
 	{
 		v2 MusicVolume;
 		MusicVolume.x = SafeRatio0((r32)Input->MouseX, (r32)Buffer->Width);
 		MusicVolume.y = 1.0 - MusicVolume.x;
 		ChangeVolume(&GameState->AudioState, GameState->Music, 0.01f, MusicVolume);
 	}
+#endif
 
 	for (int ControllerIndex = 0;
 		ControllerIndex < ArrayCount(Input->Controllers);
@@ -1028,13 +1030,16 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	DrawBuffer->Height = 719;
 #endif	
 
+	v2 MouseP = {Input->MouseX, Input->MouseY};
 	render_group *RenderGroup = AllocateRenderGroup(TranState->Assets, &TranState->TranArena, Megabytes(4), false);
 	BeginRender(RenderGroup);
 	real32 WidthOfMonitor = 0.635; // NOTE: Horizontal measurement of monitor in meters
 	real32 MetersToPixels = (real32)DrawBuffer->Width*WidthOfMonitor;
+	
 	real32 FocalLength = 0.6;
 	real32 DistanceAboveGround = 9.0f;
 	Perspective(RenderGroup, DrawBuffer->Width, DrawBuffer->Height, MetersToPixels, FocalLength, DistanceAboveGround);
+
 	Clear(RenderGroup, V4(0.25f, 0.25f, 0.25f, 0.0f));
 
 	v2 ScreenCenter = {0.5f*(real32)DrawBuffer->Width, 0.5f*(real32)DrawBuffer->Height};
@@ -1491,13 +1496,13 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 				} break;
 				case EntityType_Space:
 				{
-#if DEBUGUI_Spaces
+#if DEBUGUI_UseSpacesOutlines
 					for (uint32 VolumeIndex = 0;
 						VolumeIndex < Entity->Collision->VolumeCount;
 						++VolumeIndex)
 					{
 						sim_entity_collision_volume *Volume = Entity->Collision->Volumes + VolumeIndex;
-						PushRectOutline(RenderGroup, Volume->OffsetP + V3(0, 0, 0.5f*Volume->Dim.z), Volume->Dim.xy, V4(0.0f, 0.5f, 1.0f, 1.0f));
+						PushRectOutline(RenderGroup, Volume->OffsetP - V3(0, 0, 0.5f*Volume->Dim.z), Volume->Dim.xy, V4(0.0f, 0.5f, 1.0f, 1.0f));
 					}
 #endif
 				} break;
@@ -1507,6 +1512,43 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 				} break;
 			}
 
+#if DEBUGUI_DrawEntityOutlines
+			RenderGroup->Transform.OffsetP = V3(0, 0, 0);
+			RenderGroup->Transform.Scale = 1.0f;
+			v2 MetersMouseP = MouseP*(1.0f / RenderGroup->Transform.MetersToPixels);
+			r32 LocalZ = 10.0f;
+			v2 WorldMouseP = Unproject(RenderGroup, MetersMouseP, LocalZ);
+			RenderGroup->Transform.OffsetP = V3(WorldMouseP, RenderGroup->Transform.DistanceAboveTarget - LocalZ);
+			PushRect(RenderGroup, V3(0, 0, 0), V2(1.0f , 1.0f),
+				V4(0, 1, 1, 1));
+
+#if 0
+	
+			if (EntityIndex == 10)
+			{
+				v2 MetersMouseP = MouseP*(1.0f / RenderGroup->Transform.MetersToPixels);
+				for (uint32 VolumeIndex = 0;
+					VolumeIndex < Entity->Collision->VolumeCount;
+					++VolumeIndex)
+				{
+					sim_entity_collision_volume *Volume = Entity->Collision->Volumes + VolumeIndex;
+					
+					r32 LocalZ = (RenderGroup->Transform.OffsetP.z + Volume->OffsetP.z);
+					v4 OutlineColor = V4(1, 0, 1, 1);
+					v2 LocalMouseP = Unproject(RenderGroup, MetersMouseP, LocalZ);
+					PushRect(RenderGroup, V3(LocalMouseP, LocalZ), V2(1.0f, 1.0f), V4(0, 1, 1, 1));
+
+					if ((LocalMouseP.x > -0.5f*Volume->Dim.x) && (LocalMouseP.x < 0.5f*Volume->Dim.x) &&
+						(LocalMouseP.y > -0.5f*Volume->Dim.y) && (LocalMouseP.y < 0.5f*Volume->Dim.y))
+					{
+						OutlineColor = V4(1, 1, 0, 1);
+					}
+
+					PushRectOutline(RenderGroup, Volume->OffsetP - V3(0, 0, 0.5f*Volume->Dim.z), Volume->Dim.xy, OutlineColor, 0.05f);
+				}
+			}
+#endif
+#endif
 		}
 	}
 
@@ -1596,6 +1638,10 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		MapP += YAxis + V2(0.0f, 6.0f);
 	}
 #endif
+
+	Orthographic(RenderGroup, DrawBuffer->Width, DrawBuffer->Height, 1.0f);
+
+	PushRectOutline(RenderGroup, V3(MouseP, 0.0f), V2(2.0f, 2.0f));
 
 	TileRenderGroupToOutput(TranState->HighPriorityQueue, RenderGroup, DrawBuffer);
 	EndRenderGroup(RenderGroup);

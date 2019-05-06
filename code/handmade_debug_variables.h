@@ -116,39 +116,43 @@ DEBUGCreateVariables(debug_variable_definition_context *Context)
 {
 // TODO: Parameterize the fountain?
 
-#define DEBUG_VARIABLE_LESTING(Name) DEBUGAddVariable(Context, #Name, DEBUGUI_##Name)
+#define DEBUG_VARIABLE_LISTING(Name) DEBUGAddVariable(Context, #Name, DEBUGUI_##Name)
 
 	DEBUGBeginVariableGroup(Context, "Group Chunks");
-	DEBUG_VARIABLE_LESTING(GroundChunkOutline);
-	DEBUG_VARIABLE_LESTING(GroundCheckChekerboards);
-	DEBUG_VARIABLE_LESTING(RecomputeGroundChunksOnEXEChange);
+	DEBUG_VARIABLE_LISTING(DrawEntityOutlines);
+	DEBUGEndVariableGroup(Context);
+
+	DEBUGBeginVariableGroup(Context, "Group Chunks");
+	DEBUG_VARIABLE_LISTING(GroundChunkOutline);
+	DEBUG_VARIABLE_LISTING(GroundCheckChekerboards);
+	DEBUG_VARIABLE_LISTING(RecomputeGroundChunksOnEXEChange);
 	DEBUGEndVariableGroup(Context);
 
 	DEBUGBeginVariableGroup(Context, "Particles");
-	DEBUG_VARIABLE_LESTING(ParticleTest);
-	DEBUG_VARIABLE_LESTING(ParitcleGrid);
+	DEBUG_VARIABLE_LISTING(ParticleTest);
+	DEBUG_VARIABLE_LISTING(ParitcleGrid);
 	DEBUGEndVariableGroup(Context);
 
 	DEBUGBeginVariableGroup(Context, "Renderer");
 	{
-		DEBUG_VARIABLE_LESTING(TestWeirdDrawBufferSize);
-		DEBUG_VARIABLE_LESTING(ShowLightingSamples);
+		DEBUG_VARIABLE_LISTING(TestWeirdDrawBufferSize);
+		DEBUG_VARIABLE_LISTING(ShowLightingSamples);
 	
 		DEBUGBeginVariableGroup(Context, "Camera");
 		{
-			DEBUG_VARIABLE_LESTING(UsedDebugCamera);
-			DEBUG_VARIABLE_LESTING(DebugCameraDistance);
-			DEBUG_VARIABLE_LESTING(UseRoomBasedCamera);
+			DEBUG_VARIABLE_LISTING(UsedDebugCamera);
+			DEBUG_VARIABLE_LISTING(DebugCameraDistance);
+			DEBUG_VARIABLE_LISTING(UseRoomBasedCamera);
 		}
 		DEBUGEndVariableGroup(Context);
 	
 		DEBUGEndVariableGroup(Context);
 	}
 
-	DEBUG_VARIABLE_LESTING(UseSpacesOutline);
-	DEBUG_VARIABLE_LESTING(FamiliarFollowsHero);
+	DEBUG_VARIABLE_LISTING(UseSpacesOutline);
+	DEBUG_VARIABLE_LISTING(FamiliarFollowsHero);
 	
-#undef DEBUG_VARIABLE_LESTING
+#undef DEBUG_VARIABLE_LISTING
 }
 
 #define HANDMADE_DEBUG_VARIABLES_H
