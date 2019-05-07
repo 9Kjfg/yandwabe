@@ -980,26 +980,32 @@ CoordinateSystem(render_group *Group, v2 Origin, v2 XAxis, v2 YAxis, v4 Color,
 #endif 
 }
 
-#if 0
-inline v2
-CompleteUnproject()
+inline v3
+Unproject(render_group *Group, v2 PixelsXY)
 {
+	render_transform *Transform = &Group->Transform;
+
+	v2 UnprojectedXY;
 	if (Transform->Orthographic)
 	{
-		Result.P = Transform->ScreenCenter + Transform->MetersToPixels*P.xy;
+		UnprojectedXY = (1.0f / Transform->MetersToPixels)*(PixelsXY - Transform->ScreenCenter);
+		//NewInput->MouseX = (-0.5f*GlobalBackBaffer.Width + 0.5f) + (r32)MouseP.x;
+		//NewInput->MouseY = (0.5f*GlobalBackBaffer.Height - 0.5f) - (r32)MouseP.y;
 	}
 	else
 	{
-		v2 A = (FinalP - Transform->ScreenCenter) / Transform->MetersToPixels;
-		v2 Result = ((Transform->DistanceAboveTarget - P.z) / Transform->FocalLength)*A;
+		v2 A = (PixelsXY - Transform->ScreenCenter) * (1.0f / Transform->MetersToPixels);
+		UnprojectedXY = ((Transform->DistanceAboveTarget - Transform->OffsetP.z) / Transform->FocalLength) * A;
 	}
 
-	v3 P = V3(OriginalP.xy, 0.0f) + Transform->OffsetP;
+	v3 Result = V3(UnprojectedXY, Transform->OffsetP.z);
+	Result -= Transform->OffsetP;
+
+	return(Result);
 }
-#endif
 
 inline v2
-Unproject(render_group *Group, v2 ProjectedXY, real32 AtDistanceFromCamera)
+UnprojectOld(render_group *Group, v2 ProjectedXY, real32 AtDistanceFromCamera)
 {
 	v2 WorldXY = (AtDistanceFromCamera / Group->Transform.FocalLength)*ProjectedXY;
 	return(WorldXY);
@@ -1008,7 +1014,7 @@ Unproject(render_group *Group, v2 ProjectedXY, real32 AtDistanceFromCamera)
 inline rectangle2
 GetCameraRectangleAtDistance(render_group *Group, real32 DistanceFromCamera)
 {
-	v2 RawXY = Unproject(Group, Group->MonitroHalfDimInMeters, DistanceFromCamera);
+	v2 RawXY = UnprojectOld(Group, Group->MonitroHalfDimInMeters, DistanceFromCamera);
 
 	rectangle2 Result = RectCenterHalfDim(V2(0, 0), RawXY);
 

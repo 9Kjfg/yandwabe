@@ -251,6 +251,16 @@ operator*(v2 B, real32 A)
     return(Result);
 }
 
+inline v2
+operator/(v2 A, real32 B)
+{
+    v2 Result;
+    Result.x = A.x / B;
+    Result.y = A.y / B;
+
+    return(Result);
+}
+
 
 inline v2 &
 operator*=(v2 &B, real32 A)
@@ -299,6 +309,14 @@ operator-(v2 A, v2 B)
 
     return(Result);
 }
+
+inline v2 &
+operator-=(v2 &A, const v2 &B)
+{
+    A = A - B;
+    return(A);
+}
+
 
 inline v2
 Perp(v2 A)
@@ -468,6 +486,13 @@ operator-(v3 A, v3 B)
     return(Result);
 }
 
+inline v3 &
+operator-=(v3 &A, const v3 &B)
+{
+    A = A - B;
+    return(A);
+}
+
 inline v3
 Hadamard(v3 A, v3 B)
 {
@@ -581,13 +606,6 @@ operator+(v4 A, v4 B)
     return(Result);
 }
 
-inline v4 &
-operator+=(v4 &A, const v4 &B)
-{
-    A = A + B;
-    return(A);
-}
-
 inline v4
 operator-(v4 A, v4 B)
 {
@@ -599,6 +617,13 @@ operator-(v4 A, v4 B)
     Result.w = A.w - B.w;
 
     return(Result);
+}
+
+inline v4 &
+operator-=(v4 &A, const v4 &B)
+{
+    A = A - B;
+    return(A);
 }
 
 inline v4
