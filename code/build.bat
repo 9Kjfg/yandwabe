@@ -13,6 +13,9 @@ del *.pdb > NUL 2> NUL
 
 REM Simple preprocessor
 cl %CommonCompilerFlags% -DTRANSLATION_UNIT_INDEX=0 -D_CRT_SECURE_NO_WARNINGS=1 ..\handmade\code\simple_preprocessor.cpp /link %CommonLinkerFlags%
+pushd ..\handmade\code
+..\..\build\simple_preprocessor.exe > handmade_generated.h
+popd
 
 REM Asset file builder build
 REM cl %CommonCompilerFlags% -DTRANSLATION_UNIT_INDEX=0 -D_CRT_SECURE_NO_WARNINGS=1 ..\handmade\code\test_asset_builder.cpp /link %CommonLinkerFlags%

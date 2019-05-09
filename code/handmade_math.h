@@ -97,13 +97,13 @@ union v4
     real32 E[4];
 };
 
-struct rectangle2
+introspect(category:"regular butter") struct rectangle2
 {
     v2 Min;
     v2 Max;
 };
 
-struct rectangle3
+introspect(category:"regular butter") struct rectangle3
 {
     v3 Min;
     v3 Max;

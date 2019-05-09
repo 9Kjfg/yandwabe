@@ -1,11 +1,13 @@
 #if !defined(HANDMADE_H)
 
 #define introspect(params)
+#define counted_pointer(params)
 
 #include "handmade_platform.h"
 #include "handmade_intrinsics.h"
 #include "handmade_math.h"
 #include "handmade_file_format.h"
+#include "handmade_meta.h"
 
 struct memory_arena
 {
