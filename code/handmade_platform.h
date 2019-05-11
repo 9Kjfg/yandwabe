@@ -511,6 +511,18 @@ enum debug_event_type
 	DebugEvent_FrameMarker,
 	DebugEvent_BeginBlock,
 	DebugEvent_EndBlock,
+
+	DebugEvent_OpenDataBlock,
+	DebugEvent_CloseDataBlock,
+
+	DebugEvent_R32,
+	DebugEvent_U32,
+	DebugEvent_S32,
+	DebugEvent_V2,
+	DebugEvent_V3,
+	DebugEvent_V4,
+	DebugEvent_Rectangle2,
+	DebugEvent_Rectangle3,
 };
 
 struct threadid_coreindex
@@ -522,14 +534,19 @@ struct threadid_coreindex
 struct debug_event
 {
 	u64 Clock;
+	u16 DebugRecordIndex;
+	u8 TranslationUnit;
+	u8 Type;
 	union
 	{
 		threadid_coreindex TC;
 		r32 SecondsElapsed;
+
+		void *VecPtr[3];
+		s32 VecS32[6];
+		u32 VecU32[6];
+		r32 VecR32[6];
 	};
-	u16 DebugRecordIndex;
-	u8 TranslationUnit;
-	u8 Type;
 }; 
 
 #define MAX_DEBUG_THREAD_COUNT 256
@@ -627,12 +644,6 @@ struct timed_block
     }
 };
 
-#define DEBUG_BEGIN_HOT_ELEMENT(...)
-#define DEBUG_VALUE(...)
-#define DEBUG_BEGIN_ARRAY(...)
-#define DEBUG_END_ARRAY(...)
-#define DEBUG_END_HOT_ELEMENT(...)
-
 #else
 
 #define TIMED_BLOCK(...)
@@ -659,9 +670,76 @@ StringLength(char *String)
 	return(Count);
 }
 
-
 #ifdef __cplusplus
 }
+#endif
+
+
+#if defined (__cplusplus) && defined(HANDMADE_INTERNAL)
+
+inline void
+DEBUGValueSetEventData(debug_event *Event, r32 Value)
+{
+	Event->Type = DebugEvent_U32;
+	Event->VecR32[0] = Value;
+}
+
+inline void
+DEBUGValueSetEventData(debug_event *Event, s32 Value)
+{
+	Event->Type = DebugEvent_S32;
+	Event->VecU32[0] = Value;
+}
+
+inline void
+DEBUGValueSetEventData(debug_event *Event, u32 Value)
+{
+	Event->Type = DebugEvent_R32;
+	Event->VecS32[0] = Value;
+}
+
+#define DEBUG_BEGIN_DATA_BLOCK(Name, Ptr0, Ptr1) \
+	{ \
+		int Counter = __COUNTER__; \
+		RecordDebugEventCommon(Counter, DebugEvent_OpenDataBlock) \
+		Event->VecPtr[0] = Ptr0; \
+		Event->VecPtr[1] = Ptr1; \
+		debug_record *Record = GlobalDebugTable->Records[TRANSLATION_UNIT_INDEX] + Counter; \
+		Record->FileName = __FILE__; \
+		Record->LineNumber = __LINE__; \
+		Record->BlockName = Name; \
+	}
+
+#define DEBUG_END_DATA_BLOCK() \
+	{ \
+		int Counter = __COUNTER__; \
+		RecordDebugEventCommon(Counter, DebugEvent_CloseDataBlock) \
+		debug_record *Record = GlobalDebugTable->Records[TRANSLATION_UNIT_INDEX] + Counter; \
+		Record->FileName = __FILE__; \
+		Record->LineNumber = __LINE__; \
+	}
+
+#define DEBUG_VALUE(Value) \
+	{ \
+		int Counter = __COUNTER__; \
+		RecordDebugEventCommon(Counter, DebugEvent_R32) \
+		DEBUGValueSetEventData(Event, Value); \
+		debug_record *Record = GlobalDebugTable->Records[TRANSLATION_UNIT_INDEX] + Counter; \
+		Record->FileName = __FILE__; \
+		Record->LineNumber = __LINE__; \
+		Record->BlockName = "Value"; \
+	}
+#define DEBUG_BEGIN_ARRAY(...)
+#define DEBUG_END_ARRAY(...)
+
+#else
+
+#define DEBUG_BEGIN_DATA_ELEMENT(...)
+#define DEBUG_VALUE(...)
+#define DEBUG_BEGIN_ARRAY(...)
+#define DEBUG_END_ARRAY(...)
+#define DEBUG_END_DATA_ELEMENT(...)
+
 #endif
 
 #define HANDMADE_PLATFORM_H

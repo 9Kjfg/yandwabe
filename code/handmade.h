@@ -342,6 +342,7 @@ struct transient_state
 	// NOTE: 0 is buttom, 1 is middle, 2 is top
 	environment_map EnvMaps[3];
 
+	u32 HotEntityNub;
 };
 
 inline low_entity *

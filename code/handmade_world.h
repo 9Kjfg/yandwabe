@@ -1,14 +1,14 @@
 #if !defined(HANDMADE_WORLD_H)
 
-struct world_position
+introspect(category:"world") struct world_position
 {
     // TODO: Puzzler! How can we get rid of abstile* here,
     // and still allow references to entities to ve able to figure
     // out _where the are_ (or rather, which world_chunk the are in?)
 
-	int32 ChunkX;
-	int32 ChunkY;
-	int32 ChunkZ;
+	s32 ChunkX;
+	s32 ChunkY;
+	s32 ChunkZ;
 
 	//NOTE: These are the offsets from the chunk center
 	v3 Offset_;
