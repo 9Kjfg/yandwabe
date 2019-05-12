@@ -1537,9 +1537,11 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 					(LocalMouseP.y > -0.5f*Volume->Dim.y) && (LocalMouseP.y < 0.5f*Volume->Dim.y))
 				{
 					v4 OutlineColor = V4(1, 1, 0, 1);
-					PushRectOutline(RenderGroup, Volume->OffsetP - V3(0, 0, 0.5f*Volume->Dim.z), Volume->Dim.xy, OutlineColor, 0.05f);
+					PushRectOutline(RenderGroup, Volume->OffsetP - V3(0, 0, 0.5f*Volume->Dim.z),
+						Volume->Dim.xy, OutlineColor, 0.05f);
 					
-					DEBUG_BEGIN_DATA_BLOCK("Hot Entity", GameState->LowEntities + Entity->StorageIndex, 0);
+					DEBUG_BEGIN_DATA_BLOCK("Hot Entity", 
+						GameState->LowEntities + Entity->StorageIndex, 0);
 					DEBUG_VALUE(Entity->StorageIndex);
 					DEBUG_VALUE(Entity->Updatable);
 					DEBUG_VALUE(Entity->Type);

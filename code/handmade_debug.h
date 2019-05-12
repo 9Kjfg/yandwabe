@@ -172,6 +172,8 @@ struct debug_frame
     u64 EndClock;
     r32 WallSecondsElapsed;
 
+    debug_variable *RootGroup;
+
     u32 RegionCount;
     debug_frame_region *Regions;
 };
@@ -182,6 +184,9 @@ struct open_debug_block
     debug_record *Source;
     debug_event *OpeningEvent;   
     open_debug_block *Parent;
+
+    // NOTE: Only for data blocks?  Probably!
+    debug_variable *Group;
 
     open_debug_block *NextFree;
 };

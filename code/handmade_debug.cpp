@@ -703,8 +703,18 @@ DEBUGDrawMainMenu(debug_state *DebugState, render_group *RenderGroup, v2 MouseP)
 		int Depth = 0;
 		debug_variable_iterator Stack[DEBUG_MAX_VARIABLE_STACK_DEPTH];
 
-		Stack[Depth].Link = Tree->Group->VarGroup.Next;
-		Stack[Depth].Sentinel = &Tree->Group->VarGroup;
+		debug_variable *Group = Tree->Group;
+		if (DebugState->FrameCount > 0)
+		{
+			debug_variable *HackyGroup = DebugState->Frames[0].RootGroup;
+			if (HackyGroup)
+			{
+				Group = HackyGroup;
+			}
+		}
+
+		Stack[Depth].Link = Group->VarGroup.Next;
+		Stack[Depth].Sentinel = &Group->VarGroup;
 		++Depth;
 		while (Depth > 0)
 		{
@@ -728,7 +738,7 @@ DEBUGDrawMainMenu(debug_state *DebugState, render_group *RenderGroup, v2 MouseP)
 				v4 ItemColor = IsHot ? V4(1, 1, 0, 1) : V4(1, 1, 1, 1);
 				
 				debug_view *View = GetOrCreateDebugViewFor(DebugState, DebugIDFromLink(Tree, Link));
-				switch(Var->Type)
+				switch (Var->Type)
 				{
 					case DebugVariableType_CounterThreadList:
 					{
@@ -783,8 +793,8 @@ DEBUGDrawMainMenu(debug_state *DebugState, render_group *RenderGroup, v2 MouseP)
 					} break;
 				}
 
-				if ((Var->Type == DebugVariableType_VarGroup) &&
-					View->Collapsible.ExpandedAlways)
+				if ((Var->Type == DebugVariableType_VarGroup))
+					// && View->Collapsible.ExpandedAlways)
 				{
 					Iter = Stack + Depth;
 					Iter->Link = Var->VarGroup.Next;
@@ -1104,7 +1114,8 @@ GetRecordFrom(open_debug_block *Block)
 }
 
 inline open_debug_block *
-AllocateOpenDebugBlock(debug_state *DebugState)
+AllocateOpenDebugBlock(debug_state *DebugState, u32 FrameIndex, debug_event *Event,
+	debug_record *Source, open_debug_block **FirstOpenBlock)
 {
 	open_debug_block *Result = DebugState->FirstFreeBlock;
 	if (Result)
@@ -1116,14 +1127,77 @@ AllocateOpenDebugBlock(debug_state *DebugState)
 		Result = PushStruct(&DebugState->CollateArena, open_debug_block);
 	}
 
+	Result->StartingFrameIndex = FrameIndex;
+	Result->OpeningEvent = Event;
+	Result->Source = Source;
+	Result->NextFree = 0;
+
+	Result->Parent = *FirstOpenBlock;
+	*FirstOpenBlock = Result;
+
 	return(Result);
 }
 
 inline void
-DeallocateOpenDebugBlock(debug_state *DebugState, open_debug_block *Block)
+DeallocateOpenDebugBlock(debug_state *DebugState, open_debug_block **FirstOpenBlock)
 {
-	Block->NextFree = DebugState->FirstFreeBlock;
-	DebugState->FirstFreeBlock = Block;
+	open_debug_block *FreeBlock = *FirstOpenBlock;
+	*FirstOpenBlock = FreeBlock->Parent;
+
+	FreeBlock->NextFree = DebugState->FirstFreeBlock;
+	DebugState->FirstFreeBlock = FreeBlock;
+}
+
+inline b32
+EventMatch(debug_event A, debug_event B)
+{
+	b32 Result = ((A.TC.ThreadID == B.TC.ThreadID) &&
+		// TODO: Remove this checking
+		//(A.DebugRecordIndex == B.DebugRecordIndex) && 
+		(A.TranslationUnit == B.TranslationUnit));
+
+	return(Result);
+}
+
+
+internal debug_variable *
+CollateCreateVariable(debug_state *State, debug_variable_type Type, char *Name)
+{
+	debug_variable *Var = PushStruct(&State->CollateArena, debug_variable);
+	Var->Type = Type;
+	Var->Name = (char *)PushCopy(&State->CollateArena, StringLength(Name) + 1, Name);
+	
+	return(Var);
+}
+
+internal void
+CollateAddVariableToGroup(debug_state *State, debug_variable *Group, debug_variable *Add)
+{
+	debug_variable_link *Link = PushStruct(&State->CollateArena, debug_variable_link);
+	DLIST_INSERT(&Group->VarGroup, Link);
+	Link->Var = Add;
+}
+
+internal debug_variable *
+CollateCreateVariableGroup(debug_state *DebugState, char *Name)
+{
+	debug_variable *Group = CollateCreateVariable(DebugState, DebugVariableType_VarGroup, Name);
+	DLIST_INIT(&Group->VarGroup);
+
+	return(Group);
+}
+
+internal debug_variable *
+CollateCreateGroupedVariable(debug_state *DebugState, open_debug_block *Block,
+	debug_variable_type Type, char *Name)
+{
+	debug_variable *Result = CollateCreateVariable(DebugState, Type, Name);
+	Assert(Block);
+	Assert(Block->Group);
+
+	CollateAddVariableToGroup(DebugState, Block->Group, Result);
+
+	return(Result);
 }
 
 internal void
@@ -1174,6 +1248,7 @@ CollateDebugRecords(debug_state *DebugState, u32 InvalidEventArrayIndex)
 				}
 
 				DebugState->CollationFrame = DebugState->Frames + DebugState->FrameCount;
+				DebugState->CollationFrame->RootGroup = CollateCreateVariableGroup(DebugState, "Frame");
 				DebugState->CollationFrame->BeginClock = Event->Clock;
 				DebugState->CollationFrame->EndClock = 0;
 				DebugState->CollationFrame->RegionCount = 0;
@@ -1190,14 +1265,8 @@ CollateDebugRecords(debug_state *DebugState, u32 InvalidEventArrayIndex)
 				{
 					case DebugEvent_BeginBlock:
 					{
-						open_debug_block *DebugBlock = AllocateOpenDebugBlock(DebugState);
-
-						DebugBlock->StartingFrameIndex = FrameIndex;
-						DebugBlock->OpeningEvent = Event;
-						DebugBlock->Parent = Thread->FirstOpenCodeBlock;
-						DebugBlock->Source = Source;
-						Thread->FirstOpenCodeBlock = DebugBlock;
-						DebugBlock->NextFree = 0;
+						open_debug_block *DebugBlock = AllocateOpenDebugBlock(
+							DebugState, FrameIndex, Event, Source, &Thread->FirstOpenCodeBlock);
 					} break;
 					case DebugEvent_EndBlock:
 					{
@@ -1205,9 +1274,7 @@ CollateDebugRecords(debug_state *DebugState, u32 InvalidEventArrayIndex)
 						{
 							open_debug_block *MatchingBlock = Thread->FirstOpenCodeBlock;
 							debug_event *OpeningEvent = MatchingBlock->OpeningEvent;
-							if ((OpeningEvent->TC.ThreadID == Event->TC.ThreadID) &&
-								(OpeningEvent->DebugRecordIndex == Event->DebugRecordIndex) && 
-								(OpeningEvent->TranslationUnit == Event->TranslationUnit))
+							if (EventMatch(*OpeningEvent, *Event))
 							{
 								if (MatchingBlock->StartingFrameIndex == FrameIndex)
 								{
@@ -1233,9 +1300,7 @@ CollateDebugRecords(debug_state *DebugState, u32 InvalidEventArrayIndex)
 									// TODO: Record all frame in between and begin/end spans!
 								}
 
-								DeallocateOpenDebugBlock(DebugState, Thread->FirstOpenCodeBlock);
-								
-								Thread->FirstOpenCodeBlock = MatchingBlock->Parent;
+								DeallocateOpenDebugBlock(DebugState, &Thread->FirstOpenCodeBlock);
 							}
 							else
 							{
@@ -1246,52 +1311,94 @@ CollateDebugRecords(debug_state *DebugState, u32 InvalidEventArrayIndex)
 
 					case DebugEvent_OpenDataBlock:
 					{
+						open_debug_block *DebugBlock = AllocateOpenDebugBlock(
+							DebugState, FrameIndex, Event, Source, &Thread->FirstOpenDataBlock);
 
+						DebugBlock->Group = CollateCreateVariableGroup(DebugState, Source->BlockName);
+						CollateAddVariableToGroup(DebugState, 
+							DebugBlock->Parent ? DebugBlock->Parent->Group : DebugState->CollationFrame->RootGroup,
+							DebugBlock->Group);
 					} break;
 
 					case DebugEvent_CloseDataBlock:
 					{
-
+						if (Thread->FirstOpenDataBlock)
+						{
+							open_debug_block *MatchingBlock = Thread->FirstOpenDataBlock;
+							debug_event *OpeningEvent = MatchingBlock->OpeningEvent;
+							if (EventMatch(*OpeningEvent, *Event))
+							{
+								DeallocateOpenDebugBlock(DebugState, &Thread->FirstOpenDataBlock);
+							}
+							else
+							{
+								// TODO: Record span that goes to the beginning of the frame series?
+							}
+						}
 					} break;
 
 					case DebugEvent_R32:
 					{
-
+						debug_variable *Var = CollateCreateGroupedVariable(
+							DebugState, Thread->FirstOpenDataBlock,
+							DebugVariableType_Real32, Source->BlockName);
+						Var->Real32 = Event->VecR32[0];
 					} break;
 
 					case DebugEvent_U32:
 					{
-
+						debug_variable *Var = CollateCreateGroupedVariable(
+							DebugState, Thread->FirstOpenDataBlock,
+							DebugVariableType_UInt32, Source->BlockName);
+						Var->UInt32 = Event->VecU32[0];
 					} break;
 
 					case DebugEvent_S32:
 					{
-
+						debug_variable *Var = CollateCreateGroupedVariable(
+							DebugState, Thread->FirstOpenDataBlock,
+							DebugVariableType_Int32, Source->BlockName);
+						Var->Int32 = Event->VecS32[0];
 					} break;
 
 					case DebugEvent_V2:
 					{
-
+						debug_variable *Var = CollateCreateGroupedVariable(
+							DebugState, Thread->FirstOpenDataBlock,
+							DebugVariableType_V2, Source->BlockName);
+						Var->Vector2.x = Event->VecR32[0];
+						Var->Vector2.y = Event->VecR32[1];
 					} break;
 
 					case DebugEvent_V3:
 					{
-
+						debug_variable *Var = CollateCreateGroupedVariable(
+							DebugState, Thread->FirstOpenDataBlock,
+							DebugVariableType_V3, Source->BlockName);
+						Var->Vector3.x = Event->VecR32[0];
+						Var->Vector3.y = Event->VecR32[1];
+						Var->Vector3.z = Event->VecR32[2];
 					} break;
 
 					case DebugEvent_V4:
 					{
-
+						debug_variable *Var = CollateCreateGroupedVariable(
+							DebugState, Thread->FirstOpenDataBlock,
+							DebugVariableType_V4, Source->BlockName);
+						Var->Vector4.x = Event->VecR32[0];
+						Var->Vector4.y = Event->VecR32[1];
+						Var->Vector4.z = Event->VecR32[2];
+						Var->Vector4.w = Event->VecR32[4];
 					} break;
 
 					case DebugEvent_Rectangle2:
 					{
-
+						// TODO: inplement
 					} break;
 
 					case DebugEvent_Rectangle3:
 					{
-
+						// TODO: inplement
 					} break;
 					
 					default:
@@ -1623,7 +1730,7 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 	
 		if (!DebugState->Paused)
 		{
-			if (DebugState->FrameCount >= (MAX_DEBUG_EVENT_ARRAY_COUNT*4))
+			if (DebugState->FrameCount >= (MAX_DEBUG_EVENT_ARRAY_COUNT*4 - 1))
 			{
 				RestartCollation(DebugState, GlobalDebugTable->CurrentEventArrayIndex);
 			}
