@@ -1,6 +1,8 @@
 #if !defined(HANDMADE_DEBUG_VARIABLES_H)
 
 #define DEBUG_MAX_VARIABLE_STACK_DEPTH 64
+
+#if 0
 struct debug_variable_definition_context
 {
 	debug_state *State;
@@ -154,6 +156,7 @@ DEBUGCreateVariables(debug_variable_definition_context *Context)
 	
 #undef DEBUG_VARIABLE_LISTING
 }
+#endif
 
 #define HANDMADE_DEBUG_VARIABLES_H
 #endif

@@ -64,21 +64,6 @@ enum asset_type_id
 
 #pragma pack(push, 1)
 
-struct bitmap_id
-{
-    uint32 Value;
-};
-
-struct sound_id
-{
-    uint32 Value;
-};
-
-struct font_id
-{
-	u32 Value;
-};
-
 struct hha_header
 {
 #define HHA_MAGIC_VALUE HHA_CODE('h', 'h', 'a', 'f' )
