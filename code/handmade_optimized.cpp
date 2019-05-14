@@ -381,5 +381,3 @@ DrawRectangleQuickly(loaded_bitmap *Buffer,
 		}
 	}
 }
-
-u32 DebugRecords_Optimized_Count = __COUNTER__;

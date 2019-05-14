@@ -1,7 +1,5 @@
 #if !defined(HANDMADE_DEBUG_H)
 
-struct debug_variable;
-
 enum debug_variable_to_text_flag
 {
     DEBUGVarToText_AddDebugUI = 0x1,
@@ -14,7 +12,6 @@ enum debug_variable_to_text_flag
 };
 
 struct debug_tree;
-struct debug_variable;
 
 struct debug_view_inline_block
 {
@@ -62,7 +59,7 @@ struct debug_variable_link
     debug_variable_link *Next;
     debug_variable_link *Prev;
     debug_variable_group *Children;
-    debug_variable *Var;
+    debug_event *Event;
 };
 
 struct debug_variable_group
@@ -79,12 +76,12 @@ struct debug_tree
     debug_tree *Prev;
 };
 
-struct debug_variable
-{
-	debug_type Type;
-	char *Name;
-    debug_event Event;
-};
+// struct debug_variable
+// {
+// 	debug_type Type;
+// 	char *Name;
+//     debug_event Event;
+// };
 
 struct render_group;
 struct game_assets;
@@ -114,7 +111,8 @@ struct debug_counter_state
 
 struct debug_frame_region
 {
-    debug_record *Record;
+    // TODO: Do we want to copy these out in their entire
+    debug_event *Event;
     u32 CycleCount;
     u16 LaneIndex;
     u16 ColorIndex;
@@ -138,7 +136,6 @@ struct debug_frame
 struct open_debug_block
 {
     u32 StartingFrameIndex;
-    debug_record *Source;
     debug_event *OpeningEvent;   
     open_debug_block *Parent;
 
@@ -180,7 +177,7 @@ struct debug_interaction
     union
     {
         void *Generic;
-        debug_variable *Var;
+        debug_event *Event;
         debug_tree *Tree;
         v2 *P;
     };
@@ -222,7 +219,7 @@ struct debug_state
     r32 GlobalWidth;
     r32 GlobalHeight;
 
-    debug_record *ScopeToRecord;
+    char *ScopeToRecord;
     // NOTE: Collation
     memory_arena CollateArena;
     temporary_memory CollateTemp;
