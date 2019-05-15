@@ -1513,35 +1513,35 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 				} break;
 			}
 
-#if DEBUGUI_DrawEntityOutlines
-
-#if 0
-			RenderGroup->Transform.OffsetP = V3(0, 0, 0);
-			RenderGroup->Transform.Scale = 1.0f;
-			v3 WorldMouseP = Unproject(RenderGroup, MouseP);
-			RenderGroup->Transform.OffsetP = WorldMouseP;
-			PushRect(RenderGroup, V3(0, 0, 0), V2(1.0f , 1.0f),	V4(0, 1, 1, 1));
-#endif
-
-			for (uint32 VolumeIndex = 0;
-				VolumeIndex < Entity->Collision->VolumeCount;
-				++VolumeIndex)
+			if (DEBUG_UI_ENABLED)
 			{
-				sim_entity_collision_volume *Volume = Entity->Collision->Volumes + VolumeIndex;
-				
-				v3 LocalMouseP = Unproject(RenderGroup, MouseP);
-#if 0
-				PushRect(RenderGroup, V3(LocalMouseP.xy, 0), V2(1.0f, 1.0f), V4(0, 1, 1, 1));
-#endif
-				if ((LocalMouseP.x > -0.5f*Volume->Dim.x) && (LocalMouseP.x < 0.5f*Volume->Dim.x) &&
-					(LocalMouseP.y > -0.5f*Volume->Dim.y) && (LocalMouseP.y < 0.5f*Volume->Dim.y))
+				debug_id EntityDebugID = DEBUG_POINTER_ID(GameState->LowEntities + Entity->StorageIndex);
+
+				for (uint32 VolumeIndex = 0;
+					VolumeIndex < Entity->Collision->VolumeCount;
+					++VolumeIndex)
 				{
-					v4 OutlineColor = V4(1, 1, 0, 1);
-					PushRectOutline(RenderGroup, Volume->OffsetP - V3(0, 0, 0.5f*Volume->Dim.z),
-						Volume->Dim.xy, OutlineColor, 0.05f);
+					sim_entity_collision_volume *Volume = Entity->Collision->Volumes + VolumeIndex;
 					
-					DEBUG_BEGIN_DATA_BLOCK("Hot Entity", 
-						GameState->LowEntities + Entity->StorageIndex, 0);
+					v3 LocalMouseP = Unproject(RenderGroup, MouseP);
+
+					if ((LocalMouseP.x > -0.5f*Volume->Dim.x) && (LocalMouseP.x < 0.5f*Volume->Dim.x) &&
+						(LocalMouseP.y > -0.5f*Volume->Dim.y) && (LocalMouseP.y < 0.5f*Volume->Dim.y))
+					{
+						DEBUG_HIT(EntityDebugID, LocalMouseP.z);
+					}
+					
+					v4 OutlineColor;
+					if (DEBUG_HIGHLIGHTED(EntityDebugID, &OutlineColor))
+					{
+						PushRectOutline(RenderGroup, Volume->OffsetP - V3(0, 0, 0.5f*Volume->Dim.z),
+							Volume->Dim.xy, OutlineColor, 0.05f);
+					}
+				}
+
+				if (DEBUG_REQUESTED(EntityDebugID))
+				{
+					DEBUG_BEGIN_DATA_BLOCK("Similation Entity", EntityDebugID);
 					DEBUG_VALUE(Entity->StorageIndex);
 					DEBUG_VALUE(Entity->Updatable);
 					DEBUG_VALUE(Entity->Type);
@@ -1569,7 +1569,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 					DEBUG_END_DATA_BLOCK();
 				}
 			}
-#endif
 		}
 	}
 

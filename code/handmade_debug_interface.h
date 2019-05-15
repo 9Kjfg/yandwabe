@@ -5,6 +5,11 @@ struct debug_table;
 #define DEBUG_GAME_FRAME_END(name) debug_table* name(game_memory *Memory, game_input *Input, game_offscreen_buffer *Buffer)
 typedef DEBUG_GAME_FRAME_END(debug_game_frame_end);
 
+struct debug_id
+{
+    void *Value[2];
+};
+
 #if HANDMADE_INTERNAL
 
 enum debug_type
@@ -45,7 +50,7 @@ struct debug_event
 	u8 Type;
 	union
 	{
-		void *VecPtr[2];
+		debug_id DebugID;
 
 		b32 Bool32;
         s32 Int32;
@@ -245,11 +250,10 @@ DEBUGValueSetEventData(debug_event *Event, font_id Value)
 	Event->FontID = Value;
 }
 
-#define DEBUG_BEGIN_DATA_BLOCK(Name, Ptr0, Ptr1) \
+#define DEBUG_BEGIN_DATA_BLOCK(Name, ID) \
 	{ \
 		RecordDebugEvent(DebugType_OpenDataBlock, #Name) \
-		Event->VecPtr[0] = Ptr0; \
-		Event->VecPtr[1] = Ptr1; \
+		Event->DebugID = ID; \
 	}
 
 #define DEBUG_END_DATA_BLOCK() \
@@ -265,13 +269,32 @@ DEBUGValueSetEventData(debug_event *Event, font_id Value)
 #define DEBUG_BEGIN_ARRAY(...)
 #define DEBUG_END_ARRAY(...)
 
+inline debug_id DEBUG_POINTER_ID(void *Pointer)
+{
+	debug_id ID = {Pointer};
+	
+	return(ID);
+}
+
+#define DEBUG_UI_ENABLED 1
+
+internal void DEBUG_HIT(debug_id ID, r32 ZValue);
+internal b32 DEBUG_HIGHLIGHTED(debug_id ID, v4 *Color);
+internal b32 DEBUG_REQUESTED(debug_id ID);
+
 #else
+
+inline debug_id DEBUG_POINTER_ID(void *Pointer) {debug_id NullID = {}; return(NullID);}
 
 #define DEBUG_BEGIN_DATA_ELEMENT(...)
 #define DEBUG_VALUE(...)
 #define DEBUG_BEGIN_ARRAY(...)
 #define DEBUG_END_ARRAY(...)
 #define DEBUG_END_DATA_ELEMENT(...)
+#define DEBUG_UI_ENABLED 0
+#define DEBUG_HIT(...)
+#define DEBUG_HIGHLIGHTED(...) 0
+#define DEBUG_BEGIN_OPTIONAL_DATA_BLOCK(...) 0
 
 #endif
 

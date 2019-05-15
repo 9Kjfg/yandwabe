@@ -20,8 +20,16 @@ DebugIDFromLink(debug_tree *Tree, debug_variable_link *Link)
 inline debug_state *
 DEBUGGetState(game_memory *Memory)
 {
-	debug_state *DebugState = (debug_state *)Memory->DebugStorage;
-	Assert(DebugState->Initialized);
+	debug_state *DebugState = 0;
+	if (Memory)
+	{
+		DebugState = (debug_state *)Memory->DebugStorage;
+		if (!DebugState->Initialized)
+		{
+			DebugState = 0;
+		}
+	}
+
 	return(DebugState);
 }
 
@@ -706,6 +714,100 @@ VarLinkInteraction(debug_interaction_type Type, debug_tree *Tree, debug_variable
 	return(ItemInteraction);
 }
 
+inline debug_interaction
+DebugIDInteraction(debug_interaction_type Type, debug_id ID)
+{
+	debug_interaction ItemInteraction = {};
+	ItemInteraction.ID = ID;
+	ItemInteraction.Type = Type;
+
+	return(ItemInteraction);
+}
+
+internal void
+DEBUG_HIT(debug_id ID, r32 ZValue)
+{
+	debug_state *DebugState = DEBUGGetState();
+	if (DebugState)
+	{
+		DebugState->NextHotInteraction = DebugIDInteraction(DebugInteraction_Select, ID);
+	}
+}
+
+internal b32
+IsSelected(debug_state *DebugState, debug_id ID)
+{
+	b32 Result = false;
+
+	for (u32 Index = 0;
+		Index < DebugState->SelectedIDCount;
+		++Index)
+	{
+		if (DebugIDsAreEqual(ID, DebugState->SelectedID[Index]))
+		{
+			Result = true;
+			break;
+		}
+	}
+
+	return(Result);	
+}
+
+internal void
+ClearSelection(debug_state *DebugState)
+{
+	DebugState->SelectedIDCount = 0;
+}
+
+internal void
+AddToSelection(debug_state *DebugState, debug_id ID)
+{
+	if ((DebugState->SelectedIDCount < ArrayCount(DebugState->SelectedID)) &&
+		!IsSelected(DebugState, ID))
+	{
+		DebugState->SelectedID[DebugState->SelectedIDCount++] = ID;
+	}
+}
+
+internal b32
+DEBUG_HIGHLIGHTED(debug_id ID, v4 *Color)
+{
+	b32 Result = false;
+
+	debug_state *DebugState = DEBUGGetState();
+	if (DebugState)
+	{
+		if (IsSelected(DebugState, ID))
+		{
+			*Color = V4(0, 1, 1, 1);
+			Result = true;
+		}
+
+		if (DebugIDsAreEqual(DebugState->HotInteraction.ID, ID))
+		{
+			*Color = V4(1, 1, 0, 1);
+			Result = true;
+		}
+	}
+
+	return(Result);
+}
+
+internal b32 
+DEBUG_REQUESTED(debug_id ID)
+{
+	b32 Result = false;
+
+	debug_state *DebugState = DEBUGGetState();
+	if (DebugState)
+	{
+		Result = (IsSelected(DebugState, ID) ||
+			DebugIDsAreEqual(DebugState->HotInteraction.ID, ID));
+	}
+
+	return(Result);
+}
+
 internal void
 DEBUGDrawMainMenu(debug_state *DebugState, render_group *RenderGroup, v2 MouseP)
 {
@@ -934,6 +1036,15 @@ DEBUGBeginInteract(debug_state *DebugState, game_input *Input, v2 MouseP, b32 Al
 				DebugState->HotInteraction.P = &Tree->UIP;
 #endif
 			} break;
+
+			case DebugInteraction_Select:
+			{
+				// if (!ShiftKeyIsDown)
+				// {
+				// 	ClearSelection(DebugState);
+				// }
+				AddToSelection(DebugState, DebugState->HotInteraction.ID);
+			}
 		}
 
 		DebugState->Interaction = DebugState->HotInteraction;
@@ -1524,7 +1635,6 @@ DEBUGEnd(debug_state *DebugState, game_input *Input, loaded_bitmap *DrawBuffer)
 
 	render_group *RenderGroup = DebugState->RenderGroup;
 
-	ZeroStruct(DebugState->NextHotInteraction);
 	debug_event *HotEvent = 0;
 
 	v2 MouseP = Unproject(DebugState->RenderGroup, V2(Input->MouseX, Input->MouseY)).xy;
@@ -1636,6 +1746,9 @@ DEBUGEnd(debug_state *DebugState, game_input *Input, loaded_bitmap *DrawBuffer)
 
 	TileRenderGroupToOutput(DebugState->HighPriorityQueue, DebugState->RenderGroup, DrawBuffer);
 	EndRenderGroup(DebugState->RenderGroup);
+
+	// NOTE: Clear The UI State for the next frame
+	ZeroStruct(DebugState->NextHotInteraction);
 }
 
 extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
