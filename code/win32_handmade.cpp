@@ -1671,6 +1671,11 @@ WinMain(
 						NewInput->MouseY = (r32)((GlobalBackBaffer.Height - 1) - MouseP.y);
 						NewInput->MouseZ = 0; // TODO: Support mousewheel?
 
+						NewInput->ShiftDown = (GetKeyState(VK_SHIFT) & (1 << 15));
+						NewInput->AltDown = (GetKeyState(VK_MENU) & (1 << 15));;
+						NewInput->ControlDown = (GetKeyState(VK_CONTROL) & (1 << 15));;
+
+
 						DWORD WindButtonID[PlatformMouseBotton_Count] =
 						{
 							VK_LBUTTON,

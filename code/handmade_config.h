@@ -1,22 +1,12 @@
-    //#define DEBUGUI_Debugging 
-        //#define DEBUGUI_Profile 
-            //#define DEBUGUI_By Function 
-            //#define DEBUGUI_By Thread 
-        #define DEBUGUI_FamiliarFollowsHero 0
-        #define DEBUGUI_UseSpacesOutline 0
-        //#define DEBUGUI_Renderer 
-            //#define DEBUGUI_Camera 
-                #define DEBUGUI_UseRoomBasedCamera 0
-                #define DEBUGUI_DebugCameraDistance 38.999989f
-                #define DEBUGUI_UsedDebugCamera 0
-            #define DEBUGUI_ShowLightingSamples 0
-            #define DEBUGUI_TestWeirdDrawBufferSize 0
-        //#define DEBUGUI_Particles 
-            #define DEBUGUI_ParitcleGrid 0
-            #define DEBUGUI_ParticleTest 0
-        //#define DEBUGUI_Group Chunks 
-            #define DEBUGUI_RecomputeGroundChunksOnEXEChange 0
-            #define DEBUGUI_GroundCheckChekerboards 0
-            #define DEBUGUI_GroundChunkOutline 0
-        //#define DEBUGUI_Group Chunks 
-            #define DEBUGUI_DrawEntityOutlines 1
+#define GlobalConstants_Renderer_ShowLightingSamples 0
+#define GlobalConstants_Renderer_Camera_UseDebug 0
+#define GlobalConstants_Renderer_Camera_DebugDistance 25.0f
+#define GlobalConstants_Renderer_Camera_RoomBased 0
+#define GlobalConstants_GroundChunks_Chekerboards 0
+#define GlobalConstants_GroundChunks_RecomputeOnEXEChange 1
+#define GlobalConstants_Renderer_TestWierdDrawBufferSize 0
+#define GlobalConstants_GroundChunks_Outline 0
+#define GlobalConstants_AI_Familiar_FollowsHero 0
+#define GlobalConstants_Particles_Test 0
+#define GlobalConstants_Paritcles_ShowGrid 0
+#define GlobalConstants_Simulation_UseSpaceOutlines 0

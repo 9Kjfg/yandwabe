@@ -497,6 +497,13 @@ operator+(v4 A, v4 B)
     return(Result);
 }
 
+inline v4 &
+operator+=(v4 &A, const v4 &B)
+{
+    A = A + B;
+    return(A);
+}
+
 inline v4
 operator-(v4 A, v4 B)
 {
