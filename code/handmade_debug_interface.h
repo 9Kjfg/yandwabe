@@ -24,6 +24,8 @@ enum debug_type
 	DebugType_OpenDataBlock,
 	DebugType_CloseDataBlock,
 
+	DebugType_MarkDebugValue,
+
 	DebugType_b32,
 	DebugType_r32,
 	DebugType_u32,
@@ -54,6 +56,7 @@ struct debug_event
 	union
 	{
 		debug_id DebugID;
+		debug_event *Value_debug_event;
 
 		b32 Value_b32;
         s32 Value_s32;
@@ -285,22 +288,30 @@ internal void DEBUG_HIT(debug_id ID, r32 ZValue);
 internal b32 DEBUG_HIGHLIGHTED(debug_id ID, v4 *Color);
 internal b32 DEBUG_REQUESTED(debug_id ID);
 
-internal debug_event InitializeDebugValue(debug_type Type, debug_event *Event, char *Name);
+inline debug_event
+DEBUGInitializeValue(debug_type Type, debug_event *SubEvent, char *Name, char *FileName, int LineNumber)
+{
+	RecordDebugEvent(DebugType_MarkDebugValue, "");
+	Event->Value_debug_event = SubEvent;
 
-#if 0
+	SubEvent->Clock = 0;
+	SubEvent->FileName = FileName;
+	SubEvent->BlockName = Name;
+	SubEvent->LineNumber = LineNumber;
+	SubEvent->ThreadID = 0;
+	SubEvent->CoreIndex = 0;
+	SubEvent->Type = (u8)Type;
+
+	return(*SubEvent);
+}
+
 #define DEBUG_IF__(Path) \
-local_persist debug_event DebugValue##Varialbe = InitializeDebugValue(DebugType_b32 ,&DebugValue##Varialbe, #Path);\
-if (DebugValue##Path.Value_b32)
+	local_persist debug_event DebugValue##Path = DEBUGInitializeValue((DebugValue##Path.Value_b32 = GlobalConstants_##Path, DebugType_b32), &DebugValue##Path, #Path, __FILE__, __LINE__);\
+	if (DebugValue##Path.Value_b32)
 
-#define DEBUG_VARIABLE__(type, Path, Varialbe) \
-local_persist debug_event DebugValue##Variable = InitializeDebugValue(DebugType_##type, DebugValue##Variable, Path "_" Variable);\
-type Variable = DebugValue##Variable.Value_##type;
-#else
-
-#define DEBUG_IF__(Path) if(GlobalConstants_##Path)
-#define DEBUG_VARIABLE__(type, Path, Variable) type Variable = GlobalConstants_##Path##_##Variable;
-
-#endif
+#define DEBUG_VARIABLE__(type, Path, Variable) \
+	local_persist debug_event DebugValue##Variable = DEBUGInitializeValue((DebugValue##Variable.Value_##type = GlobalConstants_##Path##_##Variable, DebugType_##type), &DebugValue##Variable, #Path "_" #Variable,  __FILE__, __LINE__);\
+	type Variable = DebugValue##Variable.Value_##type;
 
 #else
 
@@ -315,6 +326,8 @@ inline debug_id DEBUG_POINTER_ID(void *Pointer) {debug_id NullID = {}; return(Nu
 #define DEBUG_HIT(...)
 #define DEBUG_HIGHLIGHTED(...) 0
 #define DEBUG_BEGIN_OPTIONAL_DATA_BLOCK(...) 0
+#define DEBUG_IF__(Path) if(GlobalConstants_##Path)
+#define DEBUG_VARIABLE__(type, Path, Variable) type Variable = GlobalConstants_##Path##_##Variable;
 
 #endif
 
