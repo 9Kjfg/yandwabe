@@ -118,9 +118,19 @@ struct debug_frame_region
 #define MAX_REGION_PER_FRAME (4096)
 struct debug_frame
 {
+    // IMPORTANT: This actually gets freed as a set in FreeFrame
+
+    union
+    {
+        debug_frame *Next;
+        debug_frame *NextFree;
+    };
+    
     u64 BeginClock;
     u64 EndClock;
     r32 WallSecondsElapsed;
+
+    r32 FrameBarScale;
 
     debug_variable_group *RootGroup;
 
@@ -130,14 +140,17 @@ struct debug_frame
 
 struct open_debug_block
 {
+    union
+    {
+        open_debug_block *Parent;
+        open_debug_block *NextFree;
+    };
+
     u32 StartingFrameIndex;
     debug_event *OpeningEvent;   
-    open_debug_block *Parent;
 
     // NOTE: Only for data blocks?  Probably!
     debug_variable_group *Group;
-
-    open_debug_block *NextFree;
 };
 
 struct debug_thread
@@ -146,7 +159,12 @@ struct debug_thread
     u32 LaneIndex;
     open_debug_block *FirstOpenCodeBlock;
     open_debug_block *FirstOpenDataBlock;
-    debug_thread *Next;
+
+    union
+    {
+        debug_thread *Next;
+        debug_thread *NextFree;
+    };
 };
 
 enum debug_interaction_type
@@ -183,7 +201,6 @@ struct debug_interaction
 struct debug_state
 {
     b32 Initialized;
-    b32 Paused;
 
     platform_work_queue *HighPriorityQueue;
 
@@ -212,6 +229,7 @@ struct debug_state
     debug_interaction Interaction;
     debug_interaction HotInteraction;
     debug_interaction NextHotInteraction;
+    b32 Paused;
 
     r32 LeftEdge;
     r32 RightEdge;
@@ -222,21 +240,18 @@ struct debug_state
     r32 GlobalHeight;
 
     char *ScopeToRecord;
-    // NOTE: Collation
-    memory_arena CollateArena;
-    temporary_memory CollateTemp;
 
-    u32 CollationArrayIndex;
-    debug_frame *CollationFrame;
-    u32 FrameBarLaneCount;
     u32 FrameCount;
-    r32 FrameBarScale;
+    debug_frame *OldestFrame;
+    debug_frame *MostRecentFrame;
+    debug_frame *FirstFreeFrame;
 
-    debug_frame *Frames;
+    debug_frame *CollationFrame;
+
+    u32 FrameBarLaneCount;
     debug_thread *FirstThread;
+    debug_thread *FirstFreeThread;
     open_debug_block *FirstFreeBlock;
-
-    debug_view Dummy;
 };
 
 #define HANDMADE_DEBUG_H

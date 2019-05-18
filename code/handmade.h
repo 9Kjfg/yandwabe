@@ -6,6 +6,24 @@
 #include "handmade_file_format.h"
 #include "handmade_meta.h"
 
+#define DLIST_INSERT(Sentinel, Element) \
+	(Element)->Next = (Sentinel)->Next; \
+	(Element)->Prev = (Sentinel); \
+	(Element)->Next->Prev = (Element); \
+	(Element)->Prev->Next = (Element);
+
+#define DLIST_INIT(Sentinel) \
+	(Sentinel)->Next = (Sentinel); \
+	(Sentinel)->Prev = (Sentinel);
+
+#define FREELIST_ALLOCATE(type, Result, FreeListPointer, Arena) \
+	(Result) = (FreeListPointer); \
+	if (Result) {FreeListPointer = (Result)->NextFree;} \
+	else {Result = PushStruct(Arena, type);}
+
+#define FREELIST_DEALLOCATE(Pointer, FreeListPointer) \
+	if (Pointer) {(Pointer)->NextFree = (FreeListPointer); (FreeListPointer) = (Pointer);}
+
 struct memory_arena
 {
 	memory_index Size;

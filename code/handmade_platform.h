@@ -4,17 +4,6 @@
 #define introspect(params)
 #define counted_pointer(params)
 
-#define DLIST_INSERT(Sentinel, Element) \
-	(Element)->Next = (Sentinel)->Next; \
-	(Element)->Prev = (Sentinel); \
-\
-	(Element)->Next->Prev = (Element); \
-	(Element)->Prev->Next = (Element);
-
-#define DLIST_INIT(Sentinel) \
-	(Sentinel)->Next = (Sentinel); \
-	(Sentinel)->Prev = (Sentinel);
-
 #include "handmade_config.h"
 
 /*
