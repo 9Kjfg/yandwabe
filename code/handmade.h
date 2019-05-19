@@ -16,10 +16,10 @@
 	(Sentinel)->Next = (Sentinel); \
 	(Sentinel)->Prev = (Sentinel);
 
-#define FREELIST_ALLOCATE(type, Result, FreeListPointer, Arena) \
+#define FREELIST_ALLOCATE(Result, FreeListPointer, AllocationCode) \
 	(Result) = (FreeListPointer); \
 	if (Result) {FreeListPointer = (Result)->NextFree;} \
-	else {Result = PushStruct(Arena, type);}
+	else {Result = AllocationCode;}
 
 #define FREELIST_DEALLOCATE(Pointer, FreeListPointer) \
 	if (Pointer) {(Pointer)->NextFree = (FreeListPointer); (FreeListPointer) = (Pointer);}
@@ -97,19 +97,39 @@ GetArenaSizeRemaining(memory_arena *Arena, memory_index Alignment = 4)
 }
 
 // TODO: Optional "clear" parameter!!
+#define DEFAULT_MEMORY_ALIGNMENT 4
 #define PushStruct(Arena, type, ...) (type *)PushSize_(Arena, sizeof(type), ##__VA_ARGS__)
 #define PushArray(Arena, Count, type, ...) (type *)PushSize_(Arena, (Count)*sizeof(type), ##__VA_ARGS__)
 #define PushSize(Arena, Size, ...) PushSize_(Arena, Size, ##__VA_ARGS__)
 #define PushCopy(Arena, Size, Source, ...) Copy(Size, Source, PushSize_(Arena, Size, ##__VA_ARGS__))
-inline void *
-PushSize_(memory_arena *Arena, memory_index SizeInit, memory_index Alignment = 4)
+
+inline	memory_index
+GetEffectiveSizeFor(memory_arena *Arena, memory_index SizeInit, memory_index Alignment)
 {
 	memory_index Size = SizeInit;
 
 	memory_index AlignmentOffset = GetAlignmentOffset(Arena, Alignment);
 	Size += AlignmentOffset;
 
+	return(Size);
+}
+
+inline b32
+ArenaHasRoomFor(memory_arena *Arena, memory_index SizeInit, memory_index Alignment = DEFAULT_MEMORY_ALIGNMENT)
+{
+	memory_index Size = GetEffectiveSizeFor(Arena, SizeInit, Alignment);
+	b32 Result = ((Arena->Used + Size) <= Arena->Size);
+	return(Result);
+}
+
+inline void *
+PushSize_(memory_arena *Arena, memory_index SizeInit, memory_index Alignment = DEFAULT_MEMORY_ALIGNMENT)
+{
+	memory_index Size = GetEffectiveSizeFor(Arena, SizeInit, Alignment);
+
 	Assert((Arena->Used + Size) <= Arena->Size);
+
+	memory_index AlignmentOffset = GetAlignmentOffset(Arena, Alignment);
 	void *Result = Arena->Base + Arena->Used + AlignmentOffset;
 	Arena->Used += Size;
 
