@@ -52,7 +52,7 @@ struct debug_stored_event
     union
     {
         debug_stored_event *Next;
-        debug_sotred_event *NextFree;
+        debug_stored_event *NextFree;
     };
 
     u32 FrameIndex;
@@ -61,6 +61,7 @@ struct debug_stored_event
 
 struct debug_element
 {
+    char *GUID;
     debug_element *NextInHash;
 
     debug_stored_event *OldestEvent;
@@ -221,6 +222,7 @@ struct debug_state
     platform_work_queue *HighPriorityQueue;
 
     memory_arena DebugArena;
+    memory_arena PerFrameArena;
 
     render_group *RenderGroup;
     loaded_font *DebugFont;
@@ -260,16 +262,17 @@ struct debug_state
     u32 FrameCount;
     debug_frame *OldestFrame;
     debug_frame *MostRecentFrame;
-    debug_frame *FirstFreeFrame;
 
     debug_frame *CollationFrame;
-
-    debug_stored_event *FirstFreeStoredEvent;
 
     u32 FrameBarLaneCount;
     debug_thread *FirstThread;
     debug_thread *FirstFreeThread;
     open_debug_block *FirstFreeBlock;
+    
+    // NOTE: Per-frame storage managment
+    debug_stored_event *FirstFreeStoredEvent;
+    debug_frame *FirstFreeFrame;
 };
 
 #define HANDMADE_DEBUG_H

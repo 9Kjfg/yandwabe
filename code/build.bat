@@ -3,7 +3,7 @@ cls
 @echo off
 
 set CommonCompilerFlags=-Od -MTd -nologo /fp:fast -Gm- -GR- -EHa- -Oi -WX -W4 -wd4201 -wd4100 -wd4189 -wd4211 -wd4244 -wd4459 -wd4505 -wd4127 -wd4456 -wd4311 -wd4302 -FC -Z7
-set CommonCompilerFlags= -DHANDMADE_INTERNAL=0 -DHANDMADE_SLOW=1 -DHANDMADE_WIN32=1 %CommonCompilerFlags%
+set CommonCompilerFlags= -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -DHANDMADE_WIN32=1 %CommonCompilerFlags%
 set CommonLinkerFlags= -incremental:no -opt:ref user32.lib gdi32.lib winmm.lib
 
 IF NOT EXIST ..\..\build mkdir ..\..\build
