@@ -61,6 +61,28 @@ StringAreEqual(char *A, char *B)
 	return(Result);
 }
 
+inline b32
+StringAreEqual(memory_index ALength, char *A, memory_index BLength, char *B)
+{
+	b32 Result = (ALength == BLength);
+
+	if (Result)
+	{
+		for (u32 Index = 0;
+			Index < ALength;
+			++Index)
+		{
+			if (A[Index] != B[Index])
+			{
+				Result = false;
+				break;
+			}
+		}
+	}
+
+	return(Result);
+}
+
 //
 //
 //

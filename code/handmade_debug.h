@@ -79,6 +79,8 @@ struct debug_variable_link
 
 struct debug_variable_group
 {
+    u32 NameLength;
+    char *Name;
     debug_variable_link Sentinel;
 };
 
@@ -192,6 +194,7 @@ enum debug_interaction_type
 
     DebugInteraction_AutoModifyVariable,
 
+	DebugInteraction_ToggleExpansion,
     DebugInteraction_ToggleValue,
     DebugInteraction_DragValue,
     DebugInteraction_TearValue,
@@ -200,6 +203,8 @@ enum debug_interaction_type
     DebugInteraction_Move,
 
     DebugInteraction_Select,
+
+
 };
 
 struct debug_interaction
@@ -239,7 +244,7 @@ struct debug_state
 
     debug_element *ElementHash[1024];
     debug_view *ViewHash[4096];
-    debug_tree *RootTree;
+    debug_variable_group *RootGroup;
     debug_tree TreeSentinel;
 
     v2 LastMouseP;

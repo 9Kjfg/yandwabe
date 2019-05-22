@@ -288,7 +288,11 @@ internal b32 DEBUG_REQUESTED(debug_id ID);
 inline debug_event
 DEBUGInitializeValue(debug_type Type, debug_event *SubEvent, char *GUID, char *Name)
 {
+	Assert(GUID);
+	
 	RecordDebugEvent(DebugType_MarkDebugValue, "");
+	Event->GUID = GUID;
+	Event->BlockName = Name;
 	Event->Value_debug_event = SubEvent;
 
 	SubEvent->Clock = 0;
