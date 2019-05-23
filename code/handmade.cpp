@@ -1556,7 +1556,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
 				if (DEBUG_REQUESTED(EntityDebugID))
 				{
-					DEBUG_BEGIN_DATA_BLOCK("Similation Entity", EntityDebugID);
+					DEBUG_BEGIN_DATA_BLOCK(Simulation_Entity, EntityDebugID);
 					DEBUG_VALUE(Entity->StorageIndex);
 					DEBUG_VALUE(Entity->Updatable);
 					DEBUG_VALUE(Entity->Type);

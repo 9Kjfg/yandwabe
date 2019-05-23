@@ -92,6 +92,8 @@ typedef double r64;
 typedef float real32;
 typedef double real64;
 
+#define PointerToU32(Pointer) ((u32)(memory_index)(Pointer))
+
 #pragma pack(push, 1)
 struct bitmap_id
 {

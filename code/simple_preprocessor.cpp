@@ -260,7 +260,7 @@ ParseMember(tokenizer *Tokenizer, token StructTypeToken, token MemberTypeToken)
             
             case Token_Identifier:
             {
-                printf("    {%s, MetaType_%.*s, \"%.*s\", (u32)&((%.*s *)0)->%.*s},\n",
+                printf("    {%s, MetaType_%.*s, \"%.*s\", PointerToU32(&((%.*s *)0)->%.*s)},\n",
                     IsPointer ? "MetaMemberFlag_IsPointer" : "0",
                     (int)MemberTypeToken.TextLength, MemberTypeToken.Text,
                     (int)Token.TextLength, Token.Text,
