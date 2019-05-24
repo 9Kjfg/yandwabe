@@ -7,6 +7,7 @@
 #include "handmade_asset.cpp"
 #include "handmade_audio.cpp"
 #include "handmade_meta.cpp"
+#include "handmade_cutscene.cpp"
 
 struct add_low_entity_result
 {
@@ -453,7 +454,7 @@ PLATFORM_WORK_QUEUE_CALLBACK(FillGroundChunkWork)
 	Assert(AllResourcesPresent(RenderGroup));
 
 	RenderGroupToOutput(RenderGroup, Buffer);
-	EndRenderGroup(RenderGroup);
+	EndRender(RenderGroup);
 
 	EndTaskWidthMemory(Work->Task);
 }
@@ -625,422 +626,14 @@ DEBUGGetGameAssets(game_memory *Memory)
 game_memory *DebugGlobalMemory;
 #endif
 
-extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
+internal void
+UpdateAndRenderGame(game_state *GameState, transient_state *TranState,
+	game_input *Input, render_group *RenderGroup, loaded_bitmap *DrawBuffer)
 {
-	Platform = Memory->PlatformAPI;
-
-#if HANDMADE_INTERNAL
-	DebugGlobalMemory = Memory;
-#endif
-
-	TIMED_FUNCTION();
-
-	Assert((&Input->Controllers[0].Terminator - &Input->Controllers[0].Buttons[0]) == 
-		ArrayCount(Input->Controllers[0].Buttons));
-		
-	uint32 GroundBufferWidth = 256;
-	uint32 GroundBufferHeight = 256;
-	
-	Assert(sizeof(game_state) <= Memory->PermanentStorageSize);
-	game_state *GameState = (game_state *)Memory->PermanentStorage;
-	if (!GameState->IsInitialized)
-	{
-		uint32 TilesPerWidth = 17;
-		uint32 TilesPerHeight = 9;
-		
-		GameState->EffectsEntropy = RandomSeed(1234);
-		GameState->TypicalFloorHeight = 3.0f;
-
-		// TODO: Remove this!
-		real32 PixelsToMeters = 1.0f / 42.0f;
-		v3 WorldChunkDimInMeters = 
-			{PixelsToMeters*(real32)GroundBufferWidth,
-			PixelsToMeters*(real32)GroundBufferHeight,
-			GameState->TypicalFloorHeight};
-
-		// TODO: Talk about this soon! Let's start partitioning our memory space!
-		InitializeArena(&GameState->WorldArena, Memory->PermanentStorageSize - sizeof(game_state),
-			(uint8 *)Memory->PermanentStorage + sizeof(game_state));
-
-		InitializeAudioState(&GameState->AudioState, &GameState->WorldArena);
-
-		AddLowEntity(GameState, EntityType_Null, NullPosition());
-
-		GameState->World = PushStruct(&GameState->WorldArena, world);
-		world *World = GameState->World;
-		InitializeWorld(World, WorldChunkDimInMeters);
-		
-		real32 TileSideInMeters = 1.4f;
-		real32 TileDepthInMeters = GameState->TypicalFloorHeight;
-
-		GameState->NullCollision = MakeNullCollision(GameState);
-		GameState->SwordCollision = MakeSimpleGroundedCollision(GameState, 1.0f, 0.5f, 0.1f);
-		GameState->StairCollision = MakeSimpleGroundedCollision(GameState,
-			TileSideInMeters, 2.0f*TileSideInMeters,
-			1.1f*TileDepthInMeters);
-		GameState->PlayerCollision = MakeSimpleGroundedCollision(GameState, 1.0f, 0.5f, 1.2f);
-		GameState->MonsterCollision = MakeSimpleGroundedCollision(GameState, 1.0f, 0.5f, 0.5f);
-		GameState->FamiliarCollision = MakeSimpleGroundedCollision(GameState, 1.0f, 0.5f, 0.5f);
-		GameState->WallCollision = MakeSimpleGroundedCollision(GameState,
-			TileSideInMeters, TileSideInMeters,
-			TileDepthInMeters);
-
-		GameState->StandartRoomCollision = MakeSimpleGroundedCollision(GameState,
-			TilesPerWidth*TileSideInMeters,
-			TilesPerHeight*TileSideInMeters,
-			0.9f*TileDepthInMeters);
-
-		random_series Series = RandomSeed(0);
-
-		uint32 ScreenBaseX = 0;
-		uint32 ScreenBaseY = 0;
-		uint32 ScreenBaseZ = 0;
-		uint32 ScreenX = ScreenBaseX;
-		uint32 ScreenY = ScreenBaseY;
-		uint32 AbsTileZ = ScreenBaseZ;
-
-		// TODO: Replace with real world generation
-		bool32 DoorLeft = false;
-		bool32 DoorRight = false;
-		bool32 DoorTop = false;
-		bool32 DoorBottom = false;
-		bool32 DoorUp = false;
-		bool32 DoorDown = false;
-		for (uint32 ScreenIndex = 0;
-			ScreenIndex < 20;
-			++ScreenIndex)
-		{
-#if 1
-			uint32 DoorDirection = RandomChoice(&Series, (DoorUp || DoorDown) ? 2 : 3);
-#else	
-			uint32 DoorDirection = RandomChoice(&Series, 2);
-#endif
-			//DoorDirection = 3;
-
-			bool32 CreatedZDoor = false;
-			if (DoorDirection == 3)
-			{
-				CreatedZDoor = true;
-				DoorDown = true;
-			}
-			else if (DoorDirection == 2)
-			{
-				CreatedZDoor = true;
-				DoorUp = true;
-			}
-			else if (DoorDirection == 1)
-			{
-				DoorRight = true;
-			}
-			else
-			{
-				DoorTop = true;
-			}
-
-			AddStandardRoom(GameState,
-				ScreenX*TilesPerWidth + TilesPerWidth/2,
-				ScreenY*TilesPerHeight + TilesPerHeight/2,
-				AbsTileZ);
-
-			for (uint32 TileY = 0;
-				TileY < TilesPerHeight;
-				++TileY)
-			{
-				for (uint32 TileX = 0;
-					TileX < TilesPerWidth;
-					++TileX)
-				{
-					uint32 AbsTileX = ScreenX*TilesPerWidth + TileX;
-					uint32 AbsTileY = ScreenY*TilesPerHeight + TileY;
-
-					uint32 ShouldBeDoor = false;
-					if ((TileX == 0) && (!DoorLeft || (TileY != (TilesPerHeight/2))))
-					{
-						ShouldBeDoor = true;
-					}
-
-					if ((TileX == (TilesPerWidth - 1)) && (!DoorRight || (TileY != (TilesPerHeight/2))))
-					{
-						ShouldBeDoor = true;
-					}
-
-					if ((TileY == 0) && (!DoorBottom || (TileX != (TilesPerWidth/2))))
-					{
-						ShouldBeDoor = true;
-					}
-
-					if ((TileY == (TilesPerHeight - 1)) && (!DoorTop || (TileX != (TilesPerWidth/2))))
-					{
-						ShouldBeDoor = true;
-					}
-
-					if (ShouldBeDoor)
-					{
-						AddWall(GameState, AbsTileX, AbsTileY, AbsTileZ);
-					}
-					else if (CreatedZDoor)
-					{
-						if (((AbsTileZ % 2) && (TileX == 10) && (TileY == 5)) || 
-							(!(AbsTileZ % 2) && (TileX == 4) && (TileY == 5)))
-						{
-							AddStair(GameState, AbsTileX, AbsTileY, DoorDown ? AbsTileZ - 1 : AbsTileZ);
-						}
-					}
-				}
-			}
-
-			DoorLeft = DoorRight;
-			DoorBottom = DoorTop;
-
-			if (CreatedZDoor)
-			{
-				DoorDown = !DoorDown;
-				DoorUp = !DoorUp;
-			}
-			else
-			{
-				DoorUp = false;
-				DoorDown = false;
-			}
-
-			DoorRight = false;
-			DoorTop = false;
-
-			if (DoorDirection == 3)
-			{
-				AbsTileZ -= 1;
-			}
-			else if (DoorDirection == 2)
-			{
-				AbsTileZ += 1;
-			}
-			else if (DoorDirection == 1)
-			{
-				ScreenX += 1; 
-			}
-			else
-			{
-				ScreenY += 1;
-			}
-		}
-
-		world_position NewCameraP = {};
-		uint32 CameraTileX = ScreenBaseX*TilesPerWidth + 17/2;
-		uint32 CameraTileY = ScreenBaseY*TilesPerHeight + 9/2;
-		uint32 CameraTileZ = ScreenBaseZ;
-		NewCameraP = ChunkPositionFromTilePosition(World,
-			CameraTileX, CameraTileY, CameraTileZ);
-
-		GameState->CameraP = NewCameraP;
-
-		AddMonster(GameState, CameraTileX - 3, CameraTileY + 2, CameraTileZ);
-
-		for (int FamiliarIndex = 0;
-			FamiliarIndex < 1;
-			++FamiliarIndex)
-		{
-			int32 FamiliarOffsetX = RandomBetween(&Series, -7, 7);
-			int32 FamiliarOffsetY = RandomBetween(&Series, -3, -1);
-			if ((FamiliarOffsetX != 0) || (FamiliarOffsetY != 0))
-			{
-				AddFamiliar(GameState, CameraTileX + FamiliarOffsetX, CameraTileY + FamiliarOffsetY, CameraTileZ);
-			}
-		}
-
-		GameState->IsInitialized = true;
-	}
-
-	// NOTE: Transient initialization
-	Assert(sizeof(transient_state) <= Memory->TransientStorageSize);
-	transient_state *TranState = (transient_state *)Memory->TransientStorage;
-	if (!TranState->IsInitialized)
-	{
-		InitializeArena(&TranState->TranArena, Memory->TransientStorageSize - sizeof(transient_state),
-			(uint8 *)Memory->TransientStorage + sizeof(transient_state));
-
-
-		TranState->HighPriorityQueue = Memory->HighPriorityQueue;
-		TranState->LowPriorityQueue = Memory->LowPriorityQueue;
-		for (uint32 TaskIndex = 0;
-			TaskIndex < ArrayCount(TranState->Tasks);
-			++TaskIndex)
-		{
-			task_with_memory *Task = TranState->Tasks + TaskIndex;
-
-			Task->BeingUsed = false;
-			SubArena(&Task->Arena, &TranState->TranArena, Megabytes(1));	
-		}
-		
-		TranState->Assets = AllocateGameAssets(&TranState->TranArena, TranState, Megabytes(15));
-
-		GameState->Music = 0;//PlaySound(&GameState->AudioState, GetFirstSoundFrom(TranState->Assets, Asset_Music));
-
-		// TODO: Pick a real number here!
-		TranState->GroundBufferCount = 64;
-		TranState->GroundBuffers = PushArray(&TranState->TranArena, TranState->GroundBufferCount, ground_buffer);
-		for (uint32 GroundBufferIndex = 0;
-			GroundBufferIndex < TranState->GroundBufferCount;
-			++GroundBufferIndex)
-		{
-			ground_buffer *GroundBuffer = TranState->GroundBuffers + GroundBufferIndex;
-			GroundBuffer->Bitmap = MakeEmptyBitmap(&TranState->TranArena, GroundBufferWidth, GroundBufferHeight);
-			GroundBuffer->P = NullPosition();
-		}
-
-		GameState->TestDiffuse = MakeEmptyBitmap(&TranState->TranArena, 256, 256, false);
-		
-		GameState->TestNormal = MakeEmptyBitmap(&TranState->TranArena, GameState->TestDiffuse.Width, GameState->TestDiffuse.Height, false);
-		MakeSphereNormalMap(&GameState->TestNormal, 0.0f);
-		MakeSphereDiffuseMap(&GameState->TestDiffuse);
-
-		TranState->EnvMapWidth = 512;
-		TranState->EnvMapHeight = 256;
-
-		for (uint32 MapIndex = 0;
-			MapIndex < ArrayCount(TranState->EnvMaps);
-			++MapIndex)
-		{
-			environment_map *Map = TranState->EnvMaps + MapIndex;
-			uint32 Width = TranState->EnvMapWidth;
-			uint32 Height = TranState->EnvMapHeight;
-			for (uint32 LODIndex = 0;
-				LODIndex < ArrayCount(Map->LOD);
-				++LODIndex)
-			{
-				Map->LOD[LODIndex] = MakeEmptyBitmap(&TranState->TranArena, Width, Height, false);
-				Width >>= 1;
-				Height >>= 1;
-			}
-		}
-
-		TranState->IsInitialized = true;
-	}
-
-	DEBUG_IF(GroundChunks_RecomputeOnEXEChange)
-	{
-		if (Memory->ExecutableReloaded)
-		{
-			for (uint32 GroundBufferIndex = 0;
-				GroundBufferIndex < TranState->GroundBufferCount;
-				++GroundBufferIndex)
-			{
-				ground_buffer *GroundBuffer = TranState->GroundBuffers + GroundBufferIndex;
-				GroundBuffer->P = NullPosition();
-			}
-		}
-	}
-
 	world *World = GameState->World;
-
-#if 0
-	{
-		v2 MusicVolume;
-		MusicVolume.x = SafeRatio0((r32)Input->MouseX, (r32)Buffer->Width);
-		MusicVolume.y = 1.0 - MusicVolume.x;
-		ChangeVolume(&GameState->AudioState, GameState->Music, 0.01f, MusicVolume);
-	}
-#endif
-
-	for (int ControllerIndex = 0;
-		ControllerIndex < ArrayCount(Input->Controllers);
-		++ControllerIndex)
-	{
-		game_controller_input *Controller = GetController(Input, ControllerIndex);
-		controlled_hero *ConHero = GameState->ControlledHeroes + ControllerIndex;
-		if (ConHero->EntityIndex == 0)
-		{
-			if (Controller->Start.EndedDown)
-			{
-				*ConHero = {};
-				ConHero->EntityIndex = AddPlayer(GameState).LowIndex;
-				//GameState->PlayerIndexForController[ControllerIndex] = EntityIndex;
-			}
-		}
-		else
-		{	
-			ConHero->dZ = 0.0f;
-			ConHero->ddP = {};
-			ConHero->dSword = {};
-
-			if (Controller->IsAnalog)
-			{
-				ConHero->ddP = V2(Controller->StickAverageX, Controller->StickAverageY);
-			}
-			else
-			{
-				//NOTE: Use digital movement tuning
-
-				if (Controller->MoveUp.EndedDown)
-				{
-					ConHero->ddP.y = 1.0f;
-				}
-				if (Controller->MoveDown.EndedDown)
-				{
-					ConHero->ddP.y = -1.0f;
-				}
-				if (Controller->MoveLeft.EndedDown)
-				{
-					ConHero->ddP.x = -1.0f;
-				}
-				if (Controller->MoveRight.EndedDown)
-				{
-					ConHero->ddP.x = 1.0f;
-				}
-			}
-
-			if (Controller->Start.EndedDown)
-			{
-				ConHero->dZ += 3.0f;
-			}
-
-			ConHero->dSword = {};
-			if (Controller->ActionUp.EndedDown)
-			{
-				ChangeVolume(&GameState->AudioState, GameState->Music, 10.0f, V2(1.0f, 1.0f));
-				ConHero->dSword = V2(0.0f, 1.0f);
-			}
-			if (Controller->ActionDown.EndedDown)
-			{
-				ChangeVolume(&GameState->AudioState, GameState->Music, 10.0f, V2(0.0f, 0.0f));
-				ConHero->dSword = V2(0.0f, -1.0f);
-			}
-			if (Controller->ActionLeft.EndedDown)
-			{
-				ChangeVolume(&GameState->AudioState, GameState->Music, 5.0f, V2(0.0f, 0.0f));
-				ConHero->dSword = V2(-1.0f, 0.0f);
-			}
-			if (Controller->ActionRight.EndedDown)
-			{
-				ChangeVolume(&GameState->AudioState, GameState->Music, 5.0f, V2(0.0f, 0.0f));
-				ConHero->dSword = V2(1.0f, 0.0f);
-			}
-		}
-	}
-
-	//
-	// NOTE: Render
-	//
-
-	temporary_memory RenderMemory = BeginTemporaryMemory(&TranState->TranArena);
-	// TODO: Decide what our pushbuffer size is!
-
-	loaded_bitmap DrawBuffer_ = {};
-	loaded_bitmap *DrawBuffer = &DrawBuffer_;
-	DrawBuffer->Width = SafeTruncateToUInt16(Buffer->Width);
-	DrawBuffer->Height = SafeTruncateToUInt16(Buffer->Height);
-	DrawBuffer->Pitch = SafeTruncateToUInt16(Buffer->Pitch);
-	DrawBuffer->Memory = Buffer->Memory;
-
-	DEBUG_IF(Renderer_TestWierdDrawBufferSize)
-	{
-		// NOTE: Enable this to test weird buffer sizes to the renderer
-		DrawBuffer->Width = 1279;
-		DrawBuffer->Height = 719;
-	}
-
+	
 	v2 MouseP = {Input->MouseX, Input->MouseY};
-	render_group *RenderGroup = AllocateRenderGroup(TranState->Assets, &TranState->TranArena, Megabytes(4), false);
-	BeginRender(RenderGroup);
+
 	real32 WidthOfMonitor = 0.635; // NOTE: Horizontal measurement of monitor in meters
 	real32 MetersToPixels = (real32)DrawBuffer->Width*WidthOfMonitor;
 	
@@ -1678,19 +1271,446 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
 	PushRectOutline(RenderGroup, V3(MouseP, 0.0f), V2(2.0f, 2.0f));
 
-	TileRenderGroupToOutput(TranState->HighPriorityQueue, RenderGroup, DrawBuffer);
-	EndRenderGroup(RenderGroup);
-
 	// TODO: Make sure we hoist the camera update out to a place where the renderer
 	// can know about the the location of the camera at the end of the frame os there isn't
 	// a frane of lag in camera updating compared to the hero.
-
 	EndSim(SimRegion, GameState);
 	EndTemporaryMemory(SimMemory);
+}
+
+extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
+{
+	Platform = Memory->PlatformAPI;
+
+#if HANDMADE_INTERNAL
+	DebugGlobalMemory = Memory;
+#endif
+
+	TIMED_FUNCTION();
+
+	Assert((&Input->Controllers[0].Terminator - &Input->Controllers[0].Buttons[0]) == 
+		ArrayCount(Input->Controllers[0].Buttons));
+		
+	uint32 GroundBufferWidth = 256;
+	uint32 GroundBufferHeight = 256;
+	
+	Assert(sizeof(game_state) <= Memory->PermanentStorageSize);
+	game_state *GameState = (game_state *)Memory->PermanentStorage;
+	if (!GameState->IsInitialized)
+	{
+		uint32 TilesPerWidth = 17;
+		uint32 TilesPerHeight = 9;
+		
+		GameState->EffectsEntropy = RandomSeed(1234);
+		GameState->TypicalFloorHeight = 3.0f;
+
+		// TODO: Remove this!
+		real32 PixelsToMeters = 1.0f / 42.0f;
+		v3 WorldChunkDimInMeters = 
+			{PixelsToMeters*(real32)GroundBufferWidth,
+			PixelsToMeters*(real32)GroundBufferHeight,
+			GameState->TypicalFloorHeight};
+
+		// TODO: Talk about this soon! Let's start partitioning our memory space!
+		InitializeArena(&GameState->WorldArena, Memory->PermanentStorageSize - sizeof(game_state),
+			(uint8 *)Memory->PermanentStorage + sizeof(game_state));
+
+		InitializeAudioState(&GameState->AudioState, &GameState->WorldArena);
+
+		AddLowEntity(GameState, EntityType_Null, NullPosition());
+
+		GameState->World = PushStruct(&GameState->WorldArena, world);
+		world *World = GameState->World;
+		InitializeWorld(World, WorldChunkDimInMeters);
+		
+		real32 TileSideInMeters = 1.4f;
+		real32 TileDepthInMeters = GameState->TypicalFloorHeight;
+
+		GameState->NullCollision = MakeNullCollision(GameState);
+		GameState->SwordCollision = MakeSimpleGroundedCollision(GameState, 1.0f, 0.5f, 0.1f);
+		GameState->StairCollision = MakeSimpleGroundedCollision(GameState,
+			TileSideInMeters, 2.0f*TileSideInMeters,
+			1.1f*TileDepthInMeters);
+		GameState->PlayerCollision = MakeSimpleGroundedCollision(GameState, 1.0f, 0.5f, 1.2f);
+		GameState->MonsterCollision = MakeSimpleGroundedCollision(GameState, 1.0f, 0.5f, 0.5f);
+		GameState->FamiliarCollision = MakeSimpleGroundedCollision(GameState, 1.0f, 0.5f, 0.5f);
+		GameState->WallCollision = MakeSimpleGroundedCollision(GameState,
+			TileSideInMeters, TileSideInMeters,
+			TileDepthInMeters);
+
+		GameState->StandartRoomCollision = MakeSimpleGroundedCollision(GameState,
+			TilesPerWidth*TileSideInMeters,
+			TilesPerHeight*TileSideInMeters,
+			0.9f*TileDepthInMeters);
+
+		random_series Series = RandomSeed(0);
+
+		uint32 ScreenBaseX = 0;
+		uint32 ScreenBaseY = 0;
+		uint32 ScreenBaseZ = 0;
+		uint32 ScreenX = ScreenBaseX;
+		uint32 ScreenY = ScreenBaseY;
+		uint32 AbsTileZ = ScreenBaseZ;
+
+		// TODO: Replace with real world generation
+		bool32 DoorLeft = false;
+		bool32 DoorRight = false;
+		bool32 DoorTop = false;
+		bool32 DoorBottom = false;
+		bool32 DoorUp = false;
+		bool32 DoorDown = false;
+		for (uint32 ScreenIndex = 0;
+			ScreenIndex < 20;
+			++ScreenIndex)
+		{
+#if 1
+			uint32 DoorDirection = RandomChoice(&Series, (DoorUp || DoorDown) ? 2 : 3);
+#else	
+			uint32 DoorDirection = RandomChoice(&Series, 2);
+#endif
+			//DoorDirection = 3;
+
+			bool32 CreatedZDoor = false;
+			if (DoorDirection == 3)
+			{
+				CreatedZDoor = true;
+				DoorDown = true;
+			}
+			else if (DoorDirection == 2)
+			{
+				CreatedZDoor = true;
+				DoorUp = true;
+			}
+			else if (DoorDirection == 1)
+			{
+				DoorRight = true;
+			}
+			else
+			{
+				DoorTop = true;
+			}
+
+			AddStandardRoom(GameState,
+				ScreenX*TilesPerWidth + TilesPerWidth/2,
+				ScreenY*TilesPerHeight + TilesPerHeight/2,
+				AbsTileZ);
+
+			for (uint32 TileY = 0;
+				TileY < TilesPerHeight;
+				++TileY)
+			{
+				for (uint32 TileX = 0;
+					TileX < TilesPerWidth;
+					++TileX)
+				{
+					uint32 AbsTileX = ScreenX*TilesPerWidth + TileX;
+					uint32 AbsTileY = ScreenY*TilesPerHeight + TileY;
+
+					uint32 ShouldBeDoor = false;
+					if ((TileX == 0) && (!DoorLeft || (TileY != (TilesPerHeight/2))))
+					{
+						ShouldBeDoor = true;
+					}
+
+					if ((TileX == (TilesPerWidth - 1)) && (!DoorRight || (TileY != (TilesPerHeight/2))))
+					{
+						ShouldBeDoor = true;
+					}
+
+					if ((TileY == 0) && (!DoorBottom || (TileX != (TilesPerWidth/2))))
+					{
+						ShouldBeDoor = true;
+					}
+
+					if ((TileY == (TilesPerHeight - 1)) && (!DoorTop || (TileX != (TilesPerWidth/2))))
+					{
+						ShouldBeDoor = true;
+					}
+
+					if (ShouldBeDoor)
+					{
+						AddWall(GameState, AbsTileX, AbsTileY, AbsTileZ);
+					}
+					else if (CreatedZDoor)
+					{
+						if (((AbsTileZ % 2) && (TileX == 10) && (TileY == 5)) || 
+							(!(AbsTileZ % 2) && (TileX == 4) && (TileY == 5)))
+						{
+							AddStair(GameState, AbsTileX, AbsTileY, DoorDown ? AbsTileZ - 1 : AbsTileZ);
+						}
+					}
+				}
+			}
+
+			DoorLeft = DoorRight;
+			DoorBottom = DoorTop;
+
+			if (CreatedZDoor)
+			{
+				DoorDown = !DoorDown;
+				DoorUp = !DoorUp;
+			}
+			else
+			{
+				DoorUp = false;
+				DoorDown = false;
+			}
+
+			DoorRight = false;
+			DoorTop = false;
+
+			if (DoorDirection == 3)
+			{
+				AbsTileZ -= 1;
+			}
+			else if (DoorDirection == 2)
+			{
+				AbsTileZ += 1;
+			}
+			else if (DoorDirection == 1)
+			{
+				ScreenX += 1; 
+			}
+			else
+			{
+				ScreenY += 1;
+			}
+		}
+
+		world_position NewCameraP = {};
+		uint32 CameraTileX = ScreenBaseX*TilesPerWidth + 17/2;
+		uint32 CameraTileY = ScreenBaseY*TilesPerHeight + 9/2;
+		uint32 CameraTileZ = ScreenBaseZ;
+		NewCameraP = ChunkPositionFromTilePosition(World,
+			CameraTileX, CameraTileY, CameraTileZ);
+
+		GameState->CameraP = NewCameraP;
+
+		AddMonster(GameState, CameraTileX - 3, CameraTileY + 2, CameraTileZ);
+
+		for (int FamiliarIndex = 0;
+			FamiliarIndex < 1;
+			++FamiliarIndex)
+		{
+			int32 FamiliarOffsetX = RandomBetween(&Series, -7, 7);
+			int32 FamiliarOffsetY = RandomBetween(&Series, -3, -1);
+			if ((FamiliarOffsetX != 0) || (FamiliarOffsetY != 0))
+			{
+				AddFamiliar(GameState, CameraTileX + FamiliarOffsetX, CameraTileY + FamiliarOffsetY, CameraTileZ);
+			}
+		}
+
+		GameState->IsInitialized = true;
+	}
+
+	// NOTE: Transient initialization
+	Assert(sizeof(transient_state) <= Memory->TransientStorageSize);
+	transient_state *TranState = (transient_state *)Memory->TransientStorage;
+	if (!TranState->IsInitialized)
+	{
+		InitializeArena(&TranState->TranArena, Memory->TransientStorageSize - sizeof(transient_state),
+			(uint8 *)Memory->TransientStorage + sizeof(transient_state));
+
+
+		TranState->HighPriorityQueue = Memory->HighPriorityQueue;
+		TranState->LowPriorityQueue = Memory->LowPriorityQueue;
+		for (uint32 TaskIndex = 0;
+			TaskIndex < ArrayCount(TranState->Tasks);
+			++TaskIndex)
+		{
+			task_with_memory *Task = TranState->Tasks + TaskIndex;
+
+			Task->BeingUsed = false;
+			SubArena(&Task->Arena, &TranState->TranArena, Megabytes(1));	
+		}
+		
+		TranState->Assets = AllocateGameAssets(&TranState->TranArena, TranState, Megabytes(128));
+
+		GameState->Music = 0;//PlaySound(&GameState->AudioState, GetFirstSoundFrom(TranState->Assets, Asset_Music));
+
+		// TODO: Pick a real number here!
+		TranState->GroundBufferCount = 64;
+		TranState->GroundBuffers = PushArray(&TranState->TranArena, TranState->GroundBufferCount, ground_buffer);
+		for (uint32 GroundBufferIndex = 0;
+			GroundBufferIndex < TranState->GroundBufferCount;
+			++GroundBufferIndex)
+		{
+			ground_buffer *GroundBuffer = TranState->GroundBuffers + GroundBufferIndex;
+			GroundBuffer->Bitmap = MakeEmptyBitmap(&TranState->TranArena, GroundBufferWidth, GroundBufferHeight);
+			GroundBuffer->P = NullPosition();
+		}
+
+		GameState->TestDiffuse = MakeEmptyBitmap(&TranState->TranArena, 256, 256, false);
+		
+		GameState->TestNormal = MakeEmptyBitmap(&TranState->TranArena, GameState->TestDiffuse.Width, GameState->TestDiffuse.Height, false);
+		MakeSphereNormalMap(&GameState->TestNormal, 0.0f);
+		MakeSphereDiffuseMap(&GameState->TestDiffuse);
+
+		TranState->EnvMapWidth = 512;
+		TranState->EnvMapHeight = 256;
+
+		for (uint32 MapIndex = 0;
+			MapIndex < ArrayCount(TranState->EnvMaps);
+			++MapIndex)
+		{
+			environment_map *Map = TranState->EnvMaps + MapIndex;
+			uint32 Width = TranState->EnvMapWidth;
+			uint32 Height = TranState->EnvMapHeight;
+			for (uint32 LODIndex = 0;
+				LODIndex < ArrayCount(Map->LOD);
+				++LODIndex)
+			{
+				Map->LOD[LODIndex] = MakeEmptyBitmap(&TranState->TranArena, Width, Height, false);
+				Width >>= 1;
+				Height >>= 1;
+			}
+		}
+
+		TranState->IsInitialized = true;
+	}
+
+	DEBUG_IF(GroundChunks_RecomputeOnEXEChange)
+	{
+		if (Memory->ExecutableReloaded)
+		{
+			for (uint32 GroundBufferIndex = 0;
+				GroundBufferIndex < TranState->GroundBufferCount;
+				++GroundBufferIndex)
+			{
+				ground_buffer *GroundBuffer = TranState->GroundBuffers + GroundBufferIndex;
+				GroundBuffer->P = NullPosition();
+			}
+		}
+	}
+
+	world *World = GameState->World;
+
+#if 0
+	{
+		v2 MusicVolume;
+		MusicVolume.x = SafeRatio0((r32)Input->MouseX, (r32)Buffer->Width);
+		MusicVolume.y = 1.0 - MusicVolume.x;
+		ChangeVolume(&GameState->AudioState, GameState->Music, 0.01f, MusicVolume);
+	}
+#endif
+
+	for (int ControllerIndex = 0;
+		ControllerIndex < ArrayCount(Input->Controllers);
+		++ControllerIndex)
+	{
+		game_controller_input *Controller = GetController(Input, ControllerIndex);
+		controlled_hero *ConHero = GameState->ControlledHeroes + ControllerIndex;
+		if (ConHero->EntityIndex == 0)
+		{
+			if (Controller->Start.EndedDown)
+			{
+				*ConHero = {};
+				ConHero->EntityIndex = AddPlayer(GameState).LowIndex;
+				//GameState->PlayerIndexForController[ControllerIndex] = EntityIndex;
+			}
+		}
+		else
+		{	
+			ConHero->dZ = 0.0f;
+			ConHero->ddP = {};
+			ConHero->dSword = {};
+
+			if (Controller->IsAnalog)
+			{
+				ConHero->ddP = V2(Controller->StickAverageX, Controller->StickAverageY);
+			}
+			else
+			{
+				//NOTE: Use digital movement tuning
+
+				if (Controller->MoveUp.EndedDown)
+				{
+					ConHero->ddP.y = 1.0f;
+				}
+				if (Controller->MoveDown.EndedDown)
+				{
+					ConHero->ddP.y = -1.0f;
+				}
+				if (Controller->MoveLeft.EndedDown)
+				{
+					ConHero->ddP.x = -1.0f;
+				}
+				if (Controller->MoveRight.EndedDown)
+				{
+					ConHero->ddP.x = 1.0f;
+				}
+			}
+
+			if (Controller->Start.EndedDown)
+			{
+				ConHero->dZ += 3.0f;
+			}
+
+			ConHero->dSword = {};
+			if (Controller->ActionUp.EndedDown)
+			{
+				ChangeVolume(&GameState->AudioState, GameState->Music, 10.0f, V2(1.0f, 1.0f));
+				ConHero->dSword = V2(0.0f, 1.0f);
+			}
+			if (Controller->ActionDown.EndedDown)
+			{
+				ChangeVolume(&GameState->AudioState, GameState->Music, 10.0f, V2(0.0f, 0.0f));
+				ConHero->dSword = V2(0.0f, -1.0f);
+			}
+			if (Controller->ActionLeft.EndedDown)
+			{
+				ChangeVolume(&GameState->AudioState, GameState->Music, 5.0f, V2(0.0f, 0.0f));
+				ConHero->dSword = V2(-1.0f, 0.0f);
+			}
+			if (Controller->ActionRight.EndedDown)
+			{
+				ChangeVolume(&GameState->AudioState, GameState->Music, 5.0f, V2(0.0f, 0.0f));
+				ConHero->dSword = V2(1.0f, 0.0f);
+			}
+		}
+	}
+
+	//
+	// NOTE: Render
+	//
+
+	temporary_memory RenderMemory = BeginTemporaryMemory(&TranState->TranArena);
+	// TODO: Decide what our pushbuffer size is!
+
+	loaded_bitmap DrawBuffer_ = {};
+	loaded_bitmap *DrawBuffer = &DrawBuffer_;
+	DrawBuffer->Width = SafeTruncateToUInt16(Buffer->Width);
+	DrawBuffer->Height = SafeTruncateToUInt16(Buffer->Height);
+	DrawBuffer->Pitch = SafeTruncateToUInt16(Buffer->Pitch);
+	DrawBuffer->Memory = Buffer->Memory;
+
+	DEBUG_IF(Renderer_TestWierdDrawBufferSize)
+	{
+		// NOTE: Enable this to test weird buffer sizes to the renderer
+		DrawBuffer->Width = 1279;
+		DrawBuffer->Height = 719;
+	}
+
+	// TODO: Decide what out pushbuffer size is!
+	render_group *RenderGroup = AllocateRenderGroup(TranState->Assets, &TranState->TranArena, Megabytes(4), false);
+	BeginRender(RenderGroup);
+
+	RenderCutscene(TranState->Assets, RenderGroup, DrawBuffer, GameState->tCutScene);
+	GameState->tCutScene += Input->dtForFrame;
+	if (GameState->tCutScene > 5.0f)
+	{
+		GameState->tCutScene = 0.0f;
+	}
+	//UpdateAndRenderGame(GameState, TranState, Input, RenderGroup, DrawBuffer);
+
+	TileRenderGroupToOutput(TranState->HighPriorityQueue, RenderGroup, DrawBuffer);
+	EndRender(RenderGroup);
+
 	EndTemporaryMemory(RenderMemory);
 
 	CheckArena(&GameState->WorldArena);
 	CheckArena(&TranState->TranArena);
+
 }
 
 extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)

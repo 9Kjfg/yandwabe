@@ -2061,7 +2061,7 @@ DEBUGEnd(debug_state *DebugState, game_input *Input, loaded_bitmap *DrawBuffer)
 	}
 
 	TileRenderGroupToOutput(DebugState->HighPriorityQueue, DebugState->RenderGroup, DrawBuffer);
-	EndRenderGroup(DebugState->RenderGroup);
+	EndRender(DebugState->RenderGroup);
 
 	// NOTE: Clear The UI State for the next frame
 	ZeroStruct(DebugState->NextHotInteraction);

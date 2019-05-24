@@ -1042,6 +1042,19 @@ WriteNonHero(void)
     AddBitmapAsset(Assets, "test/ground01.bmp");
 	EndAssetType(Assets);
 
+	BeginAssetType(Assets, Asset_OpeningCutscene);
+	AddBitmapAsset(Assets, "test/test_scene_layer_04.bmp", 0.5f, 0.5f);
+	AddTag(Assets, Tag_LayerIndex, 1);
+	AddBitmapAsset(Assets, "test/test_scene_layer_03.bmp", 0.5f, 0.5f);
+	AddTag(Assets, Tag_LayerIndex, 2);
+	AddBitmapAsset(Assets, "test/test_scene_layer_02.bmp", 0.5f, 0.5f);
+	AddTag(Assets, Tag_LayerIndex, 3);
+	AddBitmapAsset(Assets, "test/test_scene_layer_01.bmp", 0.5f, 0.5f);
+	AddTag(Assets, Tag_LayerIndex, 4);
+	AddBitmapAsset(Assets, "test/test_scene_layer_00.bmp", 0.5f, 0.5f);
+	AddTag(Assets, Tag_LayerIndex, 5);
+	EndAssetType(Assets);
+
 	WriteHHA(Assets, "test2.hha");
 }
 

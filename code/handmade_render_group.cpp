@@ -724,7 +724,7 @@ BeginRender(render_group *Group)
 }
 
 internal void
-EndRenderGroup(render_group *Group)
+EndRender(render_group *Group)
 {
 	if (Group)
 	{

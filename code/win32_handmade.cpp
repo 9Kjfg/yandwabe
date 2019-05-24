@@ -1516,7 +1516,7 @@ WinMain(
 #endif
 			game_memory GameMemory = {};
 			GameMemory.PermanentStorageSize = Megabytes(15);
-			GameMemory.TransientStorageSize = Megabytes(50);
+			GameMemory.TransientStorageSize = Megabytes(200);
 			GameMemory.DebugStorageSize = Megabytes(50);
 			GameMemory.HighPriorityQueue = &HighPriorityQueue;
 			GameMemory.LowPriorityQueue = &LowPriorityQueue;
