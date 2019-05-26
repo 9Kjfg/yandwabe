@@ -24,6 +24,7 @@ struct layered_scene
     u32 LayerCount;
     scene_layer *Layers;
 
+    r32 Duration;
     v3 CameraStart;
     v3 CameraEnd;
 };

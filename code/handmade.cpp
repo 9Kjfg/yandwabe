@@ -1695,12 +1695,9 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	render_group *RenderGroup = AllocateRenderGroup(TranState->Assets, &TranState->TranArena, Megabytes(4), false);
 	BeginRender(RenderGroup);
 
-	RenderCutscene(TranState->Assets, RenderGroup, DrawBuffer, GameState->tCutScene);
+	RenderCutscene(TranState->Assets, RenderGroup, DrawBuffer, &GameState->tCutScene);
 	GameState->tCutScene += Input->dtForFrame;
-	if (GameState->tCutScene > 5.0f)
-	{
-		GameState->tCutScene = 0.0f;
-	}
+
 	//UpdateAndRenderGame(GameState, TranState, Input, RenderGroup, DrawBuffer);
 
 	TileRenderGroupToOutput(TranState->HighPriorityQueue, RenderGroup, DrawBuffer);
