@@ -525,6 +525,8 @@ typedef struct game_memory
 	
 	b32 ExecutableReloaded;
 	platform_api PlatformAPI;
+
+	b32 QuitRequested;
 } game_memory;
 
 #define GAME_UPDATE_AND_RENDER(name) void name(game_memory *Memory, game_input *Input, game_offscreen_buffer *Buffer)

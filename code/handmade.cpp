@@ -39,6 +39,12 @@ AddLowEntity(game_state *GameState, entity_type Type, world_position P)
 	return(Result); 
 }
 
+internal void
+DeleteLowEntity(game_state *GameState, u32 Index)
+{
+	// TODO: Actually delete
+}
+
 internal add_low_entity_result
 AddGroundedEntity(game_state *GameState, entity_type Type, world_position P,
 	sim_entity_collision_volume_group *Collision)
@@ -1500,6 +1506,8 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			}
 		}
 
+		GameState->CurrentCutScene = MakeIntroCutScene();
+
 		GameState->IsInitialized = true;
 	}
 
@@ -1594,6 +1602,8 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	}
 #endif
 
+	b32 HeroesExist = false;
+	b32 QuitRequested = false;
 	for (int ControllerIndex = 0;
 		ControllerIndex < ArrayCount(Input->Controllers);
 		++ControllerIndex)
@@ -1602,15 +1612,19 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		controlled_hero *ConHero = GameState->ControlledHeroes + ControllerIndex;
 		if (ConHero->EntityIndex == 0)
 		{
+			if (WasPressed(Controller->Back))
+			{
+				QuitRequested = true;
+			}
 			if (Controller->Start.EndedDown)
 			{
 				*ConHero = {};
 				ConHero->EntityIndex = AddPlayer(GameState).LowIndex;
-				//GameState->PlayerIndexForController[ControllerIndex] = EntityIndex;
 			}
 		}
 		else
 		{	
+			HeroesExist = true;
 			ConHero->dZ = 0.0f;
 			ConHero->ddP = {};
 			ConHero->dSword = {};
@@ -1667,6 +1681,12 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 				ChangeVolume(&GameState->AudioState, GameState->Music, 5.0f, V2(0.0f, 0.0f));
 				ConHero->dSword = V2(1.0f, 0.0f);
 			}
+
+			if (WasPressed(Controller->Back))
+			{
+				DeleteLowEntity(GameState, ConHero->EntityIndex);
+				ConHero->EntityIndex = 0;
+			}
 		}
 	}
 
@@ -1695,15 +1715,28 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	render_group *RenderGroup = AllocateRenderGroup(TranState->Assets, &TranState->TranArena, Megabytes(4), false);
 	BeginRender(RenderGroup);
 
-	RenderCutscene(TranState->Assets, RenderGroup, DrawBuffer, &GameState->tCutScene);
-	GameState->tCutScene += Input->dtForFrame;
+	if (HeroesExist)
+	{
+		UpdateAndRenderGame(GameState, TranState, Input, RenderGroup, DrawBuffer);	
+	}
+	else
+	{
+		RenderCutscene(TranState->Assets, RenderGroup, DrawBuffer, &GameState->CurrentCutScene);
+		AdvanceCutscene(&GameState->CurrentCutScene, Input->dtForFrame);
+	}
 
-	//UpdateAndRenderGame(GameState, TranState, Input, RenderGroup, DrawBuffer);
-
-	TileRenderGroupToOutput(TranState->HighPriorityQueue, RenderGroup, DrawBuffer);
+	if (AllResourcesPresent(RenderGroup))
+	{
+		TileRenderGroupToOutput(TranState->HighPriorityQueue, RenderGroup, DrawBuffer);
+	}
 	EndRender(RenderGroup);
 
 	EndTemporaryMemory(RenderMemory);
+
+	if (!HeroesExist && QuitRequested)
+	{
+		Memory->QuitRequested = true;
+	}
 
 	CheckArena(&GameState->WorldArena);
 	CheckArena(&TranState->TranArena);

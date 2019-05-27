@@ -1445,6 +1445,7 @@ WinMain(
 	WindowClass.hInstance = Instance;
 	WindowClass.hCursor = LoadCursor(0, IDC_ARROW);
 	WindowClass.lpszClassName = "HandMadeHeroWindow";
+	WindowClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
 
 	if (RegisterClass(&WindowClass))
 	{
@@ -1453,7 +1454,7 @@ WinMain(
 				0,
 				WindowClass.lpszClassName,
 				"Handmade Hero",
-				WS_OVERLAPPEDWINDOW|WS_VISIBLE,
+				WS_OVERLAPPEDWINDOW,
 				CW_USEDEFAULT,
 				CW_USEDEFAULT,
 				CW_USEDEFAULT,
@@ -1464,6 +1465,9 @@ WinMain(
 				0);
 		if (Window)
 		{
+			ToggleFullscreen(Window);
+			ShowWindow(Window, SW_SHOW);
+
 			win32_sound_output SoundOutput = {};
 
 			// TODO: How do we reliably query on this on Windows
@@ -1847,7 +1851,10 @@ WinMain(
 						if (Game.UpdateAndRender)
 						{
 							Game.UpdateAndRender(&GameMemory, NewInput, &Buffer);
-							//HandleDebugCycleCounters(&GameMemory);
+							if (GameMemory.QuitRequested)
+							{
+								GlobalRunning = false;
+							}
 						}
 					}
 
@@ -1968,7 +1975,6 @@ WinMain(
 							AudioLatencySeconds = 
 								(((real32)AudioLatencyBytes / (real32)SoundOutput.BytesPerSample) /
 								(real32)SoundOutput.SamplesPerSecond);
-
 #if 0
 							char TextBuffer[256];
 							_snprintf_s(

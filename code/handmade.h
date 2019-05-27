@@ -5,6 +5,7 @@
 #include "handmade_math.h"
 #include "handmade_file_format.h"
 #include "handmade_meta.h"
+#include "handmade_cutscene.h"
 
 #define DLIST_INSERT(Sentinel, Element) \
 	(Element)->Next = (Sentinel)->Next; \
@@ -369,7 +370,7 @@ struct game_state
 	particle Particles[256];
 	particle_cel ParticleCels[PARTICLE_CEL_DIM][PARTICLE_CEL_DIM];
 
-	r32 tCutScene;
+	playing_cutscene CurrentCutScene;
 };
 
 struct task_with_memory

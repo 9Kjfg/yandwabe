@@ -29,5 +29,12 @@ struct layered_scene
     v3 CameraEnd;
 };
 
+struct playing_cutscene
+{
+    u32 SceneCount;
+    layered_scene *Scenes;
+    r32 t;
+};
+
 #define HANDMADE_CUTSCENE_H
 #endif
