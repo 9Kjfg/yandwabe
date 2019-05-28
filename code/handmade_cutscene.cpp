@@ -10,6 +10,14 @@ RenderLayerdScene(game_assets *Assets, render_group *RenderGroup, loaded_bitmap 
 	r32 MetersToPixels = (r32)DrawBuffer->Width*WidthOfMonitor;
     r32 FocalLength = 0.6;
 
+    r32 SceneFadeValue = 1.0f;
+    if (tNormal < Scene->tFadeIn)
+    {
+        SceneFadeValue = Clamp01MapToRange(0.0f, tNormal, Scene->tFadeIn);
+    }
+
+    v4 Color = {SceneFadeValue, SceneFadeValue, SceneFadeValue, 1.0f};
+
     v3 CameraStart = Scene->CameraStart;
     v3 CameraEnd = Scene->CameraEnd;
     v3 CameraOffset = Lerp(CameraStart, tNormal, CameraEnd);
@@ -80,9 +88,7 @@ RenderLayerdScene(game_assets *Assets, render_group *RenderGroup, loaded_bitmap 
 
                 RenderGroup->Transform.OffsetP.z = P.z - CameraOffset.z;
 
-                RenderGroup->Transform.OffsetP = P - CameraOffset;
-                RenderGroup->Transform.OffsetP = P - CameraOffset;
-                PushBitmap(RenderGroup, LayerImage, Layer.Height, V3(0, 0, 0));
+                PushBitmap(RenderGroup, LayerImage, Layer.Height, V3(0, 0, 0), Color);
             }
             else
             {
@@ -94,7 +100,7 @@ RenderLayerdScene(game_assets *Assets, render_group *RenderGroup, loaded_bitmap 
 
 global_variable scene_layer IntroLayers1[] = 
 {
-    {{0, 0, -200.0f}, 300.0f, SceneLayerFlag_AtInfinity},
+    {{0, 0, -200.0f}, 300.0f, SceneLayerFlag_AtInfinity, 0.1f},
     {{0, 0, -200.0f}, 300.0f},
     {{0, 10.0f, -70.0f}, 80.0f},
     {{0, 0, 0}, 14.0f},

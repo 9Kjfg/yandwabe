@@ -450,7 +450,37 @@ Win32DisplayBufferInWindow(
 	}
 }
 
-LRESULT CALLBACK 
+
+internal LRESULT CALLBACK 
+Win32FadeWindowCallback(
+	HWND Window,
+	UINT Message,
+	WPARAM WParam,
+	LPARAM LParam)
+{
+	LRESULT Result = 0;
+
+	switch(Message)
+	{
+		case WM_CLOSE:
+		{
+		} break;
+		
+		case WM_SETCURSOR:
+		{
+			SetCursor(0);
+		} break;
+		
+		default:
+		{
+			Result = DefWindowProc(Window, Message, WParam, LParam);
+		} break;
+	}
+
+	return(Result);
+}	
+
+internal LRESULT CALLBACK 
 Win32MainWindowCallback(
 	HWND Window,
 	UINT Message,
@@ -461,9 +491,6 @@ Win32MainWindowCallback(
 
 	switch(Message)
 	{
-		case WM_SIZE:
-		{
-		} break;
 		case WM_CLOSE:
 		{
 			GlobalRunning = false;
@@ -478,6 +505,9 @@ Win32MainWindowCallback(
 			{
 				SetCursor(0);
 			}	
+		} break;
+		case WM_SIZE:
+		{
 		} break;
 		case WM_ACTIVATEAPP:
 		{
@@ -1388,6 +1418,152 @@ global_variable debug_table GlobalDebugTable_;
 debug_table *GlobalDebugTable = &GlobalDebugTable_;
 #endif
 
+internal void
+SetFadeAlpha(HWND Window, r32 Alpha)
+{
+	BYTE WindowsAlpha = (BYTE)(Alpha*255.0f);
+
+	if (Alpha == 0)
+	{
+		if (IsWindowVisible(Window))
+		{
+			ShowWindow(Window, SW_HIDE);
+		}
+	}
+	else
+	{
+		SetLayeredWindowAttributes(Window, RGB(0, 0, 0), WindowsAlpha, LWA_ALPHA);
+		if (!IsWindowVisible(Window))
+		{
+			ShowWindow(Window, SW_SHOW);	
+		}
+	}
+}
+
+internal void
+InitFader(win32_fader *Fader, HINSTANCE Instance)
+{
+	WNDCLASSA WindowClass = {};
+
+	WindowClass.style = CS_HREDRAW|CS_VREDRAW;
+	WindowClass.lpfnWndProc = Win32FadeWindowCallback;
+	WindowClass.hInstance = Instance;
+	WindowClass.hCursor = LoadCursor(0, IDC_ARROW);
+	WindowClass.lpszClassName = "HandMadeHeroWindowFadeInClass";
+	WindowClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+
+	if (RegisterClass(&WindowClass))
+	{
+		Fader->Window = 
+			CreateWindowEx(
+				WS_EX_LAYERED,//|WS_EX_TOPMOST,
+				WindowClass.lpszClassName,
+				"Handmade Hero",
+				WS_OVERLAPPEDWINDOW,
+				CW_USEDEFAULT,
+				CW_USEDEFAULT,
+				CW_USEDEFAULT,
+				CW_USEDEFAULT,
+				0,
+				0,
+				Instance,
+				0);
+		if (Fader->Window)
+		{
+			ToggleFullscreen(Fader->Window);
+		}
+	}
+}
+
+internal void
+BeginFadeToGame(win32_fader *Fader)
+{
+	Fader->State = Win32Fade_FadingIn;
+	Fader->Alpha = 0.0f;
+}
+
+internal void
+BeginFadeToDesktop(win32_fader *Fader)
+{
+	if (Fader->State == Win32Fade_Inactive)
+	{
+		Fader->State = Win32Fade_FadingGame;
+		Fader->Alpha = 0.0f;
+	}
+}
+
+internal win32_fader_state
+UpdateFade(win32_fader *Fader, r32 dt, HWND GameWindow)
+{
+	switch(Fader->State)
+	{
+		case Win32Fade_FadingIn:
+		{
+			Fader->Alpha += dt;
+			if (Fader->Alpha >= 1.0f)
+			{
+				SetFadeAlpha(Fader->Window, 1.0f);
+				ShowWindow(GameWindow, SW_SHOW);
+				InvalidateRect(GameWindow, 0, TRUE);
+				UpdateWindow(GameWindow);
+
+				Fader->State = Win32Fade_WaitingForShow;
+			}
+			else
+			{
+				SetFadeAlpha(Fader->Window, Fader->Alpha);
+				Fader->Alpha += dt;
+			}
+		} break;
+		case Win32Fade_WaitingForShow:
+		{
+			SetFadeAlpha(Fader->Window, 0.0f);
+			Fader->State = Win32Fade_Inactive;
+		} break;
+		case Win32Fade_Inactive:
+		{
+			// NOTE: Nothing to do
+		} break;
+		case Win32Fade_FadingGame:
+		{
+			if (Fader->Alpha >= 1.0f)
+			{
+				SetFadeAlpha(Fader->Window, 1.0f);
+				ShowWindow(GameWindow, SW_HIDE);
+				Fader->State = Win32Fade_FadingOut;
+			}
+			else
+			{
+				SetFadeAlpha(Fader->Window, Fader->Alpha);
+				Fader->Alpha += dt;
+			}
+		} break;
+		case Win32Fade_FadingOut:
+		{
+			Fader->Alpha -= dt;
+			if (Fader->Alpha <= 0.0f)
+			{
+				SetFadeAlpha(Fader->Window, 0.0f);
+				Fader->State = Win32Fade_WaitingForClose;
+			}
+			else
+			{
+				SetFadeAlpha(Fader->Window, Fader->Alpha);
+			}
+		} break;
+		case Win32Fade_WaitingForClose:
+		{
+			// NOTE: Nothing to do
+		} break;
+		default:
+		{
+			Assert(!"Unrecongized fader state!")
+		} break;
+	}
+
+	return(Fader->State);
+}
+
 int CALLBACK 
 WinMain(
 	HINSTANCE Instance,
@@ -1396,7 +1572,6 @@ WinMain(
 	int ShowCode)
 {
 	win32_state Win32State = {};
-
 
 	u32 ID = GetCurrentThreadId();
 
@@ -1432,6 +1607,9 @@ WinMain(
 
 	Win32LoadXInput();
 
+	win32_fader Fader;
+	InitFader(&Fader, Instance);
+
 #if 1
 	DEBUGGlobalShowCursor = true;
 #endif
@@ -1466,7 +1644,6 @@ WinMain(
 		if (Window)
 		{
 			ToggleFullscreen(Window);
-			ShowWindow(Window, SW_SHOW);
 
 			win32_sound_output SoundOutput = {};
 
@@ -1603,16 +1780,15 @@ WinMain(
 				int DebugTimeMarketIntex = 0;
 				win32_debug_time_marker DebugTimeMarkers[30] = {0};
 
-				bool32 SoundIsValid = false;
 				DWORD AudioLatencyBytes = 0;	
 				real32 AudioLatencySeconds = 0;
-				
+				bool32 SoundIsValid = false;
+
 				win32_game_code Game = Win32LoadGameCode(
 					SourceGameCodeDLLFullPath,
 					TempGameCodeDLLFullPath,
 					GameCodeLockFullPath);
 
-				LARGE_INTEGER FrameMarker = {};
 				while (GlobalRunning)
 				{
 					//
@@ -1621,7 +1797,12 @@ WinMain(
 
 					BEGIN_BLOCK(ExecutableRefesh);
 					NewInput->dtForFrame = TargetSecondPerFrame;
-					
+
+					if (UpdateFade(&Fader, NewInput->dtForFrame, Window) == Win32Fade_WaitingForClose)
+					{
+						GlobalRunning = false;
+					}
+
 					GameMemory.ExecutableReloaded = false;
 					FILETIME NewDLLWriteTime = Win32GetLastWriteTime(SourceGameCodeDLLFullPath);
 					if (CompareFileTime(&NewDLLWriteTime, &Game.DLLLastWriteTime) != 0)
@@ -1853,7 +2034,7 @@ WinMain(
 							Game.UpdateAndRender(&GameMemory, NewInput, &Buffer);
 							if (GameMemory.QuitRequested)
 							{
-								GlobalRunning = false;
+								BeginFadeToDesktop(&Fader);
 							}
 						}
 					}
