@@ -1,4 +1,5 @@
 
+#if 0
 internal void
 OutputTestSineSound(game_state *GameState, game_sound_output_buffer *SoundBuffer, int ToneHz)
 {
@@ -27,6 +28,7 @@ OutputTestSineSound(game_state *GameState, game_sound_output_buffer *SoundBuffer
 #endif
 	}
 }
+#endif
 
 internal playing_sound *
 PlaySound(audio_state *AudioState, sound_id SoundID)

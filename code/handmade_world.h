@@ -14,7 +14,6 @@ introspect(category:"world") struct world_position
 	v3 Offset_;
 };
 
-
 // TODO: Could make this just tile_chunk and hen allow multiple tile chunks per X\Y\Z
 struct world_entity_block
 {
@@ -45,7 +44,9 @@ struct world
 
 	world_chunk ChunkHash[4096];
 
-	world_entity_block *FirstFree;                                                                                                                     
+	world_entity_block *FirstFree;
+
+	memory_arena Arena;
 };
 
 #define HANDMADE_WORLD_H
