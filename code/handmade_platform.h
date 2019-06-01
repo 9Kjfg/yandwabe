@@ -411,7 +411,8 @@ enum game_input_mouse_button
 
 typedef struct game_input
 {
-
+	b32 QuitRequested;
+	
 	r32 dtForFrame;
 
 	game_controller_input Controllers[5];
@@ -525,8 +526,6 @@ typedef struct game_memory
 	
 	b32 ExecutableReloaded;
 	platform_api PlatformAPI;
-
-	b32 QuitRequested;
 } game_memory;
 
 #define GAME_UPDATE_AND_RENDER(name) void name(game_memory *Memory, game_input *Input, game_offscreen_buffer *Buffer)

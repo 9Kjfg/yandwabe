@@ -310,6 +310,10 @@ MakeNullCollision(game_mode_world *WorldMode)
 	return(Group);
 }
 
+// TODO: IMPORTANT: fill_ground_chunk_work
+// will cause a crash if the mode goes away before the
+// task finishes, this must be sut down properly
+// if we ship it.
 struct fill_ground_chunk_work
 {
 	transient_state *TranState;
@@ -460,11 +464,8 @@ PlayWorld(game_state *GameState)
 		{PixelsToMeters*(real32)GroundBufferWidth,
 		PixelsToMeters*(real32)GroundBufferHeight,
 		WorldMode->TypicalFloorHeight};
-
-	WorldMode->World = PushStruct(&WorldMode->World->Arena, world);
 	
-	world *World = WorldMode->World;
-	InitializeWorld(World, WorldChunkDimInMeters, &GameState->ModeArena);
+	WorldMode->World = CreateWorld(WorldChunkDimInMeters, &GameState->ModeArena);
 	
 	// NOTE: Reserve entity slot 0 for the null entity
 	AddLowEntity(WorldMode, EntityType_Null, NullPosition());
@@ -627,7 +628,7 @@ PlayWorld(game_state *GameState)
 	uint32 CameraTileX = ScreenBaseX*TilesPerWidth + 17/2;
 	uint32 CameraTileY = ScreenBaseY*TilesPerHeight + 9/2;
 	uint32 CameraTileZ = ScreenBaseZ;
-	NewCameraP = ChunkPositionFromTilePosition(World,
+	NewCameraP = ChunkPositionFromTilePosition(WorldMode->World,
 		CameraTileX, CameraTileY, CameraTileZ);
 
 	WorldMode->CameraP = NewCameraP;
@@ -645,13 +646,14 @@ PlayWorld(game_state *GameState)
 			AddFamiliar(WorldMode, CameraTileX + FamiliarOffsetX, CameraTileY + FamiliarOffsetY, CameraTileZ);
 		}
 	}
-
 }
 
-internal void
-UpdateAndRenderWorld(game_mode_world *WorldMode, transient_state *TranState,
+internal b32
+UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transient_state *TranState,
 	game_input *Input, render_group *RenderGroup, loaded_bitmap *DrawBuffer)
 {
+	b32 Result = false;
+
 	world *World = WorldMode->World;
 	
 	v2 MouseP = {Input->MouseX, Input->MouseY};
@@ -672,7 +674,6 @@ UpdateAndRenderWorld(game_mode_world *WorldMode, transient_state *TranState,
 	CameraBoundsInMeters.Min.z = -3.0f * WorldMode->TypicalFloorHeight;
 	CameraBoundsInMeters.Max.z = 1.0f * WorldMode->TypicalFloorHeight;
 
-#if 1
 	// NOTE: Ground chink rendering
 	for (uint32 GroundBufferIndex = 0;
 		GroundBufferIndex < TranState->GroundBufferCount;
@@ -759,7 +760,95 @@ UpdateAndRenderWorld(game_mode_world *WorldMode, transient_state *TranState,
 			}
 		}
 	}
-#endif
+
+	b32 HeroesExist = false;
+	b32 QuitRequested = false;
+	for (int ControllerIndex = 0;
+		ControllerIndex < ArrayCount(Input->Controllers);
+		++ControllerIndex)
+	{
+		game_controller_input *Controller = GetController(Input, ControllerIndex);
+		controlled_hero *ConHero = GameState->ControlledHeroes + ControllerIndex;
+		if (ConHero->EntityIndex == 0)
+		{
+			if (WasPressed(Controller->Back))
+			{
+				QuitRequested = true;
+			}
+			if (WasPressed(Controller->Start))
+			{
+				*ConHero = {};
+				ConHero->EntityIndex = AddPlayer(WorldMode).LowIndex;
+			}
+		}
+
+		if (ConHero->EntityIndex)
+		{	
+			HeroesExist = true;
+			ConHero->dZ = 0.0f;
+			ConHero->ddP = {};
+			ConHero->dSword = {};
+
+			if (Controller->IsAnalog)
+			{
+				ConHero->ddP = V2(Controller->StickAverageX, Controller->StickAverageY);
+			}
+			else
+			{
+				//NOTE: Use digital movement tuning
+
+				if (Controller->MoveUp.EndedDown)
+				{
+					ConHero->ddP.y = 1.0f;
+				}
+				if (Controller->MoveDown.EndedDown)
+				{
+					ConHero->ddP.y = -1.0f;
+				}
+				if (Controller->MoveLeft.EndedDown)
+				{
+					ConHero->ddP.x = -1.0f;
+				}
+				if (Controller->MoveRight.EndedDown)
+				{
+					ConHero->ddP.x = 1.0f;
+				}
+			}
+
+			if (Controller->Start.EndedDown)
+			{
+				ConHero->dZ += 3.0f;
+			}
+
+			ConHero->dSword = {};
+			if (Controller->ActionUp.EndedDown)
+			{
+				ChangeVolume(&GameState->AudioState, GameState->Music, 10.0f, V2(1.0f, 1.0f));
+				ConHero->dSword = V2(0.0f, 1.0f);
+			}
+			if (Controller->ActionDown.EndedDown)
+			{
+				ChangeVolume(&GameState->AudioState, GameState->Music, 10.0f, V2(0.0f, 0.0f));
+				ConHero->dSword = V2(0.0f, -1.0f);
+			}
+			if (Controller->ActionLeft.EndedDown)
+			{
+				ChangeVolume(&GameState->AudioState, GameState->Music, 5.0f, V2(0.0f, 0.0f));
+				ConHero->dSword = V2(-1.0f, 0.0f);
+			}
+			if (Controller->ActionRight.EndedDown)
+			{
+				ChangeVolume(&GameState->AudioState, GameState->Music, 5.0f, V2(0.0f, 0.0f));
+				ConHero->dSword = V2(1.0f, 0.0f);
+			}
+
+			if (WasPressed(Controller->Back))
+			{
+				DeleteLowEntity(WorldMode, ConHero->EntityIndex);
+				ConHero->EntityIndex = 0;
+			}
+		}
+	}
 
 	// TODO: How big do we actually want to expand here?
 	// TODO: Do we want to simulate upper floors, ets.?
@@ -831,15 +920,14 @@ UpdateAndRenderWorld(game_mode_world *WorldMode, transient_state *TranState,
 			{
 				case EntityType_Hero:
 				{
-#if 0
 					// TODO: Now that we gave some real usage examples, let's solidify
 					// the positioning system
 
 					for (uint32 ControllIndex = 0;
-						ControllIndex < ArrayCount(WorldMode->ControlledHeroes);
+						ControllIndex < ArrayCount(GameState->ControlledHeroes);
 						++ControllIndex)
 					{
-						controlled_hero *ConHero = WorldMode->ControlledHeroes + ControllIndex;
+						controlled_hero *ConHero = GameState->ControlledHeroes + ControllIndex;
 
 						if (Entity->StorageIndex == ConHero->EntityIndex)
 						{
@@ -866,7 +954,6 @@ UpdateAndRenderWorld(game_mode_world *WorldMode, transient_state *TranState,
 							}
 						}
 					}
-#endif
 				} break;
 				case EntityType_Sword:
 				{
@@ -1300,6 +1387,13 @@ UpdateAndRenderWorld(game_mode_world *WorldMode, transient_state *TranState,
 	// a frane of lag in camera updating compared to the hero.
 	EndSim(SimRegion, WorldMode);
 	EndTemporaryMemory(SimMemory);
+
+	if (!HeroesExist)
+	{
+		PlayIntroCutScene(GameState);
+	}
+
+	return(Result);
 }
 
 internal void

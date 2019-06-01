@@ -110,5 +110,8 @@ GetLowEntity(game_mode_world *WorldMode, uint32 Index)
 	return(Result);	
 }
 
+struct game_state;
+internal void PlayWorld(game_state *GameState);
+
 #define HANDMADE_WORLD_MODE_H
 #endif

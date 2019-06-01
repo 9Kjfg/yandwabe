@@ -5,8 +5,8 @@
 #include "handmade_math.h"
 #include "handmade_file_format.h"
 #include "handmade_meta.h"
-#include "handmade_cutscene.h"
 #include "handmade_random.h"
+#include "handmade_cutscene.h"
 
 #define DLIST_INSERT(Sentinel, Element) \
 	(Element)->Next = (Sentinel)->Next; \
@@ -90,6 +90,16 @@ StringAreEqual(memory_index ALength, char *A, memory_index BLength, char *B)
 //
 
 inline void
+ZeroSize(memory_index Size, void *Ptr)
+{
+	uint8 *Byte = (uint8 *)Ptr;
+	while (Size--)
+	{
+		*Byte++ = 0;
+	}
+}
+
+inline void
 InitializeArena(memory_arena *Arena, memory_index Size, void *Base)
 {
 	Arena->Size = Size;
@@ -99,7 +109,7 @@ InitializeArena(memory_arena *Arena, memory_index Size, void *Base)
 }
 
 inline memory_index
-GetAlignmentOffset(memory_arena *Arena, memory_index Alignment = 4)
+GetAlignmentOffset(memory_arena *Arena, memory_index Alignment)
 {
 	memory_index AlignmentOffset = 0;
 
@@ -113,15 +123,16 @@ GetAlignmentOffset(memory_arena *Arena, memory_index Alignment = 4)
 	return(AlignmentOffset);
 }
 
+#define DEFAULT_MEMORY_ALIGNMENT 4
+
 inline memory_index 
-GetArenaSizeRemaining(memory_arena *Arena, memory_index Alignment = 4)
+GetArenaSizeRemaining(memory_arena *Arena, memory_index Alignment = DEFAULT_MEMORY_ALIGNMENT)
 {
 	memory_index Result = Arena->Size - (Arena->Used + GetAlignmentOffset(Arena, Alignment));
 	return(Result);
 }
 
 // TODO: Optional "clear" parameter!!
-#define DEFAULT_MEMORY_ALIGNMENT 4
 #define PushStruct(Arena, type, ...) (type *)PushSize_(Arena, sizeof(type), ##__VA_ARGS__)
 #define PushArray(Arena, Count, type, ...) (type *)PushSize_(Arena, (Count)*sizeof(type), ##__VA_ARGS__)
 #define PushSize(Arena, Size, ...) PushSize_(Arena, Size, ##__VA_ARGS__)
@@ -158,6 +169,8 @@ PushSize_(memory_arena *Arena, memory_index SizeInit, memory_index Alignment = D
 	Arena->Used += Size;
 
 	Assert(Size >= SizeInit);
+
+	ZeroSize(SizeInit, Result);
 
 	return(Result);
 }
@@ -226,22 +239,12 @@ CheckArena(memory_arena *Arena)
 }
 
 inline void
-SubArena(memory_arena *Result, memory_arena *Arena, memory_index Size, memory_index Alignment = 16)
+SubArena(memory_arena *Result, memory_arena *Arena, memory_index Size, memory_index Alignment = DEFAULT_MEMORY_ALIGNMENT)
 {
 	Result->Size = Size;
 	Result->Base = (uint8 *)PushSize_(Arena, Size, Alignment);
 	Result->Used = 0 ;
 	Result->TempCount = 0;
-}
-
-inline void
-ZeroSize(memory_index Size, void *Ptr)
-{
-	uint8 *Byte = (uint8 *)Ptr;
-	while (Size--)
-	{
-		*Byte++ = 0;
-	}
 }
 
 inline void *
@@ -255,14 +258,13 @@ Copy(memory_index Size, void *SourceInit, void *DestInit)
 	return(DestInit);
 }
 
-#include "handmade_render_group.h"
 #include "handmade_world.h"
 #include "handmade_sim_region.h"
 #include "handmade_entity.h"
+#include "handmade_render_group.h"
 #include "handmade_world_mode.h"
 #include "handmade_asset.h"
 #include "handmade_audio.h"
-
 
 enum entity_residence
 {

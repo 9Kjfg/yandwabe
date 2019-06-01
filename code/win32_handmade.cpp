@@ -2032,7 +2032,7 @@ WinMain(
 						if (Game.UpdateAndRender)
 						{
 							Game.UpdateAndRender(&GameMemory, NewInput, &Buffer);
-							if (GameMemory.QuitRequested)
+							if (NewInput->QuitRequested)
 							{
 								BeginFadeToDesktop(&Fader);
 							}

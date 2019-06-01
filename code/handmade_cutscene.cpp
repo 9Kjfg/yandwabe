@@ -128,7 +128,7 @@ internal b32
 RenderCutsceneAtTime(game_assets *Assets, render_group *RenderGroup, loaded_bitmap *DrawBuffer,
     game_mode_cutscene *CutScene, r32 tCutScene)
 {
-    b32 CutsceneComplete = false;
+    b32 CutsceneStillRunning = false;
 
     r32 tBase = 0.0f;
     for (u32 ShotIndex = 0;
@@ -143,34 +143,83 @@ RenderCutsceneAtTime(game_assets *Assets, render_group *RenderGroup, loaded_bitm
         {
             r32 tNormal = Clamp01MapToRange(tStart, tCutScene, tEnd);
             RenderLayerdScene(Assets, RenderGroup, DrawBuffer, &IntroCutscene[ShotIndex], tNormal);
-            CutsceneComplete = true;
+            CutsceneStillRunning = true;
         }
 
         tBase = tEnd;
     }
 
-    return(CutsceneComplete);
+    return(CutsceneStillRunning);
 }
 
-internal void
-UpdateAndRenderCutScene(game_assets *Assets, render_group *RenderGroup, loaded_bitmap *DrawBuffer,
-    game_input *Input, game_mode_cutscene *CutScene)
+internal b32
+CheckForMetaInput(game_state *GameState, game_input *Input)
 {
-    RenderCutsceneAtTime(Assets, 0, DrawBuffer, CutScene, CutScene->t + CUTSCENE_WARMUP_SECONDS);
-    b32 CutsceneComplete = RenderCutsceneAtTime(Assets, RenderGroup, DrawBuffer, CutScene, CutScene->t);
-    if (!CutsceneComplete)
-    {
-        CutScene->t = 0.0f;
+    b32 Result = false;
+    for (int ControllerIndex = 0;
+		ControllerIndex < ArrayCount(Input->Controllers);
+		++ControllerIndex)
+	{
+		game_controller_input *Controller = GetController(Input, ControllerIndex);
+		controlled_hero *ConHero = GameState->ControlledHeroes + ControllerIndex;
+        if (WasPressed(Controller->Back))
+        {
+            Input->QuitRequested = true;
+            break;
+        }
+        else if (WasPressed(Controller->Start))
+        {
+            PlayWorld(GameState);
+            Result = true;
+            break;
+        }
     }
 
-    CutScene->t += Input->dtForFrame;
+    return(Result);
 }
 
-internal void
-UpdateAndRenderTitleScreen(game_assets *Assets, render_group *RenderGroup, loaded_bitmap *DrawBuffer,
-    game_mode_title_screen *TitleScreen)
+internal b32
+UpdateAndRenderCutScene(game_state *GameState, game_assets *Assets, render_group *RenderGroup, loaded_bitmap *DrawBuffer,
+    game_input *Input, game_mode_cutscene *CutScene)
 {
+    b32 Result = CheckForMetaInput(GameState, Input);
+    if (!Result)
+    {
+        RenderCutsceneAtTime(Assets, 0, DrawBuffer, CutScene, CutScene->t + CUTSCENE_WARMUP_SECONDS);
+        b32 CutsceneStillRunning = RenderCutsceneAtTime(Assets, RenderGroup, DrawBuffer, CutScene, CutScene->t);
+        if (CutsceneStillRunning)
+        {
+            CutScene->t += Input->dtForFrame;
+        }
+        else
+        {
+            PlayTitleScreen(GameState);
+        }
 
+    }
+
+    return(Result);
+}
+
+internal b32
+UpdateAndRenderTitleScreen(game_state *GameState, game_assets *Assets, render_group *RenderGroup, loaded_bitmap *DrawBuffer,
+    game_input *Input, game_mode_title_screen *TitleScreen)
+{
+    b32 Result = CheckForMetaInput(GameState, Input);
+    if (!Result)
+    {
+        Clear(RenderGroup, V4(1.0f, 0.25f, 0.25f, 0.0f));
+        if (TitleScreen->t > 10.0f)
+        {
+            PlayIntroCutScene(GameState);
+        }
+        else
+        {
+            TitleScreen->t += Input->dtForFrame;
+        }
+    }
+
+    return(Result);
 }
 
 internal void
@@ -188,7 +237,7 @@ PlayIntroCutScene(game_state *GameState)
 }
 
 internal void
-PlayTitlteScreen(game_state *GameState)
+PlayTitleScreen(game_state *GameState)
 {
     SetGameMode(GameState, GameMode_TitleScreen);
 
