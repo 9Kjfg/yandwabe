@@ -2044,7 +2044,7 @@ DEBUGEnd(debug_state *DebugState, game_input *Input, loaded_bitmap *DrawBuffer)
 
 		_snprintf_s(TextBuffer, sizeof(TextBuffer),
 			"Per-frame arena space remaining: %ukb",
-			(u32)GetArenaSizeRemaining(&DebugState->PerFrameArena, 1) / 1024);
+			(u32)GetArenaSizeRemaining(&DebugState->PerFrameArena, AlignNoClear(1)) / 1024);
 		DEBUGTextLine(TextBuffer);
 	}
 
@@ -2060,7 +2060,8 @@ DEBUGEnd(debug_state *DebugState, game_input *Input, loaded_bitmap *DrawBuffer)
 		}
 	}
 
-	TileRenderGroupToOutput(DebugState->HighPriorityQueue, DebugState->RenderGroup, DrawBuffer);
+	TileRenderGroupToOutput(DebugState->HighPriorityQueue, DebugState->RenderGroup, DrawBuffer,
+		&DebugState->DebugArena);
 	EndRender(DebugState->RenderGroup);
 
 	// NOTE: Clear The UI State for the next frame

@@ -30,7 +30,7 @@ UscaleAndBiasNormal(v4 Normal)
 }
 
 internal void
-DrawRectangle(loaded_bitmap *Buffer, v2 vMin,v2 vMax, v4 Color, rectangle2i ClipRect, bool Even)
+DrawRectangle(loaded_bitmap *Buffer, v2 vMin,v2 vMax, v4 Color, rectangle2i ClipRect)
 {
 	real32 R = Color.r;
 	real32 G = Color.g;
@@ -44,12 +44,6 @@ DrawRectangle(loaded_bitmap *Buffer, v2 vMin,v2 vMax, v4 Color, rectangle2i Clip
 	FillRect.MaxY = RoundReal32ToInt32(vMax.y);
 
 	FillRect = Intersect(FillRect, ClipRect);
-
-	if (!Even == (FillRect.MinY & 1))
-	{
-		FillRect.MinY += 1;
-	}
-
 	uint32 Color32 = 
 		(RoundReal32ToUInt32(A * 255.0f) << 24) |
 		(RoundReal32ToUInt32(R * 255.0f) << 16) |
@@ -63,7 +57,7 @@ DrawRectangle(loaded_bitmap *Buffer, v2 vMin,v2 vMax, v4 Color, rectangle2i Clip
 	
 	for (int Y = FillRect.MinY;
 		Y < FillRect.MaxY;
-		Y += 2)
+		++Y)
 	{
 		uint32 *Pixel = (uint32 *)Row;
 		for (int X = FillRect.MinX;
@@ -73,7 +67,7 @@ DrawRectangle(loaded_bitmap *Buffer, v2 vMin,v2 vMax, v4 Color, rectangle2i Clip
 			*Pixel++ = Color32;
 		}
 
-		Row += 2*Buffer->Pitch;
+		Row += Buffer->Pitch;
 	}
 }
 
@@ -493,8 +487,7 @@ DrawBitmap(
 }
 
 internal void
-RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget,
-	rectangle2i ClipRect, bool Even)
+RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget,	rectangle2i ClipRect)
 {
 	TIMED_FUNCTION();
 
@@ -517,7 +510,7 @@ RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget,
 
 				DrawRectangle(OutputTarget, V2(0.0f, 0.0f),
 					V2((real32)OutputTarget->Width, (real32)OutputTarget->Height),
-					Entry->Color, ClipRect, Even);
+					Entry->Color, ClipRect);
                 
 				BaseAddress += sizeof(*Entry);
             } break;
@@ -537,7 +530,7 @@ RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget,
 					V2(Entry->Size.x, 0),
 					V2(0, Entry->Size.y),
 					Entry->Color, Entry->Bitmap,
-					NullPixelsToMeters, ClipRect, Even);
+					NullPixelsToMeters, ClipRect);
 #endif
 	            BaseAddress += sizeof(*Entry);
             } break;
@@ -545,7 +538,7 @@ RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget,
             case RenderGroupEntryType_render_entry_rectangle:
             {
                 render_entry_rectangle *Entry = (render_entry_rectangle *)Data;
-            	DrawRectangle(OutputTarget, Entry->P, Entry->P + Entry->Dim, Entry->Color, ClipRect, Even);
+            	DrawRectangle(OutputTarget, Entry->P, Entry->P + Entry->Dim, Entry->Color, ClipRect);
 
                 BaseAddress += sizeof(*Entry);
             } break;
@@ -576,16 +569,25 @@ RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget,
 #endif
                 BaseAddress += sizeof(*Entry);
             } break;
+
             InvalidDefaultCase;
         }
 	}
 }
+
+struct tile_sort_entry
+{
+	r32 SortKey;
+	u32 PushBufferOffset;
+};
 
 struct tile_render_work
 {
 	render_group *RenderGroup;
 	loaded_bitmap *OutputTarget;
 	rectangle2i ClipRect;
+
+	tile_sort_entry *SortSpace;
 };
 
 internal
@@ -595,14 +597,15 @@ PLATFORM_WORK_QUEUE_CALLBACK(DoTileRenderWork)
 	
 	tile_render_work *Work = (tile_render_work *)Data;
 
-	RenderGroupToOutput(Work->RenderGroup, Work->OutputTarget, Work->ClipRect, false);
-	RenderGroupToOutput(Work->RenderGroup, Work->OutputTarget, Work->ClipRect, true);
+	RenderGroupToOutput(Work->RenderGroup, Work->OutputTarget, Work->ClipRect);
 }
 
 internal void
-RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget)
+RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget, memory_arena *TempArena)
 {
 	TIMED_FUNCTION();
+
+	temporary_memory Temp = BeginTemporaryMemory(TempArena);
 
 	Assert(RenderGroup->InsideRender);
 
@@ -618,15 +621,20 @@ RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget)
 	Work.RenderGroup = RenderGroup;
 	Work.OutputTarget = OutputTarget;
 	Work.ClipRect = ClipRect;
+	Work.SortSpace = PushArray(TempArena, RenderGroup->PushBufferElementCount, tile_sort_entry);
 
 	DoTileRenderWork(0, &Work);
+
+	EndTemporaryMemory(Temp);
 }
 
 internal void
-TileRenderGroupToOutput(platform_work_queue *RenderQueue,
-	render_group *RenderGroup, loaded_bitmap *OutputTarget)
+TileRenderGroupToOutput(platform_work_queue *RenderQueue, render_group *RenderGroup,
+	loaded_bitmap *OutputTarget, memory_arena *TempArena)
 {
 	Assert(RenderGroup->InsideRender);
+
+	temporary_memory Temp = BeginTemporaryMemory(TempArena);
 
 	int const TileCountX = 4;
 	int const TileCountY = 4;
@@ -669,7 +677,7 @@ TileRenderGroupToOutput(platform_work_queue *RenderQueue,
 			Work->RenderGroup = RenderGroup;
 			Work->OutputTarget = OutputTarget;
 			Work->ClipRect = ClipRect;
-
+			Work->SortSpace = PushArray(TempArena, RenderGroup->PushBufferElementCount, tile_sort_entry);
 #if 1
 			Platform.AddEntry(RenderQueue, DoTileRenderWork, Work);
 #else
@@ -679,6 +687,8 @@ TileRenderGroupToOutput(platform_work_queue *RenderQueue,
 	}
 
 	Platform.CompleteAllWork(RenderQueue);
+
+	EndTemporaryMemory(Temp);
 }
 
 internal render_group *
@@ -691,13 +701,13 @@ AllocateRenderGroup(game_assets *Assets, memory_arena *Arena, uint32 MaxPushBuff
 	{
 		MaxPushBufferSize = (uint32)GetArenaSizeRemaining(Arena);
 	}
-	
-	Result->Assets = Assets;
-	Result->PushBufferBase = (uint8 *)PushSize(Arena, MaxPushBufferSize);
+	Result->PushBufferBase = (uint8 *)PushSize(Arena, MaxPushBufferSize, NoClear());
 
     Result->MaxPushBufferSize = MaxPushBufferSize;
     Result->PushBufferSize = 0;
+	Result->PushBufferElementCount = 0;
 
+	Result->Assets = Assets;
 	Result->GlobalAlpha = 1.0f;
 
     // NOTE: Default transform
@@ -734,6 +744,7 @@ EndRender(render_group *Group)
 		EndGeneration(Group->Assets, Group->GenerationID);
 		Group->GenerationID = 0;
 		Group->PushBufferSize = 0;
+		Group->PushBufferElementCount = 0;
 	}
 }
 
@@ -829,6 +840,7 @@ PushRenderElement_(render_group *Group, uint32 Size, render_group_entry_type Typ
         Header->Type = Type;
 		Result = (Header + 1);
 		Group->PushBufferSize += Size;
+		++Group->PushBufferElementCount;
     }
     else
     {

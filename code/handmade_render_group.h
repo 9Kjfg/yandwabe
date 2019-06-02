@@ -120,9 +120,10 @@ struct render_group
 
     render_transform Transform;
 
-    uint32 MaxPushBufferSize;
-    uint32 PushBufferSize;
-    uint8 *PushBufferBase;
+    u32 MaxPushBufferSize;
+    u32 PushBufferSize;
+    u8 *PushBufferBase;
+	u32 PushBufferElementCount;
 
 	uint32 MissingResourceCount;
 	b32 RendersInBackground;
@@ -148,7 +149,7 @@ struct used_bitmap_dim
 void DrawRectangleQuickly(loaded_bitmap *Buffer,
 	v2 Origin, v2 XAxis, v2 YAxis, v4 Color,
 	loaded_bitmap *Texture,	real32 PixelsToMeters,
-	rectangle2i ClipRect, bool32 Even);
+	rectangle2i ClipRect);
 
 #define HANDMADE_RENDER_GROUP_H
 #endif

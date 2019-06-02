@@ -279,7 +279,7 @@ LoadBitmap(game_assets *Assets, bitmap_id ID, b32 Immediate)
 			
 			if (!Immediate)
 			{
-				Task = BeginTaskWidthMemory(Assets->TranState);
+				Task = BeginTaskWidthMemory(Assets->TranState, false);
 			}
 
 			if (Immediate || Task)
@@ -316,7 +316,7 @@ LoadBitmap(game_assets *Assets, bitmap_id ID, b32 Immediate)
 				
 				if (Task)
 				{
-					load_asset_work *TaskWork = PushStruct(&Task->Arena, load_asset_work);
+					load_asset_work *TaskWork = PushStruct(&Task->Arena, load_asset_work, NoClear());
 					*TaskWork = Work;
 					Platform.AddEntry(Assets->TranState->LowPriorityQueue, LoadAssetWork, TaskWork);
 				}
@@ -354,7 +354,7 @@ LoadFont(game_assets *Assets, font_id ID, b32 Immediate)
 			
 			if (!Immediate)
 			{
-				Task = BeginTaskWidthMemory(Assets->TranState);
+				Task = BeginTaskWidthMemory(Assets->TranState, false);
 			}
 
 			if (Immediate || Task)
@@ -389,7 +389,7 @@ LoadFont(game_assets *Assets, font_id ID, b32 Immediate)
 				Work.FinalState = AssetState_Loaded;
 				if (Task)
 				{
-					load_asset_work *TaskWork = PushStruct(&Task->Arena, load_asset_work);
+					load_asset_work *TaskWork = PushStruct(&Task->Arena, load_asset_work, NoClear());
 					*TaskWork = Work;
 					Platform.AddEntry(Assets->TranState->LowPriorityQueue, LoadAssetWork, TaskWork);
 				}
@@ -419,7 +419,7 @@ LoadSound(game_assets *Assets, sound_id ID)
         (AtomicCompareExchangeUInt32((uint32 *)&Asset->State, AssetState_Queued, AssetState_Unloaded) ==
 		AssetState_Unloaded))
 	{
-		task_with_memory *Task = BeginTaskWidthMemory(Assets->TranState);
+		task_with_memory *Task = BeginTaskWidthMemory(Assets->TranState, false);
 		if (Task)
 		{
 			asset *Asset = Assets->Assets + ID.Value;
@@ -447,7 +447,7 @@ LoadSound(game_assets *Assets, sound_id ID)
 				SoundAt += ChannelSize;
 			}
 
-			load_asset_work *Work = PushStruct(&Task->Arena, load_asset_work);
+			load_asset_work *Work = PushStruct(&Task->Arena, load_asset_work, NoClear());
 			Work->Task = Task;
 			Work->Asset = Assets->Assets + ID.Value;
 			Work->Handle = GetFileHandleFor(Assets, Asset->FileIndex);
@@ -605,7 +605,7 @@ AllocateGameAssets(memory_arena *Arena, transient_state *TranState, memory_index
 	Assets->MemorySentinel.Prev = &Assets->MemorySentinel;
 	Assets->MemorySentinel.Next = &Assets->MemorySentinel;
 
-	InsertBlock(&Assets->MemorySentinel, Size, PushSize(Arena, Size));
+	InsertBlock(&Assets->MemorySentinel, Size, PushSize(Arena, Size, NoClear()));
 	
 	Assets->TranState = TranState;
 

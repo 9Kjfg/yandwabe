@@ -147,7 +147,6 @@ BeginSim(memory_arena *SimArena, game_mode_world *WorldMode, world *World, world
     // TODO: If Entities were stored in the world, we wouldn't need the game state here
 
     sim_region *SimRegion = PushStruct(SimArena, sim_region);
-	ZeroStruct(SimRegion->Hash);
 
 	// TODO: Try to make these get enforced more rigorously
 	SimRegion->MaxEntityRadius = 5.0f;
