@@ -235,7 +235,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		InitializeArena(&TranState->TranArena, Memory->TransientStorageSize - sizeof(transient_state),
 			(uint8 *)Memory->TransientStorage + sizeof(transient_state));
 
-
 		TranState->HighPriorityQueue = Memory->HighPriorityQueue;
 		TranState->LowPriorityQueue = Memory->LowPriorityQueue;
 		for (uint32 TaskIndex = 0;
@@ -245,7 +244,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			task_with_memory *Task = TranState->Tasks + TaskIndex;
 
 			Task->BeingUsed = false;
-			SubArena(&Task->Arena, &TranState->TranArena, Megabytes(5));	
+			SubArena(&Task->Arena, &TranState->TranArena, Megabytes(2));	
 		}
 		
 		TranState->Assets = AllocateGameAssets(&TranState->TranArena, TranState, Megabytes(128));

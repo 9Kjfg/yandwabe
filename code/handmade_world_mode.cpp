@@ -340,7 +340,7 @@ PLATFORM_WORK_QUEUE_CALLBACK(FillGroundChunkWork)
 	v2 HalfDim = 0.5f*V2(Width, Height);
 
 	// TODO: Decide what our pushbuffer size is
-	render_group *RenderGroup = AllocateRenderGroup(Work->TranState->Assets, &Work->Task->Arena, 0, true);
+	render_group *RenderGroup = AllocateRenderGroup(Work->TranState->Assets, &Work->Task->Arena, Kilobytes(512), true);
 	BeginRender(RenderGroup);
 	Orthographic(RenderGroup, Buffer->Width, Buffer->Height, (Buffer->Width - 2) / Width);
 	Clear(RenderGroup, V4(1.0f, 0.0f, 1.0f, 1.0f));
@@ -675,6 +675,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 	CameraBoundsInMeters.Max.z = 1.0f * WorldMode->TypicalFloorHeight;
 
 	// NOTE: Ground chink rendering
+	RenderGroup->Transform.OffsetP = V3(0, 0, -0.01f); // TODO: Figure out SortKey situation and get bias!
 	for (uint32 GroundBufferIndex = 0;
 		GroundBufferIndex < TranState->GroundBufferCount;
 		++GroundBufferIndex)
@@ -698,6 +699,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 		}	
 	}
 
+	RenderGroup->Transform.OffsetP = V3(0, 0, 0);
 	// NOTE: Ground chunk updating
 	{
 		world_position MinChunkP = MapIntoChunkSpace(World, WorldMode->CameraP, GetMinCorner(CameraBoundsInMeters));
