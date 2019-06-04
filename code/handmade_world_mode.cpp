@@ -169,7 +169,7 @@ AddFamiliar(game_mode_world *WorldMode, uint32 AbsTileX, uint32 AbsTileY, uint32
 }
 
 internal void
-DrawHitpoints(sim_entity *Entity, render_group *RenderGroup)
+DrawHitpoints(sim_entity *Entity, render_group *RenderGroup, object_transform Transform)
 {
 	if (Entity->HitPointMax >= 1)
 	{
@@ -188,7 +188,7 @@ DrawHitpoints(sim_entity *Entity, render_group *RenderGroup)
 				Color = V4(0.2f, 0.2f, 0.2f, 1.0f);
 			}
 
-			PushRect(RenderGroup, V3(HitP, 0), HealthDim, Color);
+			PushRect(RenderGroup, Transform, V3(HitP, 0), HealthDim, Color);
 			HitP += dHitP;
 		}
 	}
@@ -345,6 +345,8 @@ PLATFORM_WORK_QUEUE_CALLBACK(FillGroundChunkWork)
 	Orthographic(RenderGroup, Buffer->Width, Buffer->Height, (Buffer->Width - 2) / Width);
 	Clear(RenderGroup, V4(1.0f, 0.0f, 1.0f, 1.0f));
 
+	object_transform NoTransform = DefaultFlatTransform();
+
 	for (int32 ChunkOffsetY =  -1;
 		ChunkOffsetY <= 1;
 		++ChunkOffsetY)
@@ -386,7 +388,7 @@ PLATFORM_WORK_QUEUE_CALLBACK(FillGroundChunkWork)
 						&Series);
 
 				v2 P = Center + Hadamard(HalfDim, V2(RandomBilateral(&Series), RandomBilateral(&Series)));
-				PushBitmap(RenderGroup, Stamp, 2.0f, V3(P, 0.0f), Color);
+				PushBitmap(RenderGroup, NoTransform, Stamp, 2.0f, V3(P, 0.0f), Color);
 			}
 		}
 	}
@@ -415,7 +417,7 @@ PLATFORM_WORK_QUEUE_CALLBACK(FillGroundChunkWork)
 			{
 				bitmap_id Stamp = GetRandomBitmapFrom(Work->TranState->Assets, Asset_Tuft, &Series);
 				v2 P = Center + Hadamard(HalfDim, V2(RandomBilateral(&Series), RandomBilateral(&Series)));
-				PushBitmap(RenderGroup, Stamp, 0.1f, V3(P, 0.0f));
+				PushBitmap(RenderGroup, NoTransform, Stamp, 0.1f, V3(P, 0.0f));
 			}
 		}
 	}
@@ -674,8 +676,12 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 	CameraBoundsInMeters.Min.z = -3.0f * WorldMode->TypicalFloorHeight;
 	CameraBoundsInMeters.Max.z = 1.0f * WorldMode->TypicalFloorHeight;
 
+	r32 FadeTopEndZ = 0.75f*WorldMode->TypicalFloorHeight;
+	r32 FadeTopStartZ = 0.5f*WorldMode->TypicalFloorHeight;
+	r32 FadeBottomStartZ = -2.0f*WorldMode->TypicalFloorHeight;
+	r32 FadeBottomEndZ = -2.25*WorldMode->TypicalFloorHeight;
+
 	// NOTE: Ground chink rendering
-	RenderGroup->Transform.OffsetP = V3(0, 0, -0.01f); // TODO: Figure out SortKey situation and get bias!
 	for (uint32 GroundBufferIndex = 0;
 		GroundBufferIndex < TranState->GroundBufferCount;
 		++GroundBufferIndex)
@@ -686,20 +692,30 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 		{
 			loaded_bitmap *Bitmap = &GroundBuffer->Bitmap;
 			v3 Delta = Subtract(WorldMode->World, &GroundBuffer->P, &WorldMode->CameraP);
-			
-			if ((Delta.z >= -1.0f) && (Delta.z < 1.0f))
+
+			RenderGroup->GlobalAlpha = 1.0f;
+			if (Delta.z > FadeTopStartZ)
 			{
-				real32 GroundSideInMeters = World->ChunkDimInMeters.x;
-				PushBitmap(RenderGroup, Bitmap, GroundSideInMeters, Delta);
-				DEBUG_IF(GroundChunks_Outline)
-				{
-					PushRectOutline(RenderGroup, Delta, V2(GroundSideInMeters, GroundSideInMeters), V4(1.0f, 1.0f, 0.0f, 1.0f));
-				}
+				RenderGroup->GlobalAlpha = Clamp01MapToRange(FadeTopEndZ, Delta.z, FadeTopStartZ);
+			}
+			else if (Delta.z < FadeBottomStartZ)
+			{
+				RenderGroup->GlobalAlpha = Clamp01MapToRange(FadeBottomEndZ, Delta.z, FadeBottomStartZ);
+			}
+
+			object_transform Transform = DefaultFlatTransform();
+			Transform.OffsetP = Delta;
+
+			real32 GroundSideInMeters = World->ChunkDimInMeters.x;
+			PushBitmap(RenderGroup, Transform, Bitmap, GroundSideInMeters, V3(0, 0, 0));
+			DEBUG_IF(GroundChunks_Outline)
+			{
+				PushRectOutline(RenderGroup, Transform, Delta, V2(GroundSideInMeters, GroundSideInMeters), V4(1.0f, 1.0f, 0.0f, 1.0f));
 			}
 		}	
 	}
+	RenderGroup->GlobalAlpha = 1.0f;
 
-	RenderGroup->Transform.OffsetP = V3(0, 0, 0);
 	// NOTE: Ground chunk updating
 	{
 		world_position MinChunkP = MapIntoChunkSpace(World, WorldMode->CameraP, GetMinCorner(CameraBoundsInMeters));
@@ -864,11 +880,10 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 	// NOTE: This is the camera position relative to the origin of this region
 	v3 CameraP = Subtract(World, &WorldMode->CameraP, &SimCenterP);
 
-	PushRectOutline(RenderGroup, V3(0.0f, 0.0f, 0.0f), GetDim(ScreenBounds), V4(1.0f, 1.0f, 0.0f, 1.0f));
-	//PushRectOutline(RenderGroup, V3(0.0f, 0.0f, 0.0f), GetDim(CameraBoundsInMeters).xy, V4(1.0f, 1.0f, 1.0f, 1.0f));
-	PushRectOutline(RenderGroup, V3(0.0f, 0.0f, 0.0f), GetDim(SimBounds).xy, V4(0.0f, 1.0f, 1.0f, 1.0f));
-	PushRectOutline(RenderGroup, V3(0.0f, 0.0f, 0.0f), GetDim(SimRegion->Bounds).xy, V4(1.0f, 0.0f, 1.0f, 1.0f));
-
+	PushRectOutline(RenderGroup, DefaultFlatTransform(), V3(0.0f, 0.0f, 0.0f), GetDim(ScreenBounds), V4(1.0f, 1.0f, 0.0f, 1.0f));
+	//PushRectOutline(RenderGroup, DefaultFlatTransform(), V3(0.0f, 0.0f, 0.0f), GetDim(CameraBoundsInMeters).xy, V4(1.0f, 1.0f, 1.0f, 1.0f));
+	PushRectOutline(RenderGroup, DefaultFlatTransform(), V3(0.0f, 0.0f, 0.0f), GetDim(SimBounds).xy, V4(0.0f, 1.0f, 1.0f, 1.0f));
+	PushRectOutline(RenderGroup, DefaultFlatTransform(), V3(0.0f, 0.0f, 0.0f), GetDim(SimRegion->Bounds).xy, V4(1.0f, 0.0f, 1.0f, 1.0f));
 
 	// TODO: Move this out into handmade_entity.cpp
 	for (uint32 EntityIndex = 1;
@@ -893,10 +908,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 			// TODO: Probably indicates we want to separate update and render
 			// for entities sometime soom
 			v3 CameraRelativeGroundP = GetEntityGroundPoint(Entity) - CameraP;
-			real32 FadeTopEndZ = 0.75f*WorldMode->TypicalFloorHeight;
-			real32 FadeTopStartZ = 0.5f*WorldMode->TypicalFloorHeight;
-			real32 FadeBottomStartZ = -2.0f*WorldMode->TypicalFloorHeight;
-			real32 FadeBottomEndZ = -2.25*WorldMode->TypicalFloorHeight;
+
 			RenderGroup->GlobalAlpha = 1.0f;
 			if (CameraRelativeGroundP.z > FadeTopStartZ)
 			{
@@ -1013,7 +1025,8 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 				MoveEntity(WorldMode, SimRegion, Entity, Input->dtForFrame, &MoveSpec, ddP);
 			}
 
-			RenderGroup->Transform.OffsetP = GetEntityGroundPoint(Entity);
+			object_transform EntityTrasform = DefaultUprightTransform();
+			EntityTrasform.OffsetP = GetEntityGroundPoint(Entity);
 			
 			//
 			//NOTE: Post-physics entity work
@@ -1024,11 +1037,11 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 				{
 					// TODO: Z!!!
 					real32 HeroSizeC = 2.5f;
-					PushBitmap(RenderGroup, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), HeroSizeC*1.0f, V3(0, 0, 0), V4(1, 1, 1, ShadowAlpha));
-					PushBitmap(RenderGroup, HeroBitmaps.Torso, HeroSizeC*1.2f, V3(0, 0, 0));
-					PushBitmap(RenderGroup, HeroBitmaps.Cape, HeroSizeC*1.2f, V3(0, 0, 0));
-					PushBitmap(RenderGroup, HeroBitmaps.Head, HeroSizeC*1.2f, V3(0, 0, 0));
-					DrawHitpoints(Entity, RenderGroup);
+					PushBitmap(RenderGroup, EntityTrasform, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), HeroSizeC*1.0f, V3(0, 0, 0), V4(1, 1, 1, ShadowAlpha));
+					PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Torso, HeroSizeC*1.2f, V3(0, 0, 0));
+					PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Cape, HeroSizeC*1.2f, V3(0, 0, 0));
+					PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Head, HeroSizeC*1.2f, V3(0, 0, 0));
+					DrawHitpoints(Entity, RenderGroup, EntityTrasform);
 					
 					DEBUG_IF(Particles_Test)
 					{
@@ -1103,7 +1116,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 								{
 									particle_cel *Cel = &WorldMode->ParticleCels[Y][X];
 									r32 Alpha = Clamp01(0.1f*Cel->Density);
-									PushRect(RenderGroup, GridScale*V3((r32)X, (r32)Y, 0) + GridOrigin,
+									PushRect(RenderGroup, EntityTrasform, GridScale*V3((r32)X, (r32)Y, 0) + GridOrigin,
 										GridScale*V2(1.0f, 1.0f), V4(Alpha, Alpha, Alpha, 1.0f));
 								}
 							}
@@ -1167,20 +1180,20 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 							}
 
 							// NOTE: Render the particle
-							PushBitmap(RenderGroup, Particle->BitmapID, 0.2f, Particle->P, Color);
+							PushBitmap(RenderGroup, EntityTrasform, Particle->BitmapID, 0.2f, Particle->P, Color);
 						}
 					}
 				} break;
 				
 				case EntityType_Wall:
 				{
-					PushBitmap(RenderGroup, GetFirstBitmapFrom(TranState->Assets, Asset_Tree), 2.5f, V3(0, 0, 0));
+					PushBitmap(RenderGroup, EntityTrasform, GetFirstBitmapFrom(TranState->Assets, Asset_Tree), 2.5f, V3(0, 0, 0));
 				} break;
 
 				case EntityType_Stairwell:
 				{
-					PushRect(RenderGroup, V3(0, 0, 0), Entity->WalkableDim, V4(1.0f, 0.5f, 0, 1.0f));
-					PushRect(RenderGroup, V3(0, 0, Entity->WalkableHeight), Entity->WalkableDim, V4(1.0f, 1.0f, 0, 1.0f));
+					PushRect(RenderGroup, EntityTrasform, V3(0, 0, 0), Entity->WalkableDim, V4(1.0f, 0.5f, 0, 1.0f));
+					PushRect(RenderGroup, EntityTrasform, V3(0, 0, Entity->WalkableHeight), Entity->WalkableDim, V4(1.0f, 1.0f, 0, 1.0f));
 				} break;
 				case EntityType_Sword:
 				{
@@ -1194,8 +1207,8 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 						MakeEntityNonSpatial(Entity);
 					}
 
-					PushBitmap(RenderGroup, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), 0.5f, V3(0, 0, 0), V4(1, 1, 1, ShadowAlpha));
-					PushBitmap(RenderGroup, GetFirstBitmapFrom(TranState->Assets, Asset_Sword),  0.5f, V3(0, 0, 0));
+					PushBitmap(RenderGroup, EntityTrasform, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), 0.5f, V3(0, 0, 0), V4(1, 1, 1, ShadowAlpha));
+					PushBitmap(RenderGroup, EntityTrasform, GetFirstBitmapFrom(TranState->Assets, Asset_Sword),  0.5f, V3(0, 0, 0));
 				} break;
 				case EntityType_Familiar:
 				{
@@ -1205,15 +1218,15 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 						Entity->tBob -= Tau32;
 					}
 					real32 BobSine = Sin(2.0f*Entity->tBob);
-					PushBitmap(RenderGroup, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), 2.5f, V3(0, 0, 0), V4(1, 1, 1, (0.5f*ShadowAlpha) + 0.2f*BobSine));
-					PushBitmap(RenderGroup, HeroBitmaps.Head, 2.5f, V3(0, 0, 0.2f*BobSine));
+					PushBitmap(RenderGroup, EntityTrasform, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), 2.5f, V3(0, 0, 0), V4(1, 1, 1, (0.5f*ShadowAlpha) + 0.2f*BobSine));
+					PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Head, 2.5f, V3(0, 0, 0.2f*BobSine));
 				} break;
 				case EntityType_Monster:
 				{
-					PushBitmap(RenderGroup, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), 4.5f, V3(0, 0, 0), V4(1, 1, 1, ShadowAlpha));
-					PushBitmap(RenderGroup, HeroBitmaps.Torso, 4.5f, V3(0, 0, 0));
+					PushBitmap(RenderGroup, EntityTrasform, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), 4.5f, V3(0, 0, 0), V4(1, 1, 1, ShadowAlpha));
+					PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Torso, 4.5f, V3(0, 0, 0));
 
-					DrawHitpoints(Entity, RenderGroup);
+					DrawHitpoints(Entity, RenderGroup, EntityTrasform);
 				} break;
 				case EntityType_Space:
 				{
@@ -1224,7 +1237,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 							++VolumeIndex)
 						{
 							sim_entity_collision_volume *Volume = Entity->Collision->Volumes + VolumeIndex;
-							PushRectOutline(RenderGroup, Volume->OffsetP - V3(0, 0, 0.5f*Volume->Dim.z), Volume->Dim.xy, V4(0.0f, 0.5f, 1.0f, 1.0f));
+							PushRectOutline(RenderGroup, EntityTrasform, Volume->OffsetP - V3(0, 0, 0.5f*Volume->Dim.z), Volume->Dim.xy, V4(0.0f, 0.5f, 1.0f, 1.0f));
 						}
 					}
 				} break;
@@ -1244,7 +1257,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 				{
 					sim_entity_collision_volume *Volume = Entity->Collision->Volumes + VolumeIndex;
 					
-					v3 LocalMouseP = Unproject(RenderGroup, MouseP);
+					v3 LocalMouseP = Unproject(RenderGroup, EntityTrasform, MouseP);
 
 					if ((LocalMouseP.x > -0.5f*Volume->Dim.x) && (LocalMouseP.x < 0.5f*Volume->Dim.x) &&
 						(LocalMouseP.y > -0.5f*Volume->Dim.y) && (LocalMouseP.y < 0.5f*Volume->Dim.y))
@@ -1255,7 +1268,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 					v4 OutlineColor;
 					if (DEBUG_HIGHLIGHTED(EntityDebugID, &OutlineColor))
 					{
-						PushRectOutline(RenderGroup, Volume->OffsetP - V3(0, 0, 0.5f*Volume->Dim.z),
+						PushRectOutline(RenderGroup, EntityTrasform, Volume->OffsetP - V3(0, 0, 0.5f*Volume->Dim.z),
 							Volume->Dim.xy, OutlineColor, 0.05f);
 					}
 				}
@@ -1382,7 +1395,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 
 	Orthographic(RenderGroup, DrawBuffer->Width, DrawBuffer->Height, 1.0f);
 
-	PushRectOutline(RenderGroup, V3(MouseP, 0.0f), V2(2.0f, 2.0f));
+	PushRectOutline(RenderGroup, DefaultFlatTransform(), V3(MouseP, 0.0f), V2(2.0f, 2.0f));
 
 	// TODO: Make sure we hoist the camera update out to a place where the renderer
 	// can know about the the location of the camera at the end of the frame os there isn't
