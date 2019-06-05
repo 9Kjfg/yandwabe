@@ -582,18 +582,123 @@ PLATFORM_WORK_QUEUE_CALLBACK(DoTileRenderWork)
 	RenderGroupToOutput(Work->RenderGroup, Work->OutputTarget, Work->ClipRect);
 }
 
-internal void
-SortEntries(render_group *RenderGroup)
+inline void
+Swap(tile_sort_entry *A, tile_sort_entry *B)
 {
+	tile_sort_entry Temp = *B;
+	*B = *A;
+	*A = Temp;
+}
+
+internal void
+MergeSort(u32 Count, tile_sort_entry *First, tile_sort_entry *Temp)
+{
+	if (Count == 1)
+	{
+		// NOTE: No work to do
+	}
+	else if (Count == 2)
+	{
+		tile_sort_entry *EntryA = First;
+		tile_sort_entry *EntryB = First + 1;
+		if (EntryA->SortKey > EntryB->SortKey)
+		{
+			Swap(EntryA, EntryB);
+		}
+	}
+	else
+	{
+		u32 Half0 = Count / 2;
+		u32 Half1 = Count - Half0;
+
+		Assert(Half0 >= 1);
+		Assert(Half1 >= 1);
+
+		tile_sort_entry *InHalf0 = First;
+		tile_sort_entry *InHalf1 = First + Half0;
+		tile_sort_entry *End = First + Count;
+
+		MergeSort(Half0, InHalf0, Temp);
+		MergeSort(Half1, InHalf1, Temp);
+
+		tile_sort_entry *ReadHalf0 = InHalf0;
+		tile_sort_entry *ReadHalf1 = InHalf1;
+		
+		tile_sort_entry *Out = Temp;
+		for (u32 Index = 0;
+			Index < Count;
+			++Index)
+		{
+			if (ReadHalf0 == InHalf1)
+			{
+				*Out++ = *ReadHalf1++;
+			}
+			else if (ReadHalf1 == End)
+			{
+				*Out++ = *ReadHalf0++;
+			}
+			else if (ReadHalf0->SortKey < ReadHalf1->SortKey)
+			{
+				*Out++ = *ReadHalf0++;
+			}
+			else
+			{
+				*Out++ = *ReadHalf1++;
+			}
+		}
+		Assert(Out == (Temp + Count));
+		Assert(ReadHalf0 == InHalf1);
+		Assert(ReadHalf1 == End);
+
+		for (u32 Index = 0;
+			Index < Count;
+			++Index)
+		{
+			First[Index] = Temp[Index];	
+		}
+
+#if 0
+		tile_sort_entry *ReadHalf0 = First;
+		tile_sort_entry *ReadHalf1 = First + Half0;
+		tile_sort_entry *End = First + Count;
+
+		// NOTE: Step 1 - Find the first out-of-order pair
+		while ((ReadHalf0 != ReadHalf1) &&
+			(ReadHalf0->SortKey < ReadhHalf1->SortKey))
+		{
+			++ReadHalf0;	
+		}
+
+		// NOTE: Step 2 - Swap as many Half1 items as necessary
+		if (ReadHalf0 != ReadHalf1)
+		{
+			tile_sort_entry CompareWith = *ReadHalf0;
+			while ((ReadHalf1 != End) && (ReadHalf1->SortKey < CompareWith.SortKey))
+			{
+				Swap(*ReadHalf0++, *ReadHalf1++);
+			}
+
+			ReadHalf1 = InHalf1;
+		}
+#endif
+	}
+}
+
+internal void
+SortEntries(render_group *RenderGroup, memory_arena *TempArena)
+{
+	temporary_memory Temp = BeginTemporaryMemory(TempArena);
+
 	u32 Count = RenderGroup->PushBufferElementCount;
 	tile_sort_entry *Entries = (tile_sort_entry *)(RenderGroup->PushBufferBase + RenderGroup->SortEntryAt);
+	tile_sort_entry *TempSpace = PushArray(TempArena, Count, tile_sort_entry);
 
-	// TODO: This is not a fast way to sort!!!
+#if 0
 	for (u32 Outer = 0;
 		Outer < Count;
 		++Outer)
 	{
-		// TODO: Early out
+		b32 ListIsSorted = true;
 		for (u32 Inner = 0;
 			Inner < (Count - 1);
 			++Inner)
@@ -603,12 +708,36 @@ SortEntries(render_group *RenderGroup)
 
 			if (EntryA->SortKey > EntryB->SortKey)
 			{
-				tile_sort_entry Swap = *EntryB;
-				*EntryB = *EntryA;
-				*EntryA = Swap;
+				Swap(EntryA, EntryB);
+				ListIsSorted = false;
 			}
 		}
+
+		if (ListIsSorted)
+		{
+			break;
+		}
 	}
+#else
+	//
+	// NOTE: Merge Sort
+	//
+	MergeSort(Count, Entries, TempSpace);
+#endif
+
+#if HANDMADE_SLOW
+	for (u32 Index = 0;
+		Index < (Count - 1);
+		++Index)
+	{
+		tile_sort_entry *EntryA = Entries + Index;
+		tile_sort_entry *EntryB = EntryA + 1;
+
+		Assert(EntryA->SortKey <= EntryB->SortKey);
+	}
+#endif
+
+	EndTemporaryMemory(Temp);
 }
 
 internal void
@@ -617,9 +746,7 @@ RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget, memo
 	TIMED_FUNCTION();
 
 	// TODO: Don't do this twise?
-	SortEntries(RenderGroup);
-
-	temporary_memory Temp = BeginTemporaryMemory(TempArena);
+	SortEntries(RenderGroup, TempArena);
 
 	Assert(RenderGroup->InsideRender);
 
@@ -635,11 +762,8 @@ RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget, memo
 	Work.RenderGroup = RenderGroup;
 	Work.OutputTarget = OutputTarget;
 	Work.ClipRect = ClipRect;
-	Work.SortSpace = PushArray(TempArena, RenderGroup->PushBufferElementCount, tile_sort_entry);
 
 	DoTileRenderWork(0, &Work);
-
-	EndTemporaryMemory(Temp);
 }
 
 internal void
@@ -649,9 +773,7 @@ TileRenderGroupToOutput(platform_work_queue *RenderQueue, render_group *RenderGr
 	Assert(RenderGroup->InsideRender);
 
 	// TODO: Don't do this twise
-	SortEntries(RenderGroup);
-
-	temporary_memory Temp = BeginTemporaryMemory(TempArena);
+	SortEntries(RenderGroup, TempArena);
 
 	int const TileCountX = 4;
 	int const TileCountY = 4;
@@ -694,7 +816,6 @@ TileRenderGroupToOutput(platform_work_queue *RenderQueue, render_group *RenderGr
 			Work->RenderGroup = RenderGroup;
 			Work->OutputTarget = OutputTarget;
 			Work->ClipRect = ClipRect;
-			Work->SortSpace = PushArray(TempArena, RenderGroup->PushBufferElementCount, tile_sort_entry);
 #if 1
 			Platform.AddEntry(RenderQueue, DoTileRenderWork, Work);
 #else
@@ -704,8 +825,6 @@ TileRenderGroupToOutput(platform_work_queue *RenderQueue, render_group *RenderGr
 	}
 
 	Platform.CompleteAllWork(RenderQueue);
-
-	EndTemporaryMemory(Temp);
 }
 
 internal void
