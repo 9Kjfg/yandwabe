@@ -685,15 +685,8 @@ MergeSort(u32 Count, tile_sort_entry *First, tile_sort_entry *Temp)
 }
 
 internal void
-SortEntries(render_group *RenderGroup, memory_arena *TempArena)
+BubbleSort(u32 Count, tile_sort_entry *First, tile_sort_entry *Temp)
 {
-	temporary_memory Temp = BeginTemporaryMemory(TempArena);
-
-	u32 Count = RenderGroup->PushBufferElementCount;
-	tile_sort_entry *Entries = (tile_sort_entry *)(RenderGroup->PushBufferBase + RenderGroup->SortEntryAt);
-	tile_sort_entry *TempSpace = PushArray(TempArena, Count, tile_sort_entry);
-
-#if 0
 	for (u32 Outer = 0;
 		Outer < Count;
 		++Outer)
@@ -703,7 +696,7 @@ SortEntries(render_group *RenderGroup, memory_arena *TempArena)
 			Inner < (Count - 1);
 			++Inner)
 		{
-			tile_sort_entry *EntryA = Entries + Inner;
+			tile_sort_entry *EntryA = First + Inner;
 			tile_sort_entry *EntryB = EntryA + 1;
 
 			if (EntryA->SortKey > EntryB->SortKey)
@@ -718,12 +711,83 @@ SortEntries(render_group *RenderGroup, memory_arena *TempArena)
 			break;
 		}
 	}
-#else
-	//
-	// NOTE: Merge Sort
-	//
+}
+
+inline u32
+SortKeyToU32(r32 SortKey)
+{
+	// NOTE: We need to turn out 32-bit floating point value
+	// into same strictly ascending 32-bit unsigned integer value
+	u32 Result = *(u32 *)&SortKey;
+	if (Result & 0x80000000)
+	{
+		Result = ~Result;
+	}
+	else
+	{
+		Result |= 0x80000000;
+	}
+	return(Result);
+}
+
+internal void
+RadixSort(u32 Count, tile_sort_entry *First, tile_sort_entry *Temp)
+{
+	tile_sort_entry *Source = First;
+	tile_sort_entry *Dest = Temp;
+	for (u32 ByteIndex = 0;
+		ByteIndex < 32;
+		ByteIndex += 8)
+	{
+		u32 SortKeyOffsets[256] = {};
+
+		// NOTE: First pass - count how many of each key
+		for (u32 Index = 0;
+			Index < Count;
+			++Index)
+		{
+			u32 RadixValue = SortKeyToU32(Source[Index].SortKey);
+			u32 RadixPiece = (RadixValue >> ByteIndex) & 0xFF;
+			++SortKeyOffsets[RadixPiece];
+		}
+
+		// NOTE: Change counts to offsets
+		u32 Total = 0;
+		for (u32 SortKeyIndex = 0;
+			SortKeyIndex < ArrayCount(SortKeyOffsets);
+			++SortKeyIndex)
+		{
+			u32 Count_ = SortKeyOffsets[SortKeyIndex];
+			SortKeyOffsets[SortKeyIndex] = Total;
+			Total += Count_;
+		}
+
+		// NOTE: Second pass - place elements into the right loaction
+		for (u32 Index = 0;
+			Index < Count;
+			++Index)
+		{
+			u32 RadixValue = SortKeyToU32(Source[Index].SortKey);
+			u32 RadixPiece = (RadixValue >> ByteIndex) & 0xFF;
+			Dest[SortKeyOffsets[RadixPiece]++] = Source[Index];
+		}
+
+		tile_sort_entry *SwapTemp = Dest;
+		Dest = Source;
+		Source = SwapTemp;
+	}
+}
+
+internal void
+SortEntries(render_group *RenderGroup, memory_arena *TempArena)
+{
+	temporary_memory Temp = BeginTemporaryMemory(TempArena);
+
+	u32 Count = RenderGroup->PushBufferElementCount;
+	tile_sort_entry *Entries = (tile_sort_entry *)(RenderGroup->PushBufferBase + RenderGroup->SortEntryAt);
+	tile_sort_entry *TempSpace = PushArray(TempArena, Count, tile_sort_entry);
+
 	MergeSort(Count, Entries, TempSpace);
-#endif
 
 #if HANDMADE_SLOW
 	for (u32 Index = 0;
