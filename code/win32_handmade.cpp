@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <xinput.h>
 #include <dsound.h>
+#include <gl/gl.h>
 
 #include "win32_handmade.h"
 
@@ -370,6 +371,39 @@ Win32InitDSound(HWND Window, int32 SamplesPerSecond, int32 BufferSize)
 	}
 }
 
+internal void
+Win32InitOpenGL(HWND Window)
+{
+	HDC WindowDC = GetDC(Window);
+
+	PIXELFORMATDESCRIPTOR DesirePixelFormat = {};
+	DesirePixelFormat.nSize = sizeof(DesirePixelFormat);
+	DesirePixelFormat.nVersion = 1;
+	DesirePixelFormat.dwFlags = PFD_SUPPORT_OPENGL|PFD_DRAW_TO_WINDOW|PFD_DOUBLEBUFFER;
+	DesirePixelFormat.cColorBits = 32;
+	DesirePixelFormat.cAlphaBits = 8;
+	DesirePixelFormat.iLayerType = PFD_MAIN_PLANE;
+
+	int SuggestedPixelFormatIndex = ChoosePixelFormat(WindowDC, &DesirePixelFormat);
+	PIXELFORMATDESCRIPTOR SuggestedPixelFormat;
+	DescribePixelFormat(WindowDC, SuggestedPixelFormatIndex,
+		sizeof(SuggestedPixelFormat), &SuggestedPixelFormat);
+	SetPixelFormat(WindowDC, SuggestedPixelFormatIndex, &SuggestedPixelFormat);
+
+	HGLRC OpenGLRC = wglCreateContext(WindowDC);
+	if (wglMakeCurrent(WindowDC, OpenGLRC))
+	{
+		// NOTE: Success
+	}
+	else
+	{
+		InvalidCodePath;
+		// TODO: Diagnostic
+	}
+
+	ReleaseDC(Window, WindowDC);
+}
+
 internal win32_window_dimension
 Win32GetWindowDimension(HWND Window)
 {
@@ -414,6 +448,7 @@ Win32DisplayBufferInWindow(
 	win32_offscreen_buffer *Buffer,
 	HDC DeviceContext, int WindowWidth, int WindowHeight)
 {
+#if 0
 	// TODO: Centering / black bars?
 	if ((WindowWidth >= Buffer->Width*2) &&
 		(WindowHeight >= Buffer->Height*2))
@@ -448,8 +483,13 @@ Win32DisplayBufferInWindow(
 			&Buffer->Info,
 			DIB_RGB_COLORS, SRCCOPY);
 	}
-}
+#endif
 
+	glViewport(0, 0, WindowWidth, WindowHeight);
+	glClearColor(1.0f, 0.0f, 1.0f, 0.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+	SwapBuffers(DeviceContext);
+}
 
 internal LRESULT CALLBACK 
 Win32FadeWindowCallback(
@@ -1644,6 +1684,7 @@ WinMain(
 		if (Window)
 		{
 			ToggleFullscreen(Window);
+			Win32InitOpenGL(Window);
 
 			win32_sound_output SoundOutput = {};
 
