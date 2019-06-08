@@ -31,6 +31,7 @@ global_variable LPDIRECTSOUNDBUFFER GlobalSecondaryBuffer;
 global_variable int64 GlobalPerfCountFrequency;
 global_variable bool32 DEBUGGlobalShowCursor;
 global_variable WINDOWPLACEMENT GlobalWindowPosition = {sizeof(GlobalWindowPosition)};
+global_variable GLuint GlobalBlitTextureHandle = 0;
 
 //NOTE: XInputGetStae
 #define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
@@ -379,7 +380,13 @@ Win32InitOpenGL(HWND Window)
 	PIXELFORMATDESCRIPTOR DesirePixelFormat = {};
 	DesirePixelFormat.nSize = sizeof(DesirePixelFormat);
 	DesirePixelFormat.nVersion = 1;
+	DesirePixelFormat.iPixelType = PFD_TYPE_RGBA;
+#if HANDMADE_STREAMING
+	// NOTE: PFD_DOUBLEBUFFER appears to prevent OBS from reliably streaming the window
+	DesirePixelFormat.dwFlags = PFD_SUPPORT_OPENGL|PFD_DRAW_TO_WINDOW;
+#else
 	DesirePixelFormat.dwFlags = PFD_SUPPORT_OPENGL|PFD_DRAW_TO_WINDOW|PFD_DOUBLEBUFFER;
+#endif	
 	DesirePixelFormat.cColorBits = 32;
 	DesirePixelFormat.cAlphaBits = 8;
 	DesirePixelFormat.iLayerType = PFD_MAIN_PLANE;
@@ -394,6 +401,7 @@ Win32InitOpenGL(HWND Window)
 	if (wglMakeCurrent(WindowDC, OpenGLRC))
 	{
 		// NOTE: Success
+		glGenTextures(1, &GlobalBlitTextureHandle);
 	}
 	else
 	{
@@ -486,8 +494,58 @@ Win32DisplayBufferInWindow(
 #endif
 
 	glViewport(0, 0, WindowWidth, WindowHeight);
+
+	glBindTexture(GL_TEXTURE_2D, GlobalBlitTextureHandle);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, Buffer->Width, Buffer->Height, 0,
+		GL_BGRA_EXT, GL_UNSIGNED_BYTE, Buffer->Memory);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	
+	glEnable(GL_TEXTURE_2D);
+
 	glClearColor(1.0f, 0.0f, 1.0f, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
+
+	glMatrixMode(GL_TEXTURE);
+	glLoadIdentity();
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+
+	glBegin(GL_TRIANGLES);
+	
+	r32 P = 0.9f;
+	
+	// NOTE: Lower triangle
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex2f(-P, -P);
+
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex2f(P, -P);
+
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex2f(P, P);
+	
+	// NOTE: Upper triangle
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex2f(-P, -P);
+
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex2f(P, P);
+
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex2f(-P, P);
+	
+	glEnd();
+
 	SwapBuffers(DeviceContext);
 }
 

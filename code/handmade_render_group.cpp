@@ -787,7 +787,7 @@ SortEntries(render_group *RenderGroup, memory_arena *TempArena)
 	tile_sort_entry *Entries = (tile_sort_entry *)(RenderGroup->PushBufferBase + RenderGroup->SortEntryAt);
 	tile_sort_entry *TempSpace = PushArray(TempArena, Count, tile_sort_entry);
 
-	MergeSort(Count, Entries, TempSpace);
+	RadixSort(Count, Entries, TempSpace);
 
 #if HANDMADE_SLOW
 	for (u32 Index = 0;
