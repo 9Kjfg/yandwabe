@@ -14,7 +14,10 @@
 	- GetKeyboardLayout (for French keyboards, internation WASD support)
 	- ChngeDisplaySetting option if we detect slow fullscreen blit
 */
+
 #include "handmade_platform.h"
+#include "handmade_intrinsics.h"
+#include "handmade_math.h"
 
 #include <windows.h>
 #include <stdio.h>
@@ -518,33 +521,47 @@ Win32DisplayBufferInWindow(
 	glLoadIdentity();
 	
 	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
+	r32 a = SafeRatio1(2.0f, (r32)Buffer->Width);
+	r32 b = SafeRatio1(2.0f, (r32)Buffer->Height);
+	r32 Proj[] =
+	{
+		 a,  0, 0, 0,
+		 0,  b, 0, 0,
+		 0,  0, 1, 0,
+		-1, -1, 0, 1,
+	};
 
+	glLoadMatrixf(Proj);
+
+	// TODO: Decide how we want to handle aspect ratio - black bars or crop?
+
+	v2 MinP = {};
+	v2 MaxP = {(r32)Buffer->Width, (r32)Buffer->Height};
+	v4 Color = {1, 1, 1, 1};
 	glBegin(GL_TRIANGLES);
-	
-	r32 P = 0.9f;
-	
-	// NOTE: Lower triangle
-	glTexCoord2f(0.0f, 0.0f);
-	glVertex2f(-P, -P);
 
-	glTexCoord2f(1.0f, 0.0f);
-	glVertex2f(P, -P);
+    glColor4f(Color.r, Color.g, Color.b, Color.a);
 
-	glTexCoord2f(1.0f, 1.0f);
-	glVertex2f(P, P);
-	
-	// NOTE: Upper triangle
-	glTexCoord2f(0.0f, 0.0f);
-	glVertex2f(-P, -P);
+    glTexCoord2f(0.0f, 0.0f);
+    glVertex2f(MinP.x, MinP.y);
 
-	glTexCoord2f(1.0f, 1.0f);
-	glVertex2f(P, P);
+    glTexCoord2f(1.0f, 0.0f);
+    glVertex2f(MaxP.x, MinP.y);
 
-	glTexCoord2f(0.0f, 1.0f);
-	glVertex2f(-P, P);
-	
-	glEnd();
+    glTexCoord2f(1.0f, 1.0f);
+    glVertex2f(MaxP.x, MaxP.y);
+    
+    // NOTE: Upper triangle
+    glTexCoord2f(0.0f, 0.0f);
+    glVertex2f(MinP.x, MinP.y);
+
+    glTexCoord2f(1.0f, 1.0f);
+    glVertex2f(MaxP.x, MaxP.y);
+
+    glTexCoord2f(0.0f, 1.0f);
+    glVertex2f(MinP.x, MaxP.y);
+
+    glEnd();
 
 	SwapBuffers(DeviceContext);
 }
