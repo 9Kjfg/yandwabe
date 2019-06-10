@@ -790,14 +790,17 @@ SortEntries(render_group *RenderGroup, memory_arena *TempArena)
 	RadixSort(Count, Entries, TempSpace);
 
 #if HANDMADE_SLOW
-	for (u32 Index = 0;
-		Index < (Count - 1);
-		++Index)
+	if (Count)
 	{
-		tile_sort_entry *EntryA = Entries + Index;
-		tile_sort_entry *EntryB = EntryA + 1;
+		for (u32 Index = 0;
+			Index < (Count - 1);
+			++Index)
+		{
+			tile_sort_entry *EntryA = Entries + Index;
+			tile_sort_entry *EntryB = EntryA + 1;
 
-		Assert(EntryA->SortKey <= EntryB->SortKey);
+			Assert(EntryA->SortKey <= EntryB->SortKey);
+		}
 	}
 #endif
 
@@ -1260,3 +1263,33 @@ AllResourcesPresent(render_group *Group)
 	bool32 Result = (Group->MissingResourceCount == 0);
 	return(Result);
 }
+
+inline void
+RenderToOutput(platform_work_queue *RenderQueue, render_group *RenderGroup,
+	loaded_bitmap *OutputTarget, memory_arena *TempArena)
+{
+	SortEntries(RenderGroup, TempArena);
+	if (1)// (RenderGroup->IsHardware)
+	{
+		Platform.RenderToOpenGL(RenderGroup, OutputTarget);
+	}
+	else
+	{
+		TileRenderGroupToOutput(RenderQueue, RenderGroup, OutputTarget, TempArena);
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,10 +1,11 @@
+#include "handmade_render_group.h"
 
 inline void
-OpenGLRectangle(v4 MinP, v4 MaxP, v4 Color)
+OpenGLRectangle(v2 MinP, v2 MaxP, v4 Color)
 {
     glBegin(GL_TRIANGLES);
 
-    glColor4(Color.r, Color.g, Color.b, Color.a);
+    glColor4f(Color.r, Color.g, Color.b, Color.a);
 
     glTexCoord2f(0.0f, 0.0f);
     glVertex2f(MinP.x, MinP.y);
@@ -28,12 +29,34 @@ OpenGLRectangle(v4 MinP, v4 MaxP, v4 Color)
     glEnd();
 }
 
+global_variable u32 TextureBindCount = 0;
 internal void
-RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget,	rectangle2i ClipRect)
+OpenGLRenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget)
 {
-	TIMED_FUNCTION();
+    glViewport(0, 0, OutputTarget->Width, OutputTarget->Height);
+   
+    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
-    glViewport(0, 0, OutputTarget->WindowWidth, OutputTarget->WindowHeight);
+    glMatrixMode(GL_TEXTURE);
+	glLoadIdentity();
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	
+	glMatrixMode(GL_PROJECTION);
+	r32 a = SafeRatio1(2.0f, (r32)OutputTarget->Width);
+	r32 b = SafeRatio1(2.0f, (r32)OutputTarget->Height);
+	r32 Proj[] =
+	{
+		 a,  0, 0, 0,
+		 0,  b, 0, 0,
+		 0,  0, 1, 0,
+		-1, -1, 0, 1,
+	};
+
+	glLoadMatrixf(Proj);
 
 	u32 SortEntryCount = RenderGroup->PushBufferElementCount;
 	tile_sort_entry *SortEntries = (tile_sort_entry *)(RenderGroup->PushBufferBase + RenderGroup->SortEntryAt);
@@ -67,13 +90,34 @@ RenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget,	rect
                 v2 MinP = Entry->P;
                 v2 MaxP = MinP + Entry->Size.x*XAxis + Entry->Size.y*YAxis;
 
-                OpenGLRectangle(MinP, MaxP, Color);
+                if (Entry->Bitmap->Handle)
+                {
+                    glBindTexture(GL_TEXTURE_2D, Entry->Bitmap->Handle);
+                }
+                else
+                {
+                    Entry->Bitmap->Handle = ++TextureBindCount;
+                    glBindTexture(GL_TEXTURE_2D, Entry->Bitmap->Handle);
+
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, Entry->Bitmap->Width, Entry->Bitmap->Height, 0,
+                        GL_BGRA_EXT, GL_UNSIGNED_BYTE, Entry->Bitmap->Memory);
+
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+                    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+                }
+                
+                OpenGLRectangle(MinP, MaxP, Entry->Color);
             } break;
 
             case RenderGroupEntryType_render_entry_rectangle:
             {
                 render_entry_rectangle *Entry = (render_entry_rectangle *)Data;
-                OpenGLRectangle(Entry->P, Entry->P + Entry->Dim, Entry->Color);                
+                glDisable(GL_TEXTURE_2D);
+                OpenGLRectangle(Entry->P, Entry->P + Entry->Dim, Entry->Color);
+                glEnable(GL_TEXTURE_2D);
             } break;
 			
             case RenderGroupEntryType_render_entry_cordinate_system:

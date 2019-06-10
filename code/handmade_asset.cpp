@@ -301,6 +301,7 @@ LoadBitmap(game_assets *Assets, bitmap_id ID, b32 Immediate)
 				Bitmap->WidthOverHeight = (r32)Info->Dim[0] / (r32)Info->Dim[1];
 				Bitmap->Width = Info->Dim[0];
 				Bitmap->Height = Info->Dim[1];
+				Bitmap->Handle = 0;
 				Bitmap->Pitch = SafeTruncateToInt16(Size.Section);
 				Bitmap->Memory = (Asset->Header + 1);
 

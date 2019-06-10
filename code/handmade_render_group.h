@@ -31,7 +31,8 @@ struct loaded_bitmap
 	s16 Width;
 	s16 Height;
 	// TODO: Get rid of pitch
-	s16 Pitch;
+	s32 Pitch;
+	u32 Handle;
 };
 
 struct environment_map

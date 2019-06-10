@@ -26,6 +26,7 @@
 #include <gl/gl.h>
 
 #include "win32_handmade.h"
+#include "handmade_opengl.cpp"
 
 global_variable bool GlobalRunning;
 global_variable bool GlobalPause;
@@ -496,6 +497,7 @@ Win32DisplayBufferInWindow(
 	}
 #endif
 
+#if 0
 	glViewport(0, 0, WindowWidth, WindowHeight);
 
 	glBindTexture(GL_TEXTURE_2D, GlobalBlitTextureHandle);
@@ -562,7 +564,7 @@ Win32DisplayBufferInWindow(
     glVertex2f(MinP.x, MaxP.y);
 
     glEnd();
-
+#endif
 	SwapBuffers(DeviceContext);
 }
 
@@ -1826,6 +1828,8 @@ WinMain(
 			GameMemory.PlatformAPI.ReadDataFromFile = Win32ReadDataFromFile;
 			GameMemory.PlatformAPI.FileError = Win32FileError;
 			
+			GameMemory.PlatformAPI.RenderToOpenGL = OpenGLRenderGroupToOutput;
+
 			GameMemory.PlatformAPI.AllocateMemory = Win32AllocateMemory;
 			GameMemory.PlatformAPI.DeallocateMemory = Win32DeallocateMemory;
 
