@@ -1,6 +1,25 @@
 #include "handmade_render_group.h"
 
 inline void
+OpenGLSetScreenSpace(s32 Width, s32 Height)
+{
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
+    glMatrixMode(GL_PROJECTION);
+    r32 a = SafeRatio1(2.0f, (r32)Width);
+    r32 b = SafeRatio1(2.0f, (r32)Height);
+    r32 Proj[] =
+    {
+        a,  0, 0, 0,
+        0,  b, 0, 0,
+        0,  0, 1, 0,
+        -1, -1, 0, 1,
+    };
+    glLoadMatrixf(Proj);
+}
+
+inline void
 OpenGLRectangle(v2 MinP, v2 MaxP, v4 Color)
 {
     glBegin(GL_TRIANGLES);
@@ -29,11 +48,48 @@ OpenGLRectangle(v2 MinP, v2 MaxP, v4 Color)
     glEnd();
 }
 
+inline void
+OpenGLDisplayBitmap(s32 Width, s32 Height, void *Memory, int Pitch,
+    s32 WindowWidth, s32 WindowHeight)
+{
+    Assert(Pitch == (Width*4));
+    glViewport(0, 0, Width, Height);
+
+    glBindTexture(GL_TEXTURE_2D, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, Width, Height, 0,
+        GL_BGRA_EXT, GL_UNSIGNED_BYTE, Memory);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    
+    glEnable(GL_TEXTURE_2D);
+
+    glClearColor(1.0f, 0.0f, 1.0f, 0.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glMatrixMode(GL_TEXTURE);
+    glLoadIdentity();
+
+    OpenGLSetScreenSpace(Width, Height);
+
+    // TODO: Decide how we want to handle aspect ratio - black bars or crop?
+
+    v2 MinP = {};
+    v2 MaxP = {(r32)Buffer->Width, (r32)Buffer->Height};
+    v4 Color = {1, 1, 1, 1};
+
+    OpenGLRectangle(MinP, MaxP, Color);
+}
+
 global_variable u32 TextureBindCount = 0;
 internal void
-OpenGLRenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget)
+OpenGLRenderGroupToOutput(game_render_commands *Commands, s32 WindowWidth, s32 WindowHeight)
 {
-    glViewport(0, 0, OutputTarget->Width, OutputTarget->Height);
+    glViewport(0, 0, Commands->Width, Commands->Height);
    
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_BLEND);
@@ -42,24 +98,10 @@ OpenGLRenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget
     glMatrixMode(GL_TEXTURE);
 	glLoadIdentity();
 
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-	
-	glMatrixMode(GL_PROJECTION);
-	r32 a = SafeRatio1(2.0f, (r32)OutputTarget->Width);
-	r32 b = SafeRatio1(2.0f, (r32)OutputTarget->Height);
-	r32 Proj[] =
-	{
-		 a,  0, 0, 0,
-		 0,  b, 0, 0,
-		 0,  0, 1, 0,
-		-1, -1, 0, 1,
-	};
+    OpenGLSetScreenSpace(Commands->Width, Commands->Height);
 
-	glLoadMatrixf(Proj);
-
-	u32 SortEntryCount = RenderGroup->PushBufferElementCount;
-	tile_sort_entry *SortEntries = (tile_sort_entry *)(RenderGroup->PushBufferBase + RenderGroup->SortEntryAt);
+	u32 SortEntryCount = Commands->PushBufferElementCount;
+	tile_sort_entry *SortEntries = (tile_sort_entry *)(Commands->PushBufferBase + Commands->SortEntryAt);
 
 	tile_sort_entry *Entry = SortEntries;
 	for (u32 SortEntryIndex = 0;
@@ -67,7 +109,7 @@ OpenGLRenderGroupToOutput(render_group *RenderGroup, loaded_bitmap *OutputTarget
 		++SortEntryIndex, ++Entry)
 	{
 		render_group_entry_header *Header = (render_group_entry_header *)
-            (RenderGroup->PushBufferBase + Entry->PushBufferOffset);
+            (Commands->PushBufferBase + Entry->PushBufferOffset);
 		
 		void *Data = (uint8 *)Header + sizeof(*Header);
         switch (Header->Type)

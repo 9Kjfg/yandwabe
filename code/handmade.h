@@ -377,10 +377,10 @@ struct transient_state
 	task_with_memory Tasks[4];
 	
 	game_assets *Assets;
+	u32 MainGenerationID;
 
 	uint32 GroundBufferCount;
 	ground_buffer *GroundBuffers;
-
 	platform_work_queue *HighPriorityQueue;
 	platform_work_queue *LowPriorityQueue;
 	uint64 Pad;
@@ -389,8 +389,6 @@ struct transient_state
 	uint32 EnvMapHeight;
 	// NOTE: 0 is buttom, 1 is middle, 2 is top
 	environment_map EnvMaps[3];
-
-	u32 HotEntityNub;
 };
 
 // TODO: Get these into a more reasonable location
