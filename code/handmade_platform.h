@@ -92,6 +92,8 @@ typedef double r64;
 typedef float real32;
 typedef double real64;
 
+typedef u64 umm;
+
 #define PointerToU32(Pointer) ((u32)(memory_index)(Pointer))
 
 #pragma pack(push, 1)
@@ -504,8 +506,6 @@ typedef PLATFORM_DEALLOCATE_MEMORY(platform_deallocate_memory);
 typedef void platform_add_entry(platform_work_queue *Queue, platform_work_queue_callback *Callback, void *Data);
 typedef void platform_complete_all_work(platform_work_queue *Queue);
 
-typedef void platform_opengl_render(struct render_group *RenderGroup, struct loaded_bitmap *OutputTarget);
-
 typedef struct platform_api
 {	
 	platform_add_entry *AddEntry;
@@ -519,9 +519,6 @@ typedef struct platform_api
 
 	platform_allocate_memory *AllocateMemory;
 	platform_deallocate_memory *DeallocateMemory;
-
-	// TODO: Temporary?
-	platform_opengl_render *RenderToOpenGL;
 
 #if HANDMADE_INTERNAL
 	debug_platform_free_file_memory *DEBUGFreeFileMemory;

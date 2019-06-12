@@ -79,7 +79,7 @@ OpenGLDisplayBitmap(s32 Width, s32 Height, void *Memory, int Pitch,
     // TODO: Decide how we want to handle aspect ratio - black bars or crop?
 
     v2 MinP = {};
-    v2 MaxP = {(r32)Buffer->Width, (r32)Buffer->Height};
+    v2 MaxP = {(r32)Width, (r32)Height};
     v4 Color = {1, 1, 1, 1};
 
     OpenGLRectangle(MinP, MaxP, Color);
@@ -87,7 +87,7 @@ OpenGLDisplayBitmap(s32 Width, s32 Height, void *Memory, int Pitch,
 
 global_variable u32 TextureBindCount = 0;
 internal void
-OpenGLRenderGroupToOutput(game_render_commands *Commands, s32 WindowWidth, s32 WindowHeight)
+OpenGLRenderCommands(game_render_commands *Commands, s32 WindowWidth, s32 WindowHeight)
 {
     glViewport(0, 0, Commands->Width, Commands->Height);
    

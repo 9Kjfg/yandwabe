@@ -119,8 +119,6 @@ struct render_group
 	struct game_assets *Assets;
 	real32 GlobalAlpha;
 
-	u32 GenerationID;
-
 	v2 MonitroHalfDimInMeters;
 
     camera_transform CameraTransform;
@@ -157,13 +155,6 @@ struct tile_sort_entry
 {
 	r32 SortKey;
 	u32 PushBufferOffset;
-};
-
-struct tile_render_work
-{
-	render_group *RenderGroup;
-	loaded_bitmap *OutputTarget;
-	rectangle2i ClipRect;
 };
 
 inline object_transform

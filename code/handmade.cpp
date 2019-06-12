@@ -352,7 +352,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	render_group RenderGroup_ = BeginRenderGroup(TranState->Assets, RenderCommands, TranState->MainGenerationID, false);
 	render_group *RenderGroup = &RenderGroup_;
 
-	loaded_bitmap DrawBuffer = {}
+	loaded_bitmap DrawBuffer = {};
 	DrawBuffer.Width = RenderCommands->Width;
 	DrawBuffer.Height = RenderCommands->Height;
 

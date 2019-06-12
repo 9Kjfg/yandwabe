@@ -26,17 +26,23 @@
 #include <gl/gl.h>
 
 #include "win32_handmade.h"
-#include "handmade_opengl.cpp"
-#include "handmade_render.cpp"
 
-global_variable bool GlobalRunning;
-global_variable bool GlobalPause;
+global_variable platform_api Platform;
+
+global_variable bool32 GlobalRunning;
+global_variable bool32 GlobalPause;
+global_variable b32 GlobalUseSoftwareRenderer;
 global_variable win32_offscreen_buffer GlobalBackbuffer;
 global_variable LPDIRECTSOUNDBUFFER GlobalSecondaryBuffer;
 global_variable int64 GlobalPerfCountFrequency;
 global_variable bool32 DEBUGGlobalShowCursor;
 global_variable WINDOWPLACEMENT GlobalWindowPosition = {sizeof(GlobalWindowPosition)};
-global_variable GLuint GlobalBlitTextureHandle = 0;
+global_variable GLuint GlobalBlitTextureHandle;
+
+global_variable GLuint OpenGLDefaultInternalTextureFormat;
+
+#include "handmade_opengl.cpp"
+#include "handmade_render.cpp"
 
 //NOTE: XInputGetStae
 #define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
@@ -60,6 +66,9 @@ global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
 
 #define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPGUID lpGuid, LPDIRECTSOUND * ppDS, LPUNKNOWN  pUnkOuter )
 typedef DIRECT_SOUND_CREATE(direct_sound_create);
+
+typedef BOOL WINAPI wgl_swap_interval_ext(int interval);
+global_variable wgl_swap_interval_ext *wglSwapInterval;
 
 #if HANDMADE_INTERNAL
 DEBUG_PLATFORM_FREE_FILE_MEMORY(DEBUGPlatformFreeFileMemory)
@@ -405,8 +414,24 @@ Win32InitOpenGL(HWND Window)
 	HGLRC OpenGLRC = wglCreateContext(WindowDC);
 	if (wglMakeCurrent(WindowDC, OpenGLRC))
 	{
-		// NOTE: Success
-		glGenTextures(1, &GlobalBlitTextureHandle);
+#define GL_FRAMEBUFFER_SRGB 0x8DB9
+#define GL_SRGB8_ALPHA8 0x8C43
+		OpenGLDefaultInternalTextureFormat = GL_RGB8;
+		//if (OpenGLExtensionIsAvailable())
+		{
+			OpenGLDefaultInternalTextureFormat = GL_SRGB8_ALPHA8;
+		}
+
+		//if (OpenGLExtensionIsAvailable())
+		{
+			//glEnable(GL_FRAMEBUFFER_SRGB);
+		}
+
+		wglSwapInterval = (wgl_swap_interval_ext *)wglGetProcAddress("wglSwapIntervalEXT");
+		if (wglSwapInterval)
+		{
+			wglSwapInterval(1);
+		}
 	}
 	else
 	{
@@ -460,9 +485,11 @@ internal void
 Win32DisplayBufferInWindow(
 	platform_work_queue *RenderQueue,
 	game_render_commands *Commands,
-	HDC DeviceContext, s32 WindowWidth, s32 WindowHeight)
+	HDC DeviceContext, s32 WindowWidth, s32 WindowHeight,
+	void *SortMemory)
 {
-	SortEntries(Commands);
+	SortEntries(Commands, SortMemory);
+
 	/* TODO: Do we want to check for resources like before? Probably?
 		if (AllResourcesPresent(RenderGroup))
 		{
@@ -470,35 +497,36 @@ Win32DisplayBufferInWindow(
 		}
 	*/
 
-	b32 InHardware = true;
-	b32 DisplayViaHardware = true;
-	if (InHardware)
+	DEBUG_IF(Renderer_UseSoftware)
 	{
-		RenderToOpenGL(Commands, WindowWidth, WindowHeight);
-		SwapBuffers(DeviceContext);
-	}
-	else
-	{
-		TileRenderGroupToOutput(RenderQueue, Commands, OutputTarget);
+		loaded_bitmap OutputTarget;
+		OutputTarget.Memory = GlobalBackbuffer.Memory;
+		OutputTarget.Width = GlobalBackbuffer.Width;
+		OutputTarget.Height = GlobalBackbuffer.Height;
+		OutputTarget.Pitch = GlobalBackbuffer.Pitch;
 
+		SoftwareRenderCommands(RenderQueue, Commands, &OutputTarget);
+
+		b32 DisplayViaHardware = true;
 		if (DisplayViaHardware)
 		{
-			OpenGLDisplayBitmap();
+			OpenGLDisplayBitmap(GlobalBackbuffer.Width, GlobalBackbuffer.Height, GlobalBackbuffer.Memory,
+				GlobalBackbuffer.Pitch, WindowWidth, WindowHeight);
 			SwapBuffers(DeviceContext);
 		}
 		else
 		{
 			// TODO: Centering / black bars?
 			
-			if ((WindowWidth >= Buffer->Width*2) &&
-				(WindowHeight >= Buffer->Height*2))
+			if ((WindowWidth >= GlobalBackbuffer.Width*2) &&
+				(WindowHeight >= GlobalBackbuffer.Height*2))
 			{
 				StretchDIBits(
 					DeviceContext,
-					0, 0, 2*Buffer->Width, 2*Buffer->Height,
-					0, 0, Buffer->Width, Buffer->Height,
-					Buffer->Memory, 
-					&Buffer->Info,
+					0, 0, 2*GlobalBackbuffer.Width, 2*GlobalBackbuffer.Height,
+					0, 0, GlobalBackbuffer.Width, GlobalBackbuffer.Height,
+					GlobalBackbuffer.Memory, 
+					&GlobalBackbuffer.Info,
 					DIB_RGB_COLORS, SRCCOPY);
 			}
 			else
@@ -517,13 +545,18 @@ Win32DisplayBufferInWindow(
 #endif
 				StretchDIBits(
 					DeviceContext,
-					OffsetX, OffsetY, Buffer->Width, Buffer->Height,
-					0, 0, Buffer->Width, Buffer->Height,
-					Buffer->Memory, 
-					&Buffer->Info,
+					OffsetX, OffsetY, GlobalBackbuffer.Width, GlobalBackbuffer.Height,
+					0, 0, GlobalBackbuffer.Width, GlobalBackbuffer.Height,
+					GlobalBackbuffer.Memory, 
+					&GlobalBackbuffer.Info,
 					DIB_RGB_COLORS, SRCCOPY);
 			}
 		}
+	}
+	else
+	{
+		OpenGLRenderCommands(Commands, WindowWidth, WindowHeight);
+		SwapBuffers(DeviceContext);
 	}
 }
 
@@ -1747,6 +1780,13 @@ WinMain(
 			GlobalSecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
 
 			GlobalRunning = true;
+
+			umm CurrentSortMemorySize = Megabytes(1);
+			void *SortMemory = Win32AllocateMemory(CurrentSortMemorySize);
+
+			// TODO: Decide what out pushbuffer size is!
+			u32 PushBufferSize = Megabytes(4);
+			void *PushBuffer = Win32AllocateMemory(PushBufferSize);
 #if 0
 			while (GlobalRunning)
 			{
@@ -1788,8 +1828,6 @@ WinMain(
 			GameMemory.PlatformAPI.OpenNextFile = Win32OpenNextFile;
 			GameMemory.PlatformAPI.ReadDataFromFile = Win32ReadDataFromFile;
 			GameMemory.PlatformAPI.FileError = Win32FileError;
-			
-			GameMemory.PlatformAPI.RenderToOpenGL = OpenGLRenderGroupToOutput;
 
 			GameMemory.PlatformAPI.AllocateMemory = Win32AllocateMemory;
 			GameMemory.PlatformAPI.DeallocateMemory = Win32DeallocateMemory;
@@ -1801,6 +1839,7 @@ WinMain(
 			GameMemory.PlatformAPI.DEBUGExecuteSystemCommand = DEBUGExecuteSystemCommand;
 			GameMemory.PlatformAPI.DEBUGGetProcessState = DEBUGGetProcessState;
 #endif
+			Platform = GameMemory.PlatformAPI;
 			// TODO: Handle memory footprints (USING SYSTEM METRICS)
 			//
 			// TODO: Use MEM_LARGE_PAGES and call adjust token
@@ -2083,14 +2122,10 @@ WinMain(
 
 					BEGIN_BLOCK(GameUpdate);
 
-					// TODO: Decide what out pushbuffer size is!
-					u32 PushBufferSize = Megabytes(4);
-					void *PushBuffer = VirtualAlloc;
-
 					game_render_commands RenderCommands = RenderCommandsStruct(
 						PushBufferSize, PushBuffer, 
-						GlobalBackbuffer.Width,
-						GlobalBackbuffer.Height);
+						(u32)GlobalBackbuffer.Width,
+						(u32)GlobalBackbuffer.Height);
 
 					game_offscreen_buffer Buffer = {};
 					Buffer.Memory = GlobalBackbuffer.Memory;
@@ -2334,12 +2369,18 @@ WinMain(
 
 					BEGIN_BLOCK(FrameDisplay);
 
-					win32_window_dimension Dimension = Win32GetWindowDimension(Window);
+					umm NeededSortMemorySize = RenderCommands.PushBufferElementCount * sizeof(tile_sort_entry);
+					if (CurrentSortMemorySize < NeededSortMemorySize)
+					{
+						Win32DeallocateMemory(SortMemory);
+						CurrentSortMemorySize = NeededSortMemorySize;
+						SortMemory = Win32AllocateMemory(CurrentSortMemorySize);
+					}
 
+					win32_window_dimension Dimension = Win32GetWindowDimension(Window);
 					HDC DeviceContext = GetDC(Window);
-					Win32DisplayBufferInWindow(
-						&RenderCommands, DeviceContext,
-						Dimension.Width, Dimension.Height);
+					Win32DisplayBufferInWindow(&HighPriorityQueue, &RenderCommands, DeviceContext,
+						Dimension.Width, Dimension.Height, SortMemory);
 					ReleaseDC(Window, DeviceContext);
 
 					FlipWallClock = Win32GetWallClock();

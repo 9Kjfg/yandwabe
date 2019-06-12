@@ -1041,7 +1041,7 @@ DEBUGDrawMainMenu(debug_state *DebugState, render_group *RenderGroup, v2 MouseP)
 			MoveInteraction.P = &Tree->UIP;
 
 			rectangle2 MoveBox = RectCenterHalfDim(Tree->UIP - V2(4.0f, 4.0f), V2(4.0f, 4.0f));
-			PushRect(DebugState->RenderGroup, NoTransform, MoveBox, 0,
+			PushRect(&DebugState->RenderGroup, NoTransform, MoveBox, 0,
 				InteractionIsHot(DebugState, MoveInteraction) ? V4(1, 1, 0, 1) : V4(1, 1, 1, 1));
 
 			if (IsInRectangle(MoveBox, MouseP))
@@ -1846,7 +1846,7 @@ DEBUGStart(debug_state *DebugState, game_render_commands *Commands, game_assets 
 	DebugState->RenderGroup = BeginRenderGroup(Assets, Commands, MainGenerationID, false);
 
 	DebugState->DebugFont = PushFont(&DebugState->RenderGroup, DebugState->FontID);
-	DebugState->DebugFontInfo = GetFontInfo(&DebugState->RenderGroup.Assets, DebugState->FontID);
+	DebugState->DebugFontInfo = GetFontInfo(DebugState->RenderGroup.Assets, DebugState->FontID);
 
 	DebugState->GlobalWidth = (r32)Width;
 	DebugState->GlobalHeight = (r32)Height;

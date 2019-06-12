@@ -103,12 +103,12 @@ GetRenderEntityBasisP(camera_transform CameraTransform,
 inline void *
 PushRenderElement_(render_group *Group, uint32 Size, render_group_entry_type Type, r32 SortKey)
 {
-	game_render_comands *Commands = Group->Commands;
+	game_render_commands *Commands = Group->Commands;
     void *Result = 0;
 
 	Size += sizeof(render_group_entry_header);
 
-    if ((Group->PushBufferSize + Size) < (Commands->SortEntryAt - sizeof(tile_sort_entry)))
+    if ((Commands->PushBufferSize + Size) < (Commands->SortEntryAt - sizeof(tile_sort_entry)))
     {
         render_group_entry_header *Header = (render_group_entry_header *)(Commands->PushBufferBase + Commands->PushBufferSize);
         Header->Type = Type;
@@ -332,22 +332,6 @@ AllResourcesPresent(render_group *Group)
 	bool32 Result = (Group->MissingResourceCount == 0);
 	return(Result);
 }
-
-inline void
-RenderToOutput(platform_work_queue *RenderQueue, render_group *RenderGroup,
-	loaded_bitmap *OutputTarget, memory_arena *TempArena)
-{
-	SortEntries(RenderGroup, TempArena);
-	if (1)// (RenderGroup->IsHardware)
-	{
-		Platform.RenderToOpenGL(RenderGroup, OutputTarget);
-	}
-	else
-	{
-		TileRenderGroupToOutput(RenderQueue, RenderGroup, OutputTarget, TempArena);
-	}
-}
-
 
 
 

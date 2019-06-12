@@ -329,8 +329,9 @@ PLATFORM_WORK_QUEUE_CALLBACK(FillGroundChunkWork)
 {
 	TIMED_FUNCTION();
 	
-#if 0
 	fill_ground_chunk_work *Work = (fill_ground_chunk_work *)Data;
+	
+#if 0
 
 	loaded_bitmap *Buffer = &Work->GroundBuffer->Bitmap;
 	Buffer->AlignPercentage = V2(0.5f, 0.5f);
