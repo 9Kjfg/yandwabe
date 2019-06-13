@@ -92,7 +92,7 @@ typedef double r64;
 typedef float real32;
 typedef double real64;
 
-typedef u64 umm;
+typedef uintptr_t umm;
 
 #define PointerToU32(Pointer) ((u32)(memory_index)(Pointer))
 
