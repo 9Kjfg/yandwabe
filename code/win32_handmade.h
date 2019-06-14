@@ -92,5 +92,12 @@ struct win32_state
 	char *OnePastLastEXEFileNameSlash;	
 };
 
+struct win32_thread_startup
+{
+	HWND Window;
+	HGLRC OpenGLRC;
+	platform_work_queue *Queue;
+};
+
 #define WIN32_HANDMADE_H
 #endif

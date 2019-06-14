@@ -497,6 +497,12 @@ struct platform_work_queue;
 #define PLATFORM_WORK_QUEUE_CALLBACK(name) void name(platform_work_queue *Queue, void *Data)
 typedef PLATFORM_WORK_QUEUE_CALLBACK(platform_work_queue_callback);
 
+#define PLATFORM_ALLOCATE_TEXTURE(name) void *name(u32 Width, u32 Height, void *Data)
+typedef PLATFORM_ALLOCATE_TEXTURE(platform_allocate_texture);
+
+#define PLATFORM_DEALLOCATE_TEXTURE(name) void name(void *Texture)
+typedef PLATFORM_DEALLOCATE_TEXTURE(platform_deallocate_texture);
+
 #define PLATFORM_ALLOCATE_MEMORY(name) void *name(memory_index Size)
 typedef PLATFORM_ALLOCATE_MEMORY(platform_allocate_memory);
 
@@ -510,6 +516,9 @@ typedef struct platform_api
 {	
 	platform_add_entry *AddEntry;
 	platform_complete_all_work *CompleteAllWork;
+
+	platform_allocate_texture *AllocateTexture;
+	platform_deallocate_texture *DeallocateTexture;
 
 	platform_get_all_files_of_type_begin *GetAllFilesOfTypeBegin;
 	platform_get_all_files_of_type_end *GetAllFilesOfTypeEnd;

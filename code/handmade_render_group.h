@@ -32,7 +32,7 @@ struct loaded_bitmap
 	s16 Height;
 	// TODO: Get rid of pitch
 	s32 Pitch;
-	u32 Handle;
+	void *TextureHandle;
 };
 
 struct environment_map
