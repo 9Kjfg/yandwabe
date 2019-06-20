@@ -257,6 +257,8 @@ PLATFORM_ALLOCATE_TEXTURE(Win32AllocateTexture)
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 
+    glFlush();
+
 	Assert(sizeof(Handle) <= sizeof(void *));
 	return((void *)Handle);
 }

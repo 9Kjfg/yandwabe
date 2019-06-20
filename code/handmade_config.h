@@ -1,13 +1,11 @@
-#define GlobalConstants_Renderer_ShowLightingSamples 0
-#define GlobalConstants_Renderer_Camera_UseDebug 0
-#define GlobalConstants_Renderer_Camera_DebugDistance 25.0f
-#define GlobalConstants_Renderer_Camera_RoomBased 0
-#define GlobalConstants_GroundChunks_Chekerboards 0
-#define GlobalConstants_GroundChunks_RecomputeOnEXEChange 1
-#define GlobalConstants_Renderer_TestWierdDrawBufferSize 0
-#define GlobalConstants_GroundChunks_Outline 0
-#define GlobalConstants_AI_Familiar_FollowsHero 0
-#define GlobalConstants_Particles_Test 0
-#define GlobalConstants_Paritcles_ShowGrid 0
-#define GlobalConstants_Simulation_UseSpaceOutlines 0
-#define GlobalConstants_Renderer_UseSoftware 0
+global_variable b32 Global_Renderer_Camera_UseDebug = false;
+global_variable r32 Global_Renderer_Camera_DebugDistance = 25.0f;
+global_variable b32 Global_Renderer_Camera_RoomBased = false;
+global_variable b32 Global_GroundChunks_Chekerboards = false;
+global_variable b32 Global_GroundChunks_RecomputeOnEXEChange = true;
+global_variable b32 Global_Renderer_TestWierdDrawBufferSize = false;
+global_variable b32 Global_GroundChunks_Outline = false;
+global_variable b32 Global_AI_Familiar_FollowsHero = false;
+global_variable b32 Global_Particles_Test = false;
+global_variable b32 Global_Paritcles_ShowGrid = false;
+global_variable b32 Global_Simulation_UseSpaceOutlines = false;

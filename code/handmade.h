@@ -1,6 +1,7 @@
 #if !defined(HANDMADE_H)
 
 #include "handmade_platform.h"
+#include "handmade_config.h"
 #include "handmade_shared.h"
 #include "handmade_file_format.h"
 #include "handmade_meta.h"

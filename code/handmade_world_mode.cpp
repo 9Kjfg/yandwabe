@@ -711,7 +711,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 
 			real32 GroundSideInMeters = World->ChunkDimInMeters.x;
 			PushBitmap(RenderGroup, Transform, Bitmap, GroundSideInMeters, V3(0, 0, 0));
-			DEBUG_IF(GroundChunks_Outline)
+			if (Global_GroundChunks_Outline)
 			{
 				PushRectOutline(RenderGroup, Transform, Delta, V2(GroundSideInMeters, GroundSideInMeters), V4(1.0f, 1.0f, 0.0f, 1.0f));
 			}
@@ -988,7 +988,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 				{
 					sim_entity *ClosestHero = 0;
 					real32 ClosestHeroDSq = Square(10.0f); // NOTE: Ten meter maximum search
-					DEBUG_IF(AI_Familiar_FollowsHero)
+					if (Global_AI_Familiar_FollowsHero)
 					{
 						// TODO: Make spation queries easy for things
 						sim_entity *TestEntity = SimRegion->Entities;
@@ -1046,7 +1046,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 					PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Head, HeroSizeC*1.2f, V3(0, 0, 0));
 					DrawHitpoints(Entity, RenderGroup, EntityTrasform);
 					
-					DEBUG_IF(Particles_Test)
+					if (Global_Particles_Test)
 					{
 						for (u32 ParticleSpawnIndex = 0;
 							ParticleSpawnIndex < 2;
@@ -1107,7 +1107,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 							Cel->VelocityTimesDensity += Density*Particle->dP;
 						}
 
-						DEBUG_IF(Paritcles_ShowGrid)
+						if (Global_Paritcles_ShowGrid)
 						{
 							for (u32 Y = 0;
 								Y < PARTICLE_CEL_DIM;
@@ -1233,7 +1233,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 				} break;
 				case EntityType_Space:
 				{
-					DEBUG_IF(Simulation_UseSpaceOutlines)
+					if (Global_Simulation_UseSpaceOutlines)
 					{
 						for (uint32 VolumeIndex = 0;
 							VolumeIndex < Entity->Collision->VolumeCount;

@@ -4,8 +4,6 @@
 #define introspect(params)
 #define counted_pointer(params)
 
-#include "handmade_config.h"
-
 /*
 	HANDMADE_INTERNAL:
 		0 - Build for public
