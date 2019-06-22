@@ -285,26 +285,6 @@ internal void DEBUG_HIT(debug_id ID, r32 ZValue);
 internal b32 DEBUG_HIGHLIGHTED(debug_id ID, v4 *Color);
 internal b32 DEBUG_REQUESTED(debug_id ID);
 
-inline debug_event
-DEBUGInitializeValue(debug_type Type, debug_event *SubEvent, char *GUID, char *Name)
-{
-	Assert(GUID);
-	
-	RecordDebugEvent(DebugType_MarkDebugValue, "");
-	Event->GUID = GUID;
-	Event->BlockName = Name;
-	Event->Value_debug_event = SubEvent;
-
-	SubEvent->Clock = 0;
-	SubEvent->GUID = GUID;
-	SubEvent->BlockName = Name;
-	SubEvent->ThreadID = 0;
-	SubEvent->CoreIndex = 0;
-	SubEvent->Type = (u8)Type;
-
-	return(*SubEvent);
-}
-
 #else
 
 inline debug_id DEBUG_POINTER_ID(void *Pointer) {debug_id NullID = {}; return(NullID);}
@@ -321,9 +301,6 @@ inline debug_id DEBUG_POINTER_ID(void *Pointer) {debug_id NullID = {}; return(Nu
 #define DEBUG_BEGIN_DATA_BLOCK(...)
 #define DEBUG_END_DATA_BLOCK(...)
 #define DEBUG_REQUESTED(...) 0
-
-#define DEBUG_IF__(Path) if(GlobalConstants_##Path)
-#define DEBUG_VARIABLE__(type, Path, Variable) type Variable = GlobalConstants_##Path##_##Variable;
 
 #endif
 
