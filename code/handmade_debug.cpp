@@ -826,6 +826,16 @@ DEBUGDrawEvent(layout *Layout, debug_stored_event *StoredEvent, debug_id DebugID
 					V3(GetMinCorner(Element.Bounds), 0), V4(1, 1, 1, 1), 0);
 			} break;
 
+			case DebugType_CounterFunctionList:
+			{
+				layout_element Element_ = BeginElementRectangle(Layout, &View->InlineBlock.Dim);
+				MakeElementSizable(&Element_);
+				//DefaultInteraction(&Element, ItemInteraction);
+				EndElement(&Element_);
+				
+				DrawProfileIn(DebugState, Element_.Bounds, Layout->MouseP);
+			} break;
+
 			case DebugType_OpenDataBlock:
 			{
 			};
@@ -1615,12 +1625,8 @@ CollateDebugRecords(debug_state *DebugState, u32 EventCount, debug_event *EventA
 		{
 			DebugState->CollationFrame = NewFrame(DebugState, Event->Clock);
 		}
-
-		if (Event->Type == DebugType_MarkDebugValue)
-		{
-			StoreEvent(DebugState, Element, Event);
-		}
-		else if (Event->Type == DebugType_FrameMarker)
+		
+		if (Event->Type == DebugType_FrameMarker)
 		{
 			Assert(DebugState->CollationFrame);
 
