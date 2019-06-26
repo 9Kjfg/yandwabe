@@ -220,10 +220,10 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 #if HANDMADE_INTERNAL
 	DebugGlobalMemory = Memory;
 
-	{DEBUG_DATA_BLOCK("Game/Renderer/Camera");
+	{DEBUG_DATA_BLOCK("Game/Renderer");
 		DEBUG_VALUE(Global_Renderer_TestWierdDrawBufferSize);
 		
-		{DEBUG_DATA_BLOCK("Game/Renderer/Camera", DEBUG_POINTER_ID(Memory));
+		{DEBUG_DATA_BLOCK("Game/Renderer/Camera");
 			DEBUG_VALUE(Global_Renderer_Camera_UseDebug);
 			DEBUG_VALUE(Global_Renderer_Camera_DebugDistance);
 			DEBUG_VALUE(Global_Renderer_Camera_RoomBased);
@@ -245,7 +245,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	{DEBUG_DATA_BLOCK("Simulation");
 		DEBUG_VALUE(Global_Simulation_UseSpaceOutlines);
 	}
-	{DEBUG_DATA_BLOCK("Game/Profile");
+	{DEBUG_DATA_BLOCK("Profile");
 		DEBUG_PROFILE(GameUpdateAndRender);
 	}
 #endif

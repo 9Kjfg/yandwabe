@@ -255,7 +255,7 @@ DrawRectangleSlowly(loaded_bitmap *Buffer,
 		XMin*BITMAP_BYTES_PER_PIXEL +
 		YMin*Buffer->Pitch);
 
-	TIMED_BLOCK(PixelFill, (XMax - XMin + 1)*(YMax - YMin + 1));
+	TIMED_BLOCK("Pixel_Fill", (XMax - XMin + 1)*(YMax - YMin + 1));
 	for (int Y = YMin;
 		Y < YMax;
 		++Y)
@@ -548,7 +548,7 @@ DrawRectangleQuickly(loaded_bitmap *Buffer,
 		int MinX = FillRect.MinX;
 		int MaxX = FillRect.MaxX;
 
-		TIMED_BLOCK(PixelFill, GetClampedRectArea(FillRect) / 2);
+		TIMED_BLOCK("Pixel_Fill", GetClampedRectArea(FillRect) / 2);
 		for (int Y = MinY;
 			Y < MaxY;
 			++Y)

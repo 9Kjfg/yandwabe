@@ -2091,7 +2091,7 @@ WinMain(
 
 				while (GlobalRunning)
 				{
-					{DEBUG_DATA_BLOCK(Platform_Controls, DEBUG_POINTER_ID(&DebugTimeMarketIndex));
+					{DEBUG_DATA_BLOCK("Platform/Controls");
 						DEBUG_VALUE(GlobalPause);
 						DEBUG_VALUE(GlobalRenderingType);
 					}
@@ -2100,7 +2100,7 @@ WinMain(
 					//
 					//
 
-					BEGIN_BLOCK(ExecutableRefesh);
+					BEGIN_BLOCK("Executable Refesh");
 					NewInput->dtForFrame = TargetSecondPerFrame;
 
 					if (UpdateFade(&Fader, NewInput->dtForFrame, Window) == Win32Fade_WaitingForClose)
@@ -2127,13 +2127,13 @@ WinMain(
 						GameMemory.ExecutableReloaded = true;
 					}
 
-					END_BLOCK(ExecutableRefesh);
+					END_BLOCK();
 
 					//
 					//
 					//
 
-					BEGIN_BLOCK(InputProcessed);
+					BEGIN_BLOCK("Input Processed");
 					
 					// TODO: Zeroing macro
 					// TODO: We can't zero everuthing because the up/down state will
@@ -2300,12 +2300,12 @@ WinMain(
 						}
 					}
 
-					END_BLOCK(InputProcessed);
+					END_BLOCK();
 					//
 					//
 					//
 
-					BEGIN_BLOCK(GameUpdate);
+					BEGIN_BLOCK("Game Update");
 
 					game_render_commands RenderCommands = RenderCommandsStruct(
 						PushBufferSize, PushBuffer, 
@@ -2349,13 +2349,13 @@ WinMain(
 						}
 					}
 
-					END_BLOCK(GameUpdate);
+					END_BLOCK();
 
 					//
 					//
 					//
 					
-					BEGIN_BLOCK(AudioUpdated);
+					BEGIN_BLOCK("Audio Updated");
 					
 					if (!GlobalPause)
 					{
@@ -2484,14 +2484,14 @@ WinMain(
 						}
 					}
 
-					END_BLOCK(AudioUpdated);
+					END_BLOCK();
 
 					//
 					//
 					//
 	
 #if HANDMADE_INTERNAL
-					BEGIN_BLOCK(DebugCollating)
+					BEGIN_BLOCK("Debug Collating")
 
 					if (Game.DEBUGFrameEnd)
 					{
@@ -2499,7 +2499,7 @@ WinMain(
 					}
 					GlobalDebugTable_.EventArrayIndex_EventIndex = 0;
 
-					END_BLOCK(DebugCollating);
+					END_BLOCK();
 #endif
 			
 					//
@@ -2552,7 +2552,7 @@ WinMain(
 					//
 					//
 
-					BEGIN_BLOCK(FrameDisplay);
+					BEGIN_BLOCK("Frame Display");
 
 					umm NeededSortMemorySize = RenderCommands.PushBufferElementCount * sizeof(tile_sort_entry);
 					if (CurrentSortMemorySize < NeededSortMemorySize)
@@ -2574,7 +2574,7 @@ WinMain(
 					NewInput = OldInput;
 					OldInput = Temp;
 
-					END_BLOCK(FrameDisplay);
+					END_BLOCK();
 
 					LARGE_INTEGER EndCounter = Win32GetWallClock();
 					FRAME_MARKER(Win32GetSecondsElapsed(LastCounter, EndCounter));

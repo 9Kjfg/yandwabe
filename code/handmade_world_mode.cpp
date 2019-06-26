@@ -1278,7 +1278,8 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 
 				if (DEBUG_REQUESTED(EntityDebugID))
 				{
-					DEBUG_DATA_BLOCK(Simulation_Entity, EntityDebugID);
+					DEBUG_DATA_BLOCK("Simulation/Entity");
+					// TODO: Do we want this DEBUG_VALUE(EntityDebugID);
 					DEBUG_VALUE(Entity->StorageIndex);
 					DEBUG_VALUE(Entity->Updatable);
 					DEBUG_VALUE(Entity->Type);
