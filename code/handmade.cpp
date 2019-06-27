@@ -220,20 +220,20 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 #if HANDMADE_INTERNAL
 	DebugGlobalMemory = Memory;
 
-	{DEBUG_DATA_BLOCK("Game/Renderer");
-		DEBUG_VALUE(Global_Renderer_TestWierdDrawBufferSize);
+	{DEBUG_DATA_BLOCK("Renderer");
+		DEBUG_B32(Global_Renderer_TestWierdDrawBufferSize);
 		
-		{DEBUG_DATA_BLOCK("Game/Renderer/Camera");
-			DEBUG_VALUE(Global_Renderer_Camera_UseDebug);
-			DEBUG_VALUE(Global_Renderer_Camera_DebugDistance);
-			DEBUG_VALUE(Global_Renderer_Camera_RoomBased);
+		{DEBUG_DATA_BLOCK("Camera");
+			DEBUG_B32(Global_Renderer_Camera_UseDebug);
+			DEBUG_B32(Global_Renderer_Camera_DebugDistance);
+			DEBUG_B32(Global_Renderer_Camera_RoomBased);
 		}
 	}
 
 	{DEBUG_DATA_BLOCK("GroundChunks");	
-		DEBUG_VALUE(Global_GroundChunks_Chekerboards);
+		DEBUG_B32(Global_GroundChunks_Chekerboards);
 		DEBUG_VALUE(Global_GroundChunks_RecomputeOnEXEChange);
-		DEBUG_VALUE(Global_GroundChunks_Outline);
+		DEBUG_B32(Global_GroundChunks_Outline);
 	}
 	{DEBUG_DATA_BLOCK("AI/Familiar");
 		DEBUG_VALUE(Global_AI_Familiar_FollowsHero);

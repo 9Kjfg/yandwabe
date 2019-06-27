@@ -247,22 +247,31 @@ struct debug_data_block
 
 	~debug_data_block(void)
 	{
-		RecordDebugEvent(DebugType_OpenDataBlock, DEBUG_NAME("End Data Block"));
+		RecordDebugEvent(DebugType_CloseDataBlock, DEBUG_NAME("End Data Block"));
 	}
 };
 
 #define DEBUG_DATA_BLOCK(Name) debug_data_block DataBlock__(DEBUG_NAME(Name))
 
 #define DEBUG_VALUE(Value) \
-	{ \
-		RecordDebugEvent(DebugType_Unknown, #Value) \
-		DEBUGValueSetEventData(Event, Value); \
-	}
+{ \
+	RecordDebugEvent(DebugType_Unknown, #Value) \
+	DEBUGValueSetEventData(Event, Value); \
+}
+//TODO:	DEBUGHandleValueEdit(Event, &Vlaue); \
+
+#define DEBUG_B32(Value) \
+{ \
+	RecordDebugEvent(DebugType_Unknown, #Value) \
+	Event->Type = DebugType_b32;\
+	Event->Value_b32 = Value;\
+}
+//TODO:	DEBUGHandleValueEdit(Event, &Vlaue); \
 
 #define DEBUG_PROFILE(FunctionName) \
-	{ \
-		RecordDebugEvent(DebugType_CounterFunctionList, DEBUG_NAME(#FunctionName)) \
-	}
+{ \
+	RecordDebugEvent(DebugType_CounterFunctionList, DEBUG_NAME(#FunctionName)) \
+}
 
 #define DEBUG_BEGIN_ARRAY(...)
 #define DEBUG_END_ARRAY(...)
