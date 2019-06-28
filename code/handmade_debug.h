@@ -69,11 +69,14 @@ struct debug_string
 
 struct debug_element
 {
+    char *OriginalGUID; // NOTE: Can never be printed! Might point into unloaded DLL.
     char *GUID;
 
     u32 FileNameCount;
     u32 LineNumber;
     u32 NameStartsAt;
+
+    b32 ValueWasEdited;
 
     debug_element *NextInHash;
 

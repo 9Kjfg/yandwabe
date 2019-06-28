@@ -684,43 +684,45 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 	r32 FadeBottomStartZ = -2.0f*WorldMode->TypicalFloorHeight;
 	r32 FadeBottomEndZ = -2.25*WorldMode->TypicalFloorHeight;
 
-	// NOTE: Ground chink rendering
-	for (uint32 GroundBufferIndex = 0;
-		GroundBufferIndex < TranState->GroundBufferCount;
-		++GroundBufferIndex)
+	// NOTE: Ground chunk rendering
+	if (Global_GroundChunksOn)
 	{
-		ground_buffer *GroundBuffer = TranState->GroundBuffers + GroundBufferIndex;
-		
-		if (IsValid(GroundBuffer->P))
+		for (uint32 GroundBufferIndex = 0;
+			GroundBufferIndex < TranState->GroundBufferCount;
+			++GroundBufferIndex)
 		{
-			loaded_bitmap *Bitmap = &GroundBuffer->Bitmap;
-			v3 Delta = Subtract(WorldMode->World, &GroundBuffer->P, &WorldMode->CameraP);
-
-			RenderGroup->GlobalAlpha = 1.0f;
-			if (Delta.z > FadeTopStartZ)
+			ground_buffer *GroundBuffer = TranState->GroundBuffers + GroundBufferIndex;
+			
+			if (IsValid(GroundBuffer->P))
 			{
-				RenderGroup->GlobalAlpha = Clamp01MapToRange(FadeTopEndZ, Delta.z, FadeTopStartZ);
-			}
-			else if (Delta.z < FadeBottomStartZ)
-			{
-				RenderGroup->GlobalAlpha = Clamp01MapToRange(FadeBottomEndZ, Delta.z, FadeBottomStartZ);
-			}
+				loaded_bitmap *Bitmap = &GroundBuffer->Bitmap;
+				v3 Delta = Subtract(WorldMode->World, &GroundBuffer->P, &WorldMode->CameraP);
 
-			object_transform Transform = DefaultFlatTransform();
-			Transform.OffsetP = Delta;
+				RenderGroup->GlobalAlpha = 1.0f;
+				if (Delta.z > FadeTopStartZ)
+				{
+					RenderGroup->GlobalAlpha = Clamp01MapToRange(FadeTopEndZ, Delta.z, FadeTopStartZ);
+				}
+				else if (Delta.z < FadeBottomStartZ)
+				{
+					RenderGroup->GlobalAlpha = Clamp01MapToRange(FadeBottomEndZ, Delta.z, FadeBottomStartZ);
+				}
 
-			real32 GroundSideInMeters = World->ChunkDimInMeters.x;
-			PushBitmap(RenderGroup, Transform, Bitmap, GroundSideInMeters, V3(0, 0, 0));
-			if (Global_GroundChunks_Outline)
-			{
-				PushRectOutline(RenderGroup, Transform, Delta, V2(GroundSideInMeters, GroundSideInMeters), V4(1.0f, 1.0f, 0.0f, 1.0f));
-			}
-		}	
-	}
-	RenderGroup->GlobalAlpha = 1.0f;
+				object_transform Transform = DefaultFlatTransform();
+				Transform.OffsetP = Delta;
 
-	// NOTE: Ground chunk updating
-	{
+				real32 GroundSideInMeters = World->ChunkDimInMeters.x;
+				PushBitmap(RenderGroup, Transform, Bitmap, GroundSideInMeters, V3(0, 0, 0));
+				if (Global_GroundChunks_Outline)
+				{
+					PushRectOutline(RenderGroup, Transform, Delta, V2(GroundSideInMeters, GroundSideInMeters), V4(1.0f, 1.0f, 0.0f, 1.0f));
+				}
+			}	
+		}
+
+		RenderGroup->GlobalAlpha = 1.0f;
+
+		// NOTE: Ground chunk updating
 		world_position MinChunkP = MapIntoChunkSpace(World, WorldMode->CameraP, GetMinCorner(CameraBoundsInMeters));
 		world_position MaxChunkP = MapIntoChunkSpace(World, WorldMode->CameraP, GetMaxCorner(CameraBoundsInMeters));
 		
