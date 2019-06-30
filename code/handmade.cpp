@@ -225,7 +225,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		
 		{DEBUG_DATA_BLOCK("Camera");
 			DEBUG_B32(Global_Renderer_Camera_UseDebug);
-			DEBUG_B32(Global_Renderer_Camera_DebugDistance);
+			DEBUG_VALUE(Global_Renderer_Camera_DebugDistance);
 			DEBUG_B32(Global_Renderer_Camera_RoomBased);
 		}
 	}
