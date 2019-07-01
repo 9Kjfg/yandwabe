@@ -1994,7 +1994,7 @@ WinMain(
 			game_memory GameMemory = {};
 			GameMemory.PermanentStorageSize = Megabytes(15);
 			GameMemory.TransientStorageSize = Megabytes(256);
-			GameMemory.DebugStorageSize = Megabytes(50);
+			GameMemory.DebugStorageSize = Megabytes(256);
 			GameMemory.HighPriorityQueue = &HighPriorityQueue;
 			GameMemory.LowPriorityQueue = &LowPriorityQueue;
 			GameMemory.PlatformAPI.AddEntry = Win32AddEntry;
