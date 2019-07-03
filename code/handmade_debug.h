@@ -44,8 +44,20 @@ struct debug_view
     union
     {
         debug_view_inline_block InlineBlock;
-        debug_view_collapsible  Collapsible;
+        debug_view_collapsible Collapsible;
     };
+};
+
+struct debug_profile_node
+{
+    struct debug_element *Element;
+    struct debug_stored_event *FirstChild;
+    struct debug_stored_event *NextSameParent;
+    u32 ParentRelativeClock;
+    u32 Duration;
+    u32 AggregateCount;
+    u16 ThreadOrdinal;
+    u16 CoreIndex;
 };
 
 struct debug_stored_event
@@ -57,7 +69,12 @@ struct debug_stored_event
     };
 
     u32 FrameIndex;
-    debug_event Event;
+
+    union
+    {
+        debug_event Event;
+        debug_profile_node ProfileNode;
+    };
     // TODO: Stall call attribution data here
 };
 
@@ -174,6 +191,12 @@ struct debug_frame
     r32 FrameBarScale;
 
     u32 FrameIndex;
+
+    u32 StoredEventCount;
+    u32 ProfileBlockCount;
+    u32 DataBlockCount;
+
+    debug_stored_event *RootProfileNode;
 };
 
 struct open_debug_block
@@ -188,6 +211,8 @@ struct open_debug_block
     debug_event *OpeningEvent;   
     debug_element *Element;
 
+    debug_stored_event *Node;
+    
     // NOTE: Only for data blocks?  Probably!
     debug_variable_group *Group;
 };
