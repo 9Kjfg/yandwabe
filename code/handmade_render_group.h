@@ -99,7 +99,8 @@ struct object_transform
 {
 	b32 Upright;
 	v3 OffsetP;
-	real32 Scale;
+	r32 Scale;
+	r32 SortBias;
 };
 
 struct camera_transform

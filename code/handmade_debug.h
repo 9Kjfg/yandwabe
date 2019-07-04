@@ -279,6 +279,10 @@ struct debug_state
     loaded_font *DebugFont;
     hha_font *DebugFontInfo;
 
+    object_transform TextTransform;
+	object_transform ShadowTransform;
+    object_transform BackingTransform;
+
     v2 MenuP;
     b32 MenuActive;
 
