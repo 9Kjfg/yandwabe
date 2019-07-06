@@ -243,7 +243,7 @@ OpenGLRenderCommands(game_render_commands *Commands, s32 WindowWidth, s32 Window
 	}
 }
 
-PLATFORM_ALLOCATE_TEXTURE(Win32AllocateTexture)
+PLATFORM_ALLOCATE_TEXTURE(AllocateTexture)
 {
 	GLuint Handle;
 	glGenTextures(1, &Handle);
@@ -262,11 +262,11 @@ PLATFORM_ALLOCATE_TEXTURE(Win32AllocateTexture)
     glFlush();
 
 	Assert(sizeof(Handle) <= sizeof(void *));
-	return((void *)Handle);
+	return(PointerFromU32(void, Handle));
 }
 
-PLATFORM_DEALLOCATE_TEXTURE(Win32DeallocateTexture)
+PLATFORM_DEALLOCATE_TEXTURE(DeallocateTexture)
 {
-	GLuint Handle = (GLuint)Texture;
+	GLuint Handle = (GLuint)U32FromPointer(Texture);
 	glDeleteTextures(1, &Handle);
 }

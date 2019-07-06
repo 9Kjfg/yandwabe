@@ -1703,152 +1703,6 @@ global_variable debug_table GlobalDebugTable_;
 debug_table *GlobalDebugTable = &GlobalDebugTable_;
 #endif
 
-internal void
-SetFadeAlpha(HWND Window, r32 Alpha)
-{
-	BYTE WindowsAlpha = (BYTE)(Alpha*255.0f);
-
-	if (Alpha == 0)
-	{
-		if (IsWindowVisible(Window))
-		{
-			ShowWindow(Window, SW_HIDE);
-		}
-	}
-	else
-	{
-		SetLayeredWindowAttributes(Window, RGB(0, 0, 0), WindowsAlpha, LWA_ALPHA);
-		if (!IsWindowVisible(Window))
-		{
-			ShowWindow(Window, SW_SHOW);	
-		}
-	}
-}
-
-internal void
-InitFader(win32_fader *Fader, HINSTANCE Instance)
-{
-	WNDCLASSA WindowClass = {};
-
-	WindowClass.style = CS_HREDRAW|CS_VREDRAW;
-	WindowClass.lpfnWndProc = Win32FadeWindowCallback;
-	WindowClass.hInstance = Instance;
-	WindowClass.hCursor = LoadCursor(0, IDC_ARROW);
-	WindowClass.lpszClassName = "HandMadeHeroWindowFadeInClass";
-	WindowClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
-
-	if (RegisterClass(&WindowClass))
-	{
-		Fader->Window = 
-			CreateWindowEx(
-				WS_EX_LAYERED,//|WS_EX_TOPMOST,
-				WindowClass.lpszClassName,
-				"Handmade Hero",
-				WS_OVERLAPPEDWINDOW,
-				CW_USEDEFAULT,
-				CW_USEDEFAULT,
-				CW_USEDEFAULT,
-				CW_USEDEFAULT,
-				0,
-				0,
-				Instance,
-				0);
-		if (Fader->Window)
-		{
-			ToggleFullscreen(Fader->Window);
-		}
-	}
-}
-
-internal void
-BeginFadeToGame(win32_fader *Fader)
-{
-	Fader->State = Win32Fade_FadingIn;
-	Fader->Alpha = 0.0f;
-}
-
-internal void
-BeginFadeToDesktop(win32_fader *Fader)
-{
-	if (Fader->State == Win32Fade_Inactive)
-	{
-		Fader->State = Win32Fade_FadingGame;
-		Fader->Alpha = 0.0f;
-	}
-}
-
-internal win32_fader_state
-UpdateFade(win32_fader *Fader, r32 dt, HWND GameWindow)
-{
-	switch(Fader->State)
-	{
-		case Win32Fade_FadingIn:
-		{
-			Fader->Alpha += dt;
-			if (Fader->Alpha >= 1.0f)
-			{
-				SetFadeAlpha(Fader->Window, 1.0f);
-				ShowWindow(GameWindow, SW_SHOW);
-				InvalidateRect(GameWindow, 0, TRUE);
-				UpdateWindow(GameWindow);
-
-				Fader->State = Win32Fade_WaitingForShow;
-			}
-			else
-			{
-				SetFadeAlpha(Fader->Window, Fader->Alpha);
-				Fader->Alpha += dt;
-			}
-		} break;
-		case Win32Fade_WaitingForShow:
-		{
-			SetFadeAlpha(Fader->Window, 0.0f);
-			Fader->State = Win32Fade_Inactive;
-		} break;
-		case Win32Fade_Inactive:
-		{
-			// NOTE: Nothing to do
-		} break;
-		case Win32Fade_FadingGame:
-		{
-			if (Fader->Alpha >= 1.0f)
-			{
-				SetFadeAlpha(Fader->Window, 1.0f);
-				ShowWindow(GameWindow, SW_HIDE);
-				Fader->State = Win32Fade_FadingOut;
-			}
-			else
-			{
-				SetFadeAlpha(Fader->Window, Fader->Alpha);
-				Fader->Alpha += dt;
-			}
-		} break;
-		case Win32Fade_FadingOut:
-		{
-			Fader->Alpha -= dt;
-			if (Fader->Alpha <= 0.0f)
-			{
-				SetFadeAlpha(Fader->Window, 0.0f);
-				Fader->State = Win32Fade_WaitingForClose;
-			}
-			else
-			{
-				SetFadeAlpha(Fader->Window, Fader->Alpha);
-			}
-		} break;
-		case Win32Fade_WaitingForClose:
-		{
-			// NOTE: Nothing to do
-		} break;
-		default:
-		{
-			Assert(!"Unrecongized fader state!")
-		} break;
-	}
-
-	return(Fader->State);
-}
-
 int CALLBACK 
 WinMain(
 	HINSTANCE Instance,
@@ -1885,9 +1739,6 @@ WinMain(
 	bool32 SleepIsGranular = (timeBeginPeriod(DesiredShedulerMS) == TIMERR_NOERROR);
 
 	Win32LoadXInput();
-
-	win32_fader Fader;
-	InitFader(&Fader, Instance);
 
 #if 1
 	DEBUGGlobalShowCursor = true;
@@ -1999,6 +1850,9 @@ WinMain(
 			GameMemory.PermanentStorageSize = Megabytes(15);
 			GameMemory.TransientStorageSize = Megabytes(256);
 			GameMemory.DebugStorageSize = Megabytes(256);
+#if HANDMADE_INTERNAL
+			GameMemory.DebugTable = GlobalDebugTable;
+#endif
 			GameMemory.HighPriorityQueue = &HighPriorityQueue;
 			GameMemory.LowPriorityQueue = &LowPriorityQueue;
 			GameMemory.PlatformAPI.AddEntry = Win32AddEntry;
@@ -2013,8 +1867,8 @@ WinMain(
 			GameMemory.PlatformAPI.AllocateMemory = Win32AllocateMemory;
 			GameMemory.PlatformAPI.DeallocateMemory = Win32DeallocateMemory;
 
-			GameMemory.PlatformAPI.AllocateTexture = Win32AllocateTexture;
-			GameMemory.PlatformAPI.DeallocateTexture = Win32DeallocateTexture;
+			GameMemory.PlatformAPI.AllocateTexture = AllocateTexture;
+			GameMemory.PlatformAPI.DeallocateTexture = DeallocateTexture;
 
 #if HANDMADE_INTERNAL
 			GameMemory.PlatformAPI.DEBUGFreeFileMemory = DEBUGPlatformFreeFileMemory;
@@ -2102,6 +1956,7 @@ WinMain(
 					TempGameCodeDLLFullPath,
 					GameCodeLockFullPath);
 
+				ShowWindow(Window, SW_SHOW);
 				while (GlobalRunning)
 				{
 					{DEBUG_DATA_BLOCK("Platform/Controls");
@@ -2115,11 +1970,6 @@ WinMain(
 
 					BEGIN_BLOCK("Executable Refesh");
 					NewInput->dtForFrame = TargetSecondPerFrame;
-
-					if (UpdateFade(&Fader, NewInput->dtForFrame, Window) == Win32Fade_WaitingForClose)
-					{
-						GlobalRunning = false;
-					}
 
 					GameMemory.ExecutableReloaded = false;
 					FILETIME NewDLLWriteTime = Win32GetLastWriteTime(SourceGameCodeDLLFullPath);
@@ -2375,7 +2225,7 @@ WinMain(
 							Game.UpdateAndRender(&GameMemory, NewInput, &RenderCommands);
 							if (NewInput->QuitRequested)
 							{
-								BeginFadeToDesktop(&Fader);
+								GlobalRunning = false;
 							}
 						}
 					}
@@ -2526,9 +2376,15 @@ WinMain(
 
 					if (Game.DEBUGFrameEnd)
 					{
-						GlobalDebugTable = Game.DEBUGFrameEnd(&GameMemory, NewInput, &RenderCommands);
+						Game.DEBUGFrameEnd(&GameMemory, NewInput, &RenderCommands);
 					}
-					GlobalDebugTable_.EventArrayIndex_EventIndex = 0;
+					else
+					{
+						// NOTE: if for some reason the game didn't load,
+						// make sure we clear the debug event array so it doesn't
+						// pile up on itself
+						GlobalDebugTable_.EventArrayIndex_EventIndex = 0;
+					}
 
 					END_BLOCK();
 #endif

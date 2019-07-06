@@ -4,7 +4,6 @@
 #include "handmade_config.h"
 #include "handmade_shared.h"
 #include "handmade_file_format.h"
-#include "handmade_meta.h"
 #include "handmade_random.h"
 #include "handmade_cutscene.h"
 
@@ -209,6 +208,21 @@ PushString(memory_arena *Arena, char *Source)
 	{
 		Dest[CharIndex] = Source[CharIndex];
 	}
+
+	return(Dest);
+}
+
+inline char *
+PushAndNullTerminate(memory_arena *Arena, u32 Length, char *Source)
+{
+	char *Dest = (char *)PushSize_(Arena, Length + 1, NoClear());
+	for (u32 CharIndex = 0;
+		CharIndex < Length;
+		++CharIndex)
+	{
+		Dest[CharIndex] = Source[CharIndex];
+	}
+	Dest[Length] = 0;
 
 	return(Dest);
 }

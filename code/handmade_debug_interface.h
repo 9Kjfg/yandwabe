@@ -3,7 +3,7 @@
 #define DEBUG_MAX_VARIABLE_STACK_DEPTH 64
 
 struct debug_table;
-#define DEBUG_GAME_FRAME_END(name) debug_table* name(game_memory *Memory, game_input *Input, game_render_commands *RenderCommands)
+#define DEBUG_GAME_FRAME_END(name) void name(game_memory *Memory, game_input *Input, game_render_commands *RenderCommands)
 typedef DEBUG_GAME_FRAME_END(debug_game_frame_end);
 
 struct debug_id
