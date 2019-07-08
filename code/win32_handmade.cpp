@@ -1710,6 +1710,8 @@ WinMain(
 	LPSTR commandLine,
 	int ShowCode)
 {
+	DEBUGSetEventRecording(true);
+	
 	win32_state Win32State = {};
 
 	u32 ID = GetCurrentThreadId();
@@ -1968,29 +1970,7 @@ WinMain(
 					//
 					//
 
-					BEGIN_BLOCK("Executable Refesh");
 					NewInput->dtForFrame = TargetSecondPerFrame;
-
-					GameMemory.ExecutableReloaded = false;
-					FILETIME NewDLLWriteTime = Win32GetLastWriteTime(SourceGameCodeDLLFullPath);
-					if (CompareFileTime(&NewDLLWriteTime, &Game.DLLLastWriteTime) != 0)
-					{
-						Win32CompleteAllWork(&HighPriorityQueue);
-						Win32CompleteAllWork(&LowPriorityQueue);
-
-#if HANDMADE_INTERNAL
-						GlobalDebugTable = &GlobalDebugTable_;
-#endif
-						Win32UnloadGameCode(&Game);
-						Game = Win32LoadGameCode(
-							SourceGameCodeDLLFullPath,
-							TempGameCodeDLLFullPath,
-							GameCodeLockFullPath);
-						
-						GameMemory.ExecutableReloaded = true;
-					}
-
-					END_BLOCK();
 
 					//
 					//
@@ -2374,6 +2354,20 @@ WinMain(
 #if HANDMADE_INTERNAL
 					BEGIN_BLOCK("Debug Collating")
 
+					FILETIME NewDLLWriteTime = Win32GetLastWriteTime(SourceGameCodeDLLFullPath);
+					b32 ExecutableNeedsToBeReloaded =
+						(CompareFileTime(&NewDLLWriteTime, &Game.DLLLastWriteTime) != 0);
+
+					GameMemory.ExecutableReloaded = false;
+
+					if (ExecutableNeedsToBeReloaded)
+					{
+						Win32CompleteAllWork(&HighPriorityQueue);
+						Win32CompleteAllWork(&LowPriorityQueue);
+						DEBUGSetEventRecording(false);
+					}
+
+
 					if (Game.DEBUGFrameEnd)
 					{
 						Game.DEBUGFrameEnd(&GameMemory, NewInput, &RenderCommands);
@@ -2385,6 +2379,26 @@ WinMain(
 						// pile up on itself
 						GlobalDebugTable_.EventArrayIndex_EventIndex = 0;
 					}
+	
+					if (ExecutableNeedsToBeReloaded)
+					{
+						Win32UnloadGameCode(&Game);
+
+						for (u32 LoadTryIndex = 0;
+							Game.IsValid && LoadTryIndex < 100;
+							++LoadTryIndex)
+						{
+							Game = Win32LoadGameCode(
+								SourceGameCodeDLLFullPath,
+								TempGameCodeDLLFullPath,
+								GameCodeLockFullPath);
+							Sleep(100);
+						}
+
+						GameMemory.ExecutableReloaded = true;
+						DEBUGSetEventRecording(Game.IsValid);
+					}
+
 
 					END_BLOCK();
 #endif

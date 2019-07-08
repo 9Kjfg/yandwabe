@@ -71,6 +71,7 @@ struct debug_event
 struct debug_table
 {
 	debug_event EditEvent;
+	u32 RecordIncrement;
 
     // TODO: No attempt is currently made to ensure that the final
     // debug records being writen to the event array actually complete
@@ -88,8 +89,10 @@ extern debug_table *GlobalDebugTable;
 #define UniqueFileCounterString_(A, B, C, D) UniqueFileCounterString__(A, B, C, D)
 #define DEBUG_NAME(Name) UniqueFileCounterString_(__FILE__, __LINE__, __COUNTER__, Name)
 
+#define DEBUGSetEventRecording(Enabled) (GlobalDebugTable->RecordIncrement = (Enabled) ? 1 : 0)
+
 #define RecordDebugEvent(EventType, GUIDInit) \
-	u64 ArrayIndex_EventIndex = AtomicAddU64(&GlobalDebugTable->EventArrayIndex_EventIndex, 1); \
+	u64 ArrayIndex_EventIndex = AtomicAddU64(&GlobalDebugTable->EventArrayIndex_EventIndex, GlobalDebugTable->RecordIncrement); \
 	u32 EventIndex = ArrayIndex_EventIndex & 0xFFFFFFFF; \
 	Assert(EventIndex < ArrayCount(GlobalDebugTable->Events[0])); \
 	debug_event *Event = GlobalDebugTable->Events[ArrayIndex_EventIndex >> 32] + EventIndex; \
