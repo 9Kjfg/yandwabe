@@ -60,7 +60,9 @@ OpenGLGetInfo(b32 ModerContext)
 
         if (StringAreEqual(Count, At, "GL_EXT_texture_sRGB")) {Result.GL_EXT_texture_sRGB = true;}
         if (StringAreEqual(Count, At, "GL_EXT_framebuffer_sRGB")) {Result.GL_EXT_framebuffer_sRGB = true;}
-
+        if (StringAreEqual(Count, At, "GL_ARB_framebuffer_sRGB")) {Result.GL_EXT_framebuffer_sRGB = true;}
+        // TODO: Is there some kind of ARB string to look for that indicates GL_EXT_texture_sRGB
+        
         At = End;
     }
 
@@ -68,22 +70,20 @@ OpenGLGetInfo(b32 ModerContext)
 }
 
 internal void
-OpenGLInit(b32 ModerContext)
+OpenGLInit(b32 ModerContext, b32 FramebufferSupportsSRGB)
 {
     opengl_info Info = OpenGLGetInfo(ModerContext);
 
+    // NOTE: If we believe we can do full sRGB on the texture side
+    // and the frambuffer side, then we can enable it, otherwise it is
+    // safe for us to pass it straight through
     OpenGLDefaultInternalTextureFormat = GL_RGB8;
-    if (Info.GL_EXT_texture_sRGB)
+    if (FramebufferSupportsSRGB && Info.GL_EXT_texture_sRGB &&
+        Info.GL_EXT_framebuffer_sRGB)
     {
         OpenGLDefaultInternalTextureFormat = GL_SRGB8_ALPHA8;
-    }
-
-    // TODO: Need to go back and use extended varsion of choose pixel format
-    // to ensure that out framebuffer is marked ad SRGB
-    if (Info.GL_EXT_framebuffer_sRGB)
-    {
         glEnable(GL_FRAMEBUFFER_SRGB);
-    }    
+    }
 }
 
 inline void
@@ -106,29 +106,29 @@ OpenGLSetScreenSpace(s32 Width, s32 Height)
 }
 
 inline void
-OpenGLRectangle(v2 MinP, v2 MaxP, v4 Color)
+OpenGLRectangle(v2 MinP, v2 MaxP, v4 Color, v2 MinUV = V2(0, 0), v2 MaxUV = V2(1, 1))
 {
     glBegin(GL_TRIANGLES);
 
     glColor4f(Color.r, Color.g, Color.b, Color.a);
 
-    glTexCoord2f(0.0f, 0.0f);
+    glTexCoord2f(MinUV.x, MinUV.y);
     glVertex2f(MinP.x, MinP.y);
 
-    glTexCoord2f(1.0f, 0.0f);
+    glTexCoord2f(MaxUV.x, MinUV.y);
     glVertex2f(MaxP.x, MinP.y);
 
-    glTexCoord2f(1.0f, 1.0f);
+    glTexCoord2f(MaxUV.x, MaxUV.y);
     glVertex2f(MaxP.x, MaxP.y);
     
     // NOTE: Upper triangle
-    glTexCoord2f(0.0f, 0.0f);
+    glTexCoord2f(MinUV.x, MinUV.y);
     glVertex2f(MinP.x, MinP.y);
 
-    glTexCoord2f(1.0f, 1.0f);
+    glTexCoord2f(MaxUV.x, MaxUV.y);
     glVertex2f(MaxP.x, MaxP.y);
 
-    glTexCoord2f(0.0f, 1.0f);
+    glTexCoord2f(MinUV.x, MaxUV.y);
     glVertex2f(MinP.x, MaxP.y);
 
     glEnd();
@@ -215,14 +215,21 @@ OpenGLRenderCommands(game_render_commands *Commands, s32 WindowWidth, s32 Window
                 render_entry_bitmap *Entry = (render_entry_bitmap *)Data;
 				Assert(Entry->Bitmap);
 
-                v2 XAxis = {1.0f, 0.0f};
-                v2 YAxis = {0.0f, 1.0f};
-                v2 MinP = Entry->P;
-                v2 MaxP = MinP + Entry->Size.x*XAxis + Entry->Size.y*YAxis;
+                if (Entry->Bitmap->Width && Entry->Bitmap->Height)
+                {
+                    v2 XAxis = {1.0f, 0.0f};
+                    v2 YAxis = {0.0f, 1.0f};
+                    v2 MinP = Entry->P;
+                    v2 MaxP = MinP + Entry->Size.x*XAxis + Entry->Size.y*YAxis;
 
-                // TODO: Hold the frame if we are not ready with the textrure
-                glBindTexture(GL_TEXTURE_2D, (GLuint)Entry->Bitmap->TextureHandle);
-                OpenGLRectangle(MinP, MaxP, Entry->Color);
+                    // TODO: Hold the frame if we are not ready with the textrure
+                    glBindTexture(GL_TEXTURE_2D, (GLuint)Entry->Bitmap->TextureHandle);
+                    r32 OneTexelU = 1.0f / (r32)Entry->Bitmap->Width;
+                    r32 OneTexelV = 1.0f / (r32)Entry->Bitmap->Height;
+                    v2 MinUV = V2(OneTexelU, OneTexelV);
+                    v2 MaxUV = V2(1.0f - OneTexelU, 1.0f - OneTexelV);
+                    OpenGLRectangle(MinP, MaxP, Entry->Color, MinUV, MaxUV);
+                }
             } break;
 
             case RenderGroupEntryType_render_entry_rectangle:

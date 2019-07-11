@@ -473,12 +473,12 @@ DrawProfileIn(debug_state *DebugState, rectangle2 ProfileRect, v2 MouseP,
 		r32 ThisMinX = ProfileRect.Min.x + Scale*(r32)(Node->ParentRelativeClock);
 		r32 ThisMaxX = ThisMinX + Scale*(r32)(Node->Duration);
 		
-		u32 LaneIndex = 0;
+		u32 LaneIndex = Node->ThreadOrdinal;
 		rectangle2 RegionRect = RectMinMax(
 			V2(ThisMinX, ProfileRect.Max.y - LaneHeight*(LaneIndex + 1)),
 			V2(ThisMaxX, ProfileRect.Max.y - LaneHeight*(LaneIndex + 0)));
 
-		PushRect(&DebugState->RenderGroup, DebugState->BackingTransform, RegionRect, 0.0f, V4(Color, 1));
+		PushRect(&DebugState->RenderGroup, DebugState->UITransform, RegionRect, 0.0f, V4(Color, 1));
 
 		if (IsInRectangle(RegionRect, MouseP))
 		{
@@ -1897,11 +1897,13 @@ DEBUGStart(debug_state *DebugState, game_render_commands *Commands, game_assets 
 
 	DebugState->TextTransform = DefaultFlatTransform();
 	DebugState->ShadowTransform = DefaultFlatTransform();
+	DebugState->UITransform = DefaultFlatTransform();
 	DebugState->BackingTransform = DefaultFlatTransform();
 
 	DebugState->BackingTransform.SortBias = 100000.0f;
 	DebugState->ShadowTransform.SortBias = 200000.0f;
-	DebugState->TextTransform.SortBias = 300000.0f;
+	DebugState->UITransform.SortBias = 300000.0f;
+	DebugState->TextTransform.SortBias = 400000.0f;
 }
 
 internal void

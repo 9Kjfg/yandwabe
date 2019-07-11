@@ -553,7 +553,7 @@ Win32LoadWGLExtension(void)
 			wglCreateContextAttribsARB = 
 				(wgl_create_context_attribs_arb *)wglGetProcAddress("wglCreateContextAttribsARB");
 			wglSwapIntervalEXT = (wgl_swap_interval_ext *)wglGetProcAddress("wglSwapIntervalEXT");
-			wglGetExtensionStringEXT = (wgl_get_extension_string_ext *)wglGetProcAddress("wglGetExtensionStringEXT");
+			wglGetExtensionStringEXT = (wgl_get_extension_string_ext *)wglGetProcAddress("wglGetExtensionsStringARB");
 
 			if (wglGetExtensionStringEXT)
 			{
@@ -603,7 +603,7 @@ Win32InitOpenGL(HDC WindowDC)
 
 	if (wglMakeCurrent(WindowDC, OpenGLRC))
 	{
-		OpenGLInit(ModernContext);
+		OpenGLInit(ModernContext, OpenGLSupportsSRGBFramebuffer);
 		if (wglSwapIntervalEXT)
 		{
 			wglSwapIntervalEXT(1);
