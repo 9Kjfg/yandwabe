@@ -243,6 +243,13 @@ PushRectOutline(render_group *Group, object_transform ObjectTransform,
 }
 
 inline void
+PushRectOutline(render_group *Group, object_transform ObjectTransform,
+	rectangle2 Rectangle, r32 Z, v4 Color = V4(1, 1, 1, 1), r32 Thickness = 0.1f)
+{
+	PushRectOutline(Group, ObjectTransform, V3(GetCenter(Rectangle), Z), GetDim(Rectangle), Color, Thickness);
+}
+
+inline void
 Clear(render_group *Group, v4 Color)
 {
 	render_entry_clear *Entry = PushRenderElement(Group, render_entry_clear, Real32Minimum);

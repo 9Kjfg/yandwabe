@@ -4,6 +4,90 @@
 
 #include "handmade_debug.h"
 
+struct debug_parsed_name
+{
+	u32 HashValue;
+	u32 FileNameCount;
+	u32 NameStartsAt;
+	u32 LineNumber;
+
+	u32 NameLength;
+	char *Name;
+};
+
+inline debug_parsed_name
+DebugParseName(char *GUID)
+{
+	debug_parsed_name Result = {};
+	
+	u32 PipeCount = 0;
+	char *Scan = GUID;
+	for (;
+		*Scan;
+		++Scan)
+	{
+		if (*Scan == '|')
+		{
+			if (PipeCount == 0)
+			{
+				Result.FileNameCount = (u32)(Scan - GUID);
+				Result.LineNumber = atoi(Scan + 1);
+			}
+			else if (PipeCount == 1)
+			{
+			}
+			else
+			{
+				Result.NameStartsAt = (u32)(Scan - GUID + 1);
+			}
+			++PipeCount;
+		}
+
+		// TODO: Better hash function
+		Result.HashValue = 65599*Result.HashValue + *Scan;
+	}
+
+	Result.NameLength = (u32)(Scan - GUID) - Result.NameStartsAt;
+	Result.Name = GUID + Result.NameStartsAt;
+
+	return(Result);
+}
+
+inline debug_element *
+GetElementFromGUID(debug_state *DebugState, u32 Index, char *GUID)
+{
+	debug_element *Result = 0;
+
+	for (debug_element *Chain = DebugState->ElementHash[Index];
+		Chain;
+		Chain = Chain->NextInHash)
+	{
+		if (StringAreEqual(Chain->GUID, GUID))
+		{
+			Result = Chain;
+			break;
+		}
+	}
+
+	return(Result);
+}
+
+inline debug_element *
+GetElementFromGUID(debug_state *DebugState, char *GUID)
+{
+	debug_element *Result = 0;
+
+	if (GUID)
+	{
+		debug_parsed_name ParsedName = DebugParseName(GUID);
+		u32 Index = ParsedName.HashValue % ArrayCount(DebugState->ElementHash);
+
+		Result = GetElementFromGUID(DebugState, Index, GUID);
+	}
+
+	return(Result);
+}
+
 inline b32
 DebugIDsAreEqual(debug_id A, debug_id B)
 {
@@ -212,6 +296,13 @@ DEBUGGetTextSize(debug_state *DebugState, char *String)
 	return(Result);
 }
 
+inline r32
+GetLineAdvance(debug_state *DebugState)
+{
+	r32 Result = GetLineAdvanceFor(DebugState->DebugFontInfo)*DebugState->FontScale;
+	return(Result);
+}
+
 internal void
 DEBUGTextLine(char *String)
 {
@@ -220,16 +311,10 @@ DEBUGTextLine(char *String)
 	{
 		render_group *RenderGroup = &DebugState->RenderGroup;
 		
-		loaded_font *Font = PushFont(RenderGroup, DebugState->FontID);
-		if (Font)
-		{
-			hha_font *Info = GetFontInfo(RenderGroup->Assets, DebugState->FontID);
+		DEBUGTextOutAt(V2(DebugState->LeftEdge,
+			DebugState->AtY - DebugState->FontScale*GetStartingBaselineY(DebugState->DebugFontInfo)), String);
 
-			DEBUGTextOutAt(V2(DebugState->LeftEdge,
-				DebugState->AtY - DebugState->FontScale*GetStartingBaselineY(DebugState->DebugFontInfo)), String);
-
-			DebugState->AtY -= GetLineAdvanceFor(Info)*DebugState->FontScale;
-		}
+		DebugState->AtY -= GetLineAdvance(DebugState);
 	}
 }
 
@@ -420,77 +505,6 @@ struct debug_variable_iterator
 	debug_variable_link *Link;
 	debug_variable_link *Sentinel;
 };
-
-internal void
-DrawProfileIn(debug_state *DebugState, rectangle2 ProfileRect, v2 MouseP,
-	debug_stored_event *RootEvent)
-{
-	debug_profile_node *RootNode = &RootEvent->ProfileNode;
-	object_transform NoTransform = DefaultFlatTransform();
-	PushRect(&DebugState->RenderGroup, DebugState->BackingTransform, ProfileRect, 0.0f, V4(0, 0, 0, 0.25f));
-
-	r32 FrameSpan = (r32)(RootNode->Duration);
-	r32 PixelSpan = GetDim(ProfileRect).x;
-
-	r32 Scale = 0.0f;
-	if (FrameSpan > 0)
-	{
-		Scale = PixelSpan / FrameSpan;
-	}
-
-	u32 LaneCount = DebugState->FrameBarLaneCount;
-	r32 LaneHeight = 0.0f;
-	if (LaneCount > 0)
-	{
-		LaneHeight = GetDim(ProfileRect).y / (r32)LaneCount;
-	}
-
-	v3 Colors[]
-	{
-		{1, 0, 0},
-		{0, 1, 0},
-		{0, 0, 1},
-		{1, 1, 0},
-		{0, 1, 1},
-		{1, 0, 1},
-		{1, 0.5f, 0},
-		{0, 1, 0.5f},
-		{0.5f, 1, 0},
-		{0, 1, 0.5f},
-		{0.5f, 0, 1},
-		//{0, 0.5f, 1},
-	};
-
-	for (debug_stored_event *StoredEvent = RootNode->FirstChild;
-		StoredEvent;
-		StoredEvent = StoredEvent->ProfileNode.NextSameParent)
-	{
-		debug_profile_node *Node = &StoredEvent->ProfileNode;
-		debug_element *Element = Node->Element;
-		Assert(Element);
-
-		v3 Color = Colors[U32FromPointer(Element->GUID) % ArrayCount(Colors)];
-		r32 ThisMinX = ProfileRect.Min.x + Scale*(r32)(Node->ParentRelativeClock);
-		r32 ThisMaxX = ThisMinX + Scale*(r32)(Node->Duration);
-		
-		u32 LaneIndex = Node->ThreadOrdinal;
-		rectangle2 RegionRect = RectMinMax(
-			V2(ThisMinX, ProfileRect.Max.y - LaneHeight*(LaneIndex + 1)),
-			V2(ThisMaxX, ProfileRect.Max.y - LaneHeight*(LaneIndex + 0)));
-
-		PushRect(&DebugState->RenderGroup, DebugState->UITransform, RegionRect, 0.0f, V4(Color, 1));
-
-		if (IsInRectangle(RegionRect, MouseP))
-		{
-			char TextBuffer[256];
-			_snprintf_s(TextBuffer, sizeof(TextBuffer),
-				"%s: %10ucy",
-				Element->GUID, Node->Duration);
-			DEBUGTextOutAt(MouseP + V2(0, 10), TextBuffer);
-			//HotRecord = Record;
-		}
-	}
-}
 
 inline b32
 InteractionsAreEqual(debug_interaction A, debug_interaction B)
@@ -770,6 +784,96 @@ DEBUG_REQUESTED(debug_id ID)
 }
 
 internal void
+DrawProfileBars(debug_state *DebugState, debug_id GraphID, rectangle2 ProfileRect, v2 MouseP,
+	debug_profile_node *RootNode, r32 LaneStride, r32 LaneHeight)
+{
+	r32 FrameSpan = (r32)(RootNode->Duration);
+	r32 PixelSpan = GetDim(ProfileRect).x;
+
+	r32 Scale = 0.0f;
+	if (FrameSpan > 0)
+	{
+		Scale = PixelSpan / FrameSpan;
+	}
+
+	v3 Colors[]
+	{
+		{1, 0, 0},
+		{0, 1, 0},
+		{0, 0, 1},
+		{1, 1, 0},
+		{0, 1, 1},
+		{1, 0, 1},
+		{1, 0.5f, 0},
+		{0, 1, 0.5f},
+		{0.5f, 1, 0},
+		{0, 1, 0.5f},
+		{0.5f, 0, 1},
+		//{0, 0.5f, 1},
+	};
+
+	for (debug_stored_event *StoredEvent = RootNode->FirstChild;
+		StoredEvent;
+		StoredEvent = StoredEvent->ProfileNode.NextSameParent)
+	{
+		debug_profile_node *Node = &StoredEvent->ProfileNode;
+		debug_element *Element = Node->Element;
+		Assert(Element);
+
+		v3 Color = Colors[U32FromPointer(Element->GUID) % ArrayCount(Colors)];
+		r32 ThisMinX = ProfileRect.Min.x + Scale*(r32)(Node->ParentRelativeClock);
+		r32 ThisMaxX = ThisMinX + Scale*(r32)(Node->Duration);
+		
+		u32 LaneIndex = Node->ThreadOrdinal;
+		r32 LaneY = ProfileRect.Max.y - LaneStride*LaneIndex;
+		rectangle2 RegionRect = RectMinMax(
+			V2(ThisMinX, LaneY - LaneHeight),
+			V2(ThisMaxX, LaneY));
+
+		PushRectOutline(&DebugState->RenderGroup, DebugState->UITransform, RegionRect,
+			0.0f, V4(Color, 1), 2.0f);
+
+		if (IsInRectangle(RegionRect, MouseP))
+		{
+			char TextBuffer[256];
+			_snprintf_s(TextBuffer, sizeof(TextBuffer),
+				"%s: %10ucy",
+				Element->GUID, Node->Duration);
+			DEBUGTextOutAt(MouseP + V2(0, DebugState->MouseTextStackY), TextBuffer);
+			DebugState->MouseTextStackY -= GetLineAdvance(DebugState);
+	
+			debug_interaction ZoomInteraction = {};
+			ZoomInteraction.ID = GraphID;
+			ZoomInteraction.Type = DebugInteraction_SetProfileGraphRoot;
+			ZoomInteraction.Element = Element;
+			DebugState->NextHotInteraction = ZoomInteraction;
+		}
+
+		DrawProfileBars(DebugState, GraphID, RegionRect, MouseP, Node, 0, LaneHeight / 2);
+	}
+}
+
+internal void
+DrawProfileIn(debug_state *DebugState, debug_id GraphID, rectangle2 ProfileRect, v2 MouseP,
+	debug_stored_event *RootEvent)
+{
+	DebugState->MouseTextStackY = 10.0f;
+
+	debug_profile_node *RootNode = &RootEvent->ProfileNode;
+	object_transform NoTransform = DefaultFlatTransform();
+	PushRect(&DebugState->RenderGroup, DebugState->BackingTransform, ProfileRect, 0.0f, V4(0, 0, 0, 0.25f));
+
+	u32 LaneCount = DebugState->FrameBarLaneCount;
+	r32 LaneHeight = 0.0f;
+	if (LaneCount > 0)
+	{
+		LaneHeight = GetDim(ProfileRect).y / (r32)LaneCount;
+	}
+
+	DrawProfileBars(DebugState, GraphID, ProfileRect, MouseP, RootNode, LaneHeight, LaneHeight);
+}
+
+internal void
 DEBUGDrawElement(layout *Layout, debug_tree *Tree, debug_element *Element, debug_id DebugID)
 {
 	object_transform NoTransform = DefaultFlatTransform();
@@ -812,18 +916,42 @@ DEBUGDrawElement(layout *Layout, debug_tree *Tree, debug_element *Element, debug
 
 			case DebugType_ThreadIntervalGraph:
 			{
-				layout_element Element_ = BeginElementRectangle(Layout, &View->InlineBlock.Dim);
+				layout_element Element_ = BeginElementRectangle(Layout, &View->ProfileGraph.Block.Dim);
 				MakeElementSizable(&Element_);
 				//DefaultInteraction(&Element, ItemInteraction);
 				EndElement(&Element_);
 
+				debug_stored_event *RootNode = 0;
+
+				// TODO: Need to figure out how we're going to get specific frames
+				// less slowly than linear search?
 				debug_frame *Frame = DebugState->MostRecentFrame;
-				if (Frame && Frame->RootProfileNode)
-				{
-					DrawProfileIn(DebugState, Element_.Bounds, Layout->MouseP,
-						Frame->RootProfileNode);
+				if (Frame)
+				{	
+					debug_element *ViewingElement = GetElementFromGUID(DebugState, View->ProfileGraph.GUID);
+					if (ViewingElement)
+					{
+						for (debug_stored_event *Search = ViewingElement->OldestEvent;
+							Search;
+							Search = Search->Next)
+						{
+							if (Search->FrameIndex == Frame->FrameIndex)
+							{
+								RootNode = Search;
+							}
+						}
+					}
+
+					if (!RootNode)
+					{
+						RootNode = Frame->RootProfileNode;
+					}
 				}
-				
+
+				if (RootNode)
+				{
+					DrawProfileIn(DebugState, DebugID, Element_.Bounds, Layout->MouseP, RootNode);
+				}
 			} break;
 
 			default:
@@ -1073,6 +1201,12 @@ DEBUGEndInteract(debug_state *DebugState, game_input *Input, v2 MouseP)
 		{
 			debug_view *View = GetOrCreateDebugViewFor(DebugState, DebugState->Interaction.ID);
 			View->Collapsible.ExpandedAlways = !View->Collapsible.ExpandedAlways;
+		} break;
+
+		case DebugInteraction_SetProfileGraphRoot:
+		{
+			debug_view *View = GetOrCreateDebugViewFor(DebugState, DebugState->Interaction.ID);
+			View->ProfileGraph.GUID = DebugState->Interaction.Element->GUID;
 		} break;
 
 		case DebugInteraction_ToggleValue:
@@ -1521,74 +1655,6 @@ StoreEvent(debug_state *DebugState, debug_element *Element, debug_event *Event)
 	return(Result);
 }
 
-struct debug_parsed_name
-{
-	u32 HashValue;
-	u32 FileNameCount;
-	u32 NameStartsAt;
-	u32 LineNumber;
-
-	u32 NameLength;
-	char *Name;
-};
-
-inline debug_parsed_name
-DebugParseName(char *GUID)
-{
-	debug_parsed_name Result = {};
-	
-	u32 PipeCount = 0;
-	char *Scan = GUID;
-	for (;
-		*Scan;
-		++Scan)
-	{
-		if (*Scan == '|')
-		{
-			if (PipeCount == 0)
-			{
-				Result.FileNameCount = (u32)(Scan - GUID);
-				Result.LineNumber = atoi(Scan + 1);
-			}
-			else if (PipeCount == 1)
-			{
-			}
-			else
-			{
-				Result.NameStartsAt = (u32)(Scan - GUID + 1);
-			}
-			++PipeCount;
-		}
-
-		// TODO: Better hash function
-		Result.HashValue = 65599*Result.HashValue + *Scan;
-	}
-
-	Result.NameLength = (u32)(Scan - GUID) - Result.NameStartsAt;
-	Result.Name = GUID + Result.NameStartsAt;
-
-	return(Result);
-}
-
-inline debug_element *
-GetElementFromEvent(debug_state *DebugState, u32 Index, char *GUID)
-{
-	debug_element *Result = 0;
-
-	for (debug_element *Chain = DebugState->ElementHash[Index];
-		Chain;
-		Chain = Chain->NextInHash)
-	{
-		if (StringAreEqual(Chain->GUID, GUID))
-		{
-			Result = Chain;
-			break;
-		}
-	}
-
-	return(Result);
-}
-
 internal debug_element *
 GetElementFromEvent(debug_state *DebugState, debug_event *Event, debug_variable_group *Parent,
 	b32 CreateHierarchy)
@@ -1603,7 +1669,7 @@ GetElementFromEvent(debug_state *DebugState, debug_event *Event, debug_variable_
 	debug_parsed_name ParsedName = DebugParseName(Event->GUID);
 	u32 Index = ParsedName.HashValue % ArrayCount(DebugState->ElementHash);
 
-	debug_element *Result = GetElementFromEvent(DebugState, Index, Event->GUID);
+	debug_element *Result = GetElementFromGUID(DebugState, Index, Event->GUID);
 	if (!Result)
 	{
 		Result = PushStruct(&DebugState->DebugArena, debug_element);

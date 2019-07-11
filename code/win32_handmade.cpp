@@ -1819,7 +1819,7 @@ WinMain(
 			void *SortMemory = Win32AllocateMemory(CurrentSortMemorySize);
 
 			// TODO: Decide what out pushbuffer size is!
-			u32 PushBufferSize = Megabytes(4);
+			u32 PushBufferSize = Megabytes(10);
 			void *PushBuffer = Win32AllocateMemory(PushBufferSize);
 #if 0
 			while (GlobalRunning)

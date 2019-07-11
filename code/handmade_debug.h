@@ -20,6 +20,12 @@ struct debug_view_inline_block
     v2 Dim;
 };
 
+struct debug_view_profile_graph
+{
+    debug_view_inline_block Block;
+    char *GUID;
+};
+
 struct debug_view_collapsible
 {
     b32 ExpandedAlways;
@@ -44,6 +50,7 @@ struct debug_view
     union
     {
         debug_view_inline_block InlineBlock;
+        debug_view_profile_graph ProfileGraph;
         debug_view_collapsible Collapsible;
     };
 };
@@ -247,7 +254,7 @@ enum debug_interaction_type
 
     DebugInteraction_Select,
 
-
+    DebugInteraction_SetProfileGraphRoot,
 };
 
 struct debug_interaction
@@ -308,6 +315,8 @@ struct debug_state
     font_id FontID;
     r32 GlobalWidth;
     r32 GlobalHeight;
+
+    r32 MouseTextStackY;
 
     char *ScopeToRecord;
 
