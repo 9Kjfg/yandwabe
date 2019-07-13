@@ -1,5 +1,7 @@
 #if !defined(HANDMADE_DEBUG_H)
 
+#define DEBUG_FRAME_COUNT 256
+
 enum debug_variable_to_text_flag
 {
     DEBUGVarToText_AddDebugUI = 0x1,
@@ -91,6 +93,13 @@ struct debug_string
     char *Value;
 };
 
+struct debug_element_frame
+{
+    u64 TotalClocks;
+    debug_stored_event *OldestEvent;
+    debug_stored_event *MostRecentEvent;
+};
+
 struct debug_element
 {
     char *OriginalGUID; // NOTE: Can never be printed! Might point into unloaded DLL.
@@ -102,10 +111,9 @@ struct debug_element
 
     b32 ValueWasEdited;
 
-    debug_element *NextInHash;
+    debug_element_frame Frames[DEBUG_FRAME_COUNT];
 
-    debug_stored_event *OldestEvent;
-    debug_stored_event *MostRecentEvent;
+    debug_element *NextInHash;
 };
 
 inline char *GetName(debug_element *Element) {char *Result = Element->GUID + Element->NameStartsAt; return(Result);}
@@ -168,28 +176,10 @@ struct debug_counter_state
     int LineNumber;
 };
 
-struct debug_frame_region
-{
-    // TODO: Do we want to copy these out in their entire
-    debug_event *Event;
-    u32 CycleCount;
-    u16 LaneIndex;
-    u16 ColorIndex;
-    r32 MinT;
-    r32 MaxT;
-};
-
 #define MAX_REGION_PER_FRAME (4096)
 struct debug_frame
 {
     // IMPORTANT: This actually gets freed as a set in FreeFrame
-
-    union
-    {
-        debug_frame *Next;
-        debug_frame *NextFree;
-    };
-    
     u64 BeginClock;
     u64 EndClock;
     r32 WallSecondsElapsed;
@@ -321,20 +311,18 @@ struct debug_state
     char *ScopeToRecord;
 
     u32 TotalFrameCount;
-    u32 FrameCount;
-    debug_frame *OldestFrame;
-    debug_frame *MostRecentFrame;
 
-    debug_frame *CollationFrame;
+    u32 MostRecentFrameOrdinal;
+    u32 CollationFrameOrdinal;
+    u32 OldestFrameOrdinal;
+    debug_frame Frames[DEBUG_FRAME_COUNT];
 
     u32 FrameBarLaneCount;
     debug_thread *FirstThread;
     debug_thread *FirstFreeThread;
     open_debug_block *FirstFreeBlock;
-    
-    // NOTE: Per-frame storage managment
+
     debug_stored_event *FirstFreeStoredEvent;
-    debug_frame *FirstFreeFrame;
 };
 
 internal debug_variable_group *CreateVariableGroup(debug_state *DebugState, u32 NameLength, char *Name);
