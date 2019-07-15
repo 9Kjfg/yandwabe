@@ -39,6 +39,9 @@ enum debug_type
 
 	DebugType_ThreadIntervalGraph,
     //DebugType_CounterFunctionList,
+	DebugType_LastFrameInfo,
+	DebugType_DebugMemoryInfo,
+	DebugType_FrameSlider,
 };
 
 struct debug_event
@@ -222,9 +225,9 @@ internal void DEBUGEditEventData(char *GUID, debug_event *Event);
 	Event->Type = DebugType_b32; \
 }
 
-#define DEBUG_THREAD_INTERVAL_GRAPH(FunctionName) \
+#define DEBUG_UI_ELEMENT(Type, Name) \
 { \
-	RecordDebugEvent(DebugType_ThreadIntervalGraph, DEBUG_NAME(#FunctionName)); \
+	RecordDebugEvent(Type, DEBUG_NAME(#Name)); \
 }
 
 #define DEBUG_BEGIN_ARRAY(...)
