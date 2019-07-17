@@ -87,11 +87,13 @@ struct debug_stored_event
     // TODO: Stall call attribution data here
 };
 
+/*
 struct debug_string
 {
     u32 Length;
     char *Value;
 };
+ */
 
 struct debug_element_frame
 {
@@ -117,7 +119,7 @@ struct debug_element
 };
 
 inline char *GetName(debug_element *Element) {char *Result = Element->GUID + Element->NameStartsAt; return(Result);}
-inline debug_string GetFileName(debug_element *Element) {debug_string Result = {Element->FileNameCount, Element->GUID}; return(Result);}
+//inline debug_string GetFileName(debug_element *Element) {debug_string Result = {Element->FileNameCount, Element->GUID}; return(Result);}
 
 struct debug_variable_group;
 struct debug_variable_link
@@ -155,12 +157,6 @@ struct game_assets;
 struct loaded_bitmap;
 struct loaded_font;
 struct hha_font;
-
-enum debug_text_op
-{
-    DEBUGTextOp_DrawText,
-    DEBUGTextOp_SizeText,
-};
 
 struct debug_counter_snapshot
 {
@@ -226,46 +222,7 @@ struct debug_thread
     };
 };
 
-enum debug_interaction_type
-{
-    DebugInteraction_None,
-
-    DebugInteraction_NOP,
-
-    DebugInteraction_AutoModifyVariable,
-
-	DebugInteraction_ToggleExpansion,
-    DebugInteraction_ToggleValue,
-    DebugInteraction_DragValue,
-    DebugInteraction_TearValue,
-
-    DebugInteraction_Resize,
-    DebugInteraction_Move,
-
-    DebugInteraction_Select,
-
-    DebugInteraction_SetProfileGraphRoot,
-    DebugInteraction_SetViewFrameOrdinal,
-
-    DebugInteraction_SetElementType,
-};
-
-struct debug_interaction
-{
-    debug_id ID;
-    debug_interaction_type Type;
-    debug_element *Element;
-
-    union
-    {
-        void *Generic;
-        u32 UInt32;
-        debug_tree *Tree;
-        debug_variable_link *Link;
-        debug_type DebugType;
-        v2 *P;
-    };
-};
+#include "handmade_debug_ui.h"
 
 struct debug_state
 {
@@ -335,34 +292,26 @@ struct debug_state
     debug_stored_event *FirstFreeStoredEvent;
 };
 
-struct layout
+struct debug_statistic
 {
-	debug_state *DebugState;
-	v2 MouseP;
-    v2 BaseCorner;
-	v2 At;
-	int Depth;
-	r32 LineAdvance;
-    r32 NextYDelta;
-    r32 SpacingX;
-	r32 SpacingY;
-    u32 NoLineFeed;
-};
-
-struct layout_element
-{
-	// NOTE: Storage
-	layout *Layout;
-	v2 *Dim;
-	v2 *Size;
-	debug_interaction Interaction;
-
-	// NOTE: Out
-	rectangle2 Bounds;
+	r64 Min;
+	r64 Max;
+	r64 Avg;
+	u32 Count;
 };
 
 internal debug_variable_group *CreateVariableGroup(debug_state *DebugState, u32 NameLength, char *Name);
 internal debug_variable_group *CloneVariableGroup(debug_state *DebugState, debug_variable_link *Source);
+
+inline b32
+DebugIDsAreEqual(debug_id A, debug_id B)
+{
+	b32 Result = 
+		((A.Value[0] == B.Value[0]) && 
+		(A.Value[1] == B.Value[1]));
+		
+	return(Result);
+}
 
 #define HANDMADE_DEBUG_H
 #endif
