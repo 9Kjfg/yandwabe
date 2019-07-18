@@ -87,14 +87,6 @@ struct debug_stored_event
     // TODO: Stall call attribution data here
 };
 
-/*
-struct debug_string
-{
-    u32 Length;
-    char *Value;
-};
- */
-
 struct debug_element_frame
 {
     debug_stored_event *OldestEvent;
@@ -296,6 +288,7 @@ struct debug_statistic
 {
 	r64 Min;
 	r64 Max;
+    r64 Sum;
 	r64 Avg;
 	u32 Count;
 };
@@ -312,6 +305,12 @@ DebugIDsAreEqual(debug_id A, debug_id B)
 		
 	return(Result);
 }
+
+enum debug_element_and_op
+{
+	DebugElement_AddToGroup = 0x1,
+	DebugElement_CreateHierarchy = 0x2,
+};
 
 #define HANDMADE_DEBUG_H
 #endif

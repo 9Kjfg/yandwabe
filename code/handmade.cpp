@@ -1,5 +1,6 @@
 
 #include "handmade.h"
+#include "handmade_sort.cpp"
 #include "handmade_render_group.cpp"
 #include "handmade_asset.cpp"
 #include "handmade_audio.cpp"
@@ -220,9 +221,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 #if HANDMADE_INTERNAL
 	GlobalDebugTable = Memory->DebugTable;
 	DebugGlobalMemory = Memory;
-	{DEBUG_DATA_BLOCK("Debug Control");
-		DEBUG_UI_ELEMENT(DebugType_FrameSlider, FrameSlider);
-	}
 
 	{DEBUG_DATA_BLOCK("Renderer");
 		DEBUG_B32(Global_Renderer_TestWierdDrawBufferSize);
@@ -251,9 +249,10 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		DEBUG_B32(Global_Simulation_UseSpaceOutlines);
 	}
 	{DEBUG_DATA_BLOCK("Profile");
+		DEBUG_UI_ELEMENT(DebugType_FrameSlider, FrameSlider);
 		DEBUG_UI_ELEMENT(DebugType_LastFrameInfo, LastFrame);
 		DEBUG_UI_ELEMENT(DebugType_DebugMemoryInfo, DebugMemory);
-		DEBUG_UI_ELEMENT(DebugType_ThreadIntervalGraph,GameUpdateAndRender);
+		DEBUG_UI_ELEMENT(DebugType_TopClocksList,GameUpdateAndRender);
 	}
 #endif
 

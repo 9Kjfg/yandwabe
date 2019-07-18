@@ -168,6 +168,13 @@ GetLineAdvance(debug_state *DebugState)
 	return(Result);
 }
 
+inline r32
+GetBaseLine(debug_state *DebugState)
+{
+	r32 Result = DebugState->FontScale*GetStartingBaselineY(DebugState->DebugFontInfo);
+	return(Result);
+}
+
 inline debug_interaction
 SetPointerInteraction(debug_id DebugID, void **Target, void *Value)
 {

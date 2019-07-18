@@ -1038,209 +1038,13 @@ DrawBitmap(
 	};
 }
 
-inline void
-Swap(tile_sort_entry *A, tile_sort_entry *B)
-{
-	tile_sort_entry Temp = *B;
-	*B = *A;
-	*A = Temp;
-}
-
-internal void
-MergeSort(u32 Count, tile_sort_entry *First, tile_sort_entry *Temp)
-{
-	if (Count == 1)
-	{
-		// NOTE: No work to do
-	}
-	else if (Count == 2)
-	{
-		tile_sort_entry *EntryA = First;
-		tile_sort_entry *EntryB = First + 1;
-		if (EntryA->SortKey > EntryB->SortKey)
-		{
-			Swap(EntryA, EntryB);
-		}
-	}
-	else
-	{
-		u32 Half0 = Count / 2;
-		u32 Half1 = Count - Half0;
-
-		Assert(Half0 >= 1);
-		Assert(Half1 >= 1);
-
-		tile_sort_entry *InHalf0 = First;
-		tile_sort_entry *InHalf1 = First + Half0;
-		tile_sort_entry *End = First + Count;
-
-		MergeSort(Half0, InHalf0, Temp);
-		MergeSort(Half1, InHalf1, Temp);
-
-		tile_sort_entry *ReadHalf0 = InHalf0;
-		tile_sort_entry *ReadHalf1 = InHalf1;
-		
-		tile_sort_entry *Out = Temp;
-		for (u32 Index = 0;
-			Index < Count;
-			++Index)
-		{
-			if (ReadHalf0 == InHalf1)
-			{
-				*Out++ = *ReadHalf1++;
-			}
-			else if (ReadHalf1 == End)
-			{
-				*Out++ = *ReadHalf0++;
-			}
-			else if (ReadHalf0->SortKey < ReadHalf1->SortKey)
-			{
-				*Out++ = *ReadHalf0++;
-			}
-			else
-			{
-				*Out++ = *ReadHalf1++;
-			}
-		}
-		Assert(Out == (Temp + Count));
-		Assert(ReadHalf0 == InHalf1);
-		Assert(ReadHalf1 == End);
-
-		for (u32 Index = 0;
-			Index < Count;
-			++Index)
-		{
-			First[Index] = Temp[Index];	
-		}
-
-#if 0
-		tile_sort_entry *ReadHalf0 = First;
-		tile_sort_entry *ReadHalf1 = First + Half0;
-		tile_sort_entry *End = First + Count;
-
-		// NOTE: Step 1 - Find the first out-of-order pair
-		while ((ReadHalf0 != ReadHalf1) &&
-			(ReadHalf0->SortKey < ReadhHalf1->SortKey))
-		{
-			++ReadHalf0;	
-		}
-
-		// NOTE: Step 2 - Swap as many Half1 items as necessary
-		if (ReadHalf0 != ReadHalf1)
-		{
-			tile_sort_entry CompareWith = *ReadHalf0;
-			while ((ReadHalf1 != End) && (ReadHalf1->SortKey < CompareWith.SortKey))
-			{
-				Swap(*ReadHalf0++, *ReadHalf1++);
-			}
-
-			ReadHalf1 = InHalf1;
-		}
-#endif
-	}
-}
-
-internal void
-BubbleSort(u32 Count, tile_sort_entry *First, tile_sort_entry *Temp)
-{
-	for (u32 Outer = 0;
-		Outer < Count;
-		++Outer)
-	{
-		b32 ListIsSorted = true;
-		for (u32 Inner = 0;
-			Inner < (Count - 1);
-			++Inner)
-		{
-			tile_sort_entry *EntryA = First + Inner;
-			tile_sort_entry *EntryB = EntryA + 1;
-
-			if (EntryA->SortKey > EntryB->SortKey)
-			{
-				Swap(EntryA, EntryB);
-				ListIsSorted = false;
-			}
-		}
-
-		if (ListIsSorted)
-		{
-			break;
-		}
-	}
-}
-
-inline u32
-SortKeyToU32(r32 SortKey)
-{
-	// NOTE: We need to turn out 32-bit floating point value
-	// into same strictly ascending 32-bit unsigned integer value
-	u32 Result = *(u32 *)&SortKey;
-	if (Result & 0x80000000)
-	{
-		Result = ~Result;
-	}
-	else
-	{
-		Result |= 0x80000000;
-	}
-	return(Result);
-}
-
-internal void
-RadixSort(u32 Count, tile_sort_entry *First, tile_sort_entry *Temp)
-{
-	tile_sort_entry *Source = First;
-	tile_sort_entry *Dest = Temp;
-	for (u32 ByteIndex = 0;
-		ByteIndex < 32;
-		ByteIndex += 8)
-	{
-		u32 SortKeyOffsets[256] = {};
-
-		// NOTE: First pass - count how many of each key
-		for (u32 Index = 0;
-			Index < Count;
-			++Index)
-		{
-			u32 RadixValue = SortKeyToU32(Source[Index].SortKey);
-			u32 RadixPiece = (RadixValue >> ByteIndex) & 0xFF;
-			++SortKeyOffsets[RadixPiece];
-		}
-
-		// NOTE: Change counts to offsets
-		u32 Total = 0;
-		for (u32 SortKeyIndex = 0;
-			SortKeyIndex < ArrayCount(SortKeyOffsets);
-			++SortKeyIndex)
-		{
-			u32 Count_ = SortKeyOffsets[SortKeyIndex];
-			SortKeyOffsets[SortKeyIndex] = Total;
-			Total += Count_;
-		}
-
-		// NOTE: Second pass - place elements into the right loaction
-		for (u32 Index = 0;
-			Index < Count;
-			++Index)
-		{
-			u32 RadixValue = SortKeyToU32(Source[Index].SortKey);
-			u32 RadixPiece = (RadixValue >> ByteIndex) & 0xFF;
-			Dest[SortKeyOffsets[RadixPiece]++] = Source[Index];
-		}
-
-		tile_sort_entry *SwapTemp = Dest;
-		Dest = Source;
-		Source = SwapTemp;
-	}
-}
-
 internal void
 SortEntries(game_render_commands *Commands, void *SortMemory)
 {
 	u32 Count = Commands->PushBufferElementCount;
-	tile_sort_entry *Entries = (tile_sort_entry *)(Commands->PushBufferBase + Commands->SortEntryAt);
+	sort_entry *Entries = (sort_entry *)(Commands->PushBufferBase + Commands->SortEntryAt);
 
-	RadixSort(Count, Entries, (tile_sort_entry *)SortMemory);
+	RadixSort(Count, Entries, (sort_entry *)SortMemory);
 
 #if HANDMADE_SLOW
 	if (Count)
@@ -1249,8 +1053,8 @@ SortEntries(game_render_commands *Commands, void *SortMemory)
 			Index < (Count - 1);
 			++Index)
 		{
-			tile_sort_entry *EntryA = Entries + Index;
-			tile_sort_entry *EntryB = EntryA + 1;
+			sort_entry *EntryA = Entries + Index;
+			sort_entry *EntryB = EntryA + 1;
 
 			Assert(EntryA->SortKey <= EntryB->SortKey);
 		}
@@ -1264,16 +1068,16 @@ RenderCommandsToBitmap(game_render_commands *Commands, loaded_bitmap *OutputTarg
 	TIMED_FUNCTION();
 
 	u32 SortEntryCount = Commands->PushBufferElementCount;
-	tile_sort_entry *SortEntries = (tile_sort_entry *)(Commands->PushBufferBase + Commands->SortEntryAt);
+	sort_entry *SortEntries = (sort_entry *)(Commands->PushBufferBase + Commands->SortEntryAt);
 	real32 NullPixelsToMeters = 1.0f;
 
-	tile_sort_entry *Entry = SortEntries;
+	sort_entry *Entry = SortEntries;
 	for (u32 SortEntryIndex = 0;
 		SortEntryIndex < SortEntryCount;
 		++SortEntryIndex, ++Entry)
 	{
 		render_group_entry_header *Header = (render_group_entry_header *)
-            (Commands->PushBufferBase + Entry->PushBufferOffset);
+            (Commands->PushBufferBase + Entry->Index);
 		
 		void *Data = (uint8 *)Header + sizeof(*Header);
         switch (Header->Type)
