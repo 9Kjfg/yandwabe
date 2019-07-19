@@ -229,7 +229,7 @@ internal void DEBUGEditEventData(char *GUID, debug_event *Event);
 
 #define DEBUG_UI_ELEMENT(Type, Name) \
 { \
-	RecordDebugEvent(Type, DEBUG_NAME(#Name)); \
+	RecordDebugEvent(Type, #Name); \
 }
 
 #define DEBUG_BEGIN_ARRAY(...)

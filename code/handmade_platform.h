@@ -256,7 +256,7 @@ introspect(category:"regular butter") struct rectangle3
 #define Align16(Value) ((Value + 15) & ~15)
 
 inline uint32
-SafeTruncateUint64(uint64 Value)
+SafeTruncateUInt64(uint64 Value)
 {	
 	// TODO: Define for maximum values
 	Assert(Value <= 0xFFFFFFFF);
@@ -268,8 +268,17 @@ inline uint16
 SafeTruncateToUInt16(int32 Value)
 {	
 	// TODO: Define for maximum values
-	Assert(Value <= 65525);
+	Assert(Value <= 0xFFFF);
 	Assert(Value >= 0);
+	uint16 Result = (uint16)Value;
+	return(Result);
+}
+
+inline uint16
+SafeTruncateToU16(u32 Value)
+{	
+	// TODO: Define for maximum values
+	Assert(Value <= 0xFFFF);
 	uint16 Result = (uint16)Value;
 	return(Result);
 }
@@ -360,6 +369,12 @@ typedef struct game_render_commands
 
 	u32 PushBufferElementCount;
 	u32 SortEntryAt;
+
+	u32 ClipRectCount;
+	struct render_entry_cliprect *ClipRects;
+
+	render_entry_cliprect *FirstRect;
+	render_entry_cliprect *LastRect;
 } game_render_commands;
 
 #define RenderCommandsStruct(MaxPushBufferSize, PushBuffer, Width, Height) \

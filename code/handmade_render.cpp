@@ -1063,7 +1063,20 @@ SortEntries(game_render_commands *Commands, void *SortMemory)
 }
 
 internal void
-RenderCommandsToBitmap(game_render_commands *Commands, loaded_bitmap *OutputTarget,	rectangle2i ClipRect)
+LinearizeClipRects(game_render_commands *Commands, void *ClipMemory)
+{
+	render_entry_cliprect *Out = (render_entry_cliprect *)ClipMemory;
+	for (render_entry_cliprect *Rect = Commands->FirstRect;
+		Rect;
+		Rect = Rect->Next)
+	{
+		*Out++ = *Rect;
+	}
+	Commands->ClipRects = (render_entry_cliprect *)ClipMemory;
+}
+
+internal void
+RenderCommandsToBitmap(game_render_commands *Commands, loaded_bitmap *OutputTarget,	rectangle2i BaseClipRect)
 {
 	TIMED_FUNCTION();
 
@@ -1071,6 +1084,9 @@ RenderCommandsToBitmap(game_render_commands *Commands, loaded_bitmap *OutputTarg
 	sort_entry *SortEntries = (sort_entry *)(Commands->PushBufferBase + Commands->SortEntryAt);
 	real32 NullPixelsToMeters = 1.0f;
 
+	u32 ClipRectIndex = 0xFFFFFFFF;
+	rectangle2i ClipRect = BaseClipRect;
+	
 	sort_entry *Entry = SortEntries;
 	for (u32 SortEntryIndex = 0;
 		SortEntryIndex < SortEntryCount;
@@ -1078,6 +1094,15 @@ RenderCommandsToBitmap(game_render_commands *Commands, loaded_bitmap *OutputTarg
 	{
 		render_group_entry_header *Header = (render_group_entry_header *)
             (Commands->PushBufferBase + Entry->Index);
+
+		if (ClipRectIndex != Header->ClipRectIndex)
+        {
+            ClipRectIndex = Header->ClipRectIndex;
+            Assert(ClipRectIndex < Commands->ClipRectCount);
+            
+            render_entry_cliprect *Clip = Commands->ClipRects + ClipRectIndex;
+			ClipRect = Intersect(BaseClipRect, Clip->Rect);
+        }
 		
 		void *Data = (uint8 *)Header + sizeof(*Header);
         switch (Header->Type)

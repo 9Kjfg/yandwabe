@@ -137,7 +137,7 @@ DEBUG_PLATFORM_READ_ENTIRE_FILE(DEBUGPlatformReadEntireFile)
 		LARGE_INTEGER FileSize;
 		if (GetFileSizeEx(FileHandle, &FileSize))
 		{
-			uint32 FileSize32 = SafeTruncateUint64(FileSize.QuadPart);
+			uint32 FileSize32 = SafeTruncateUInt64(FileSize.QuadPart);
 			Result.Contents = VirtualAlloc(0, FileSize.QuadPart, MEM_COMMIT, PAGE_READWRITE);
 			if (Result.Contents)
 			{
@@ -667,9 +667,10 @@ Win32DisplayBufferInWindow(
 	platform_work_queue *RenderQueue,
 	game_render_commands *Commands,
 	HDC DeviceContext, s32 WindowWidth, s32 WindowHeight,
-	void *SortMemory)
+	void *SortMemory, void *ClipRectMemory)
 {
 	SortEntries(Commands, SortMemory);
+	LinearizeClipRects(Commands, ClipRectMemory);
 
 	/* TODO: Do we want to check for resources like before? Probably?
 		if (AllResourcesPresent(RenderGroup))
@@ -1669,7 +1670,7 @@ internal PLATFORM_READ_DATA_FROM_FILE(Win32ReadDataFromFile)
 		Overlapped.Offset = (u32)((Offset >> 0) & 0xFFFFFFFF);
 		Overlapped.OffsetHigh = (u32)((Offset >> 32) & 0xFFFFFFFF);
 
-		u32 FileSize32 = SafeTruncateUint64(Size);
+		u32 FileSize32 = SafeTruncateUInt64(Size);
 
 		DWORD BytesRead;
 		if (ReadFile(Handle->Win32Handle, Dest, FileSize32, &BytesRead, &Overlapped) &&
@@ -1860,8 +1861,8 @@ WinMain(
 			{
 				MonitorRefreshHz = Win32RefreshRate;
 			}
-			real32 GameUpdateHz = (real32)(MonitorRefreshHz / 2);
-			real32 TargetSecondPerFrame = 1.0f / GameUpdateHz;
+			r32 GameUpdateHz = (r32)(MonitorRefreshHz / 2);
+			r32 TargetSecondPerFrame = 1.0f / GameUpdateHz;
 
 			SoundOutput.SamplesPerSecond = 48000;
 			SoundOutput.BytesPerSample = sizeof(int16)*2;
@@ -1875,6 +1876,9 @@ WinMain(
 
 			umm CurrentSortMemorySize = Megabytes(1);
 			void *SortMemory = Win32AllocateMemory(CurrentSortMemorySize);
+
+			umm CurrentClipMemorySize = Megabytes(1);
+			void *ClipRectMemory = Win32AllocateMemory(CurrentClipMemorySize);
 
 			// TODO: Decide what out pushbuffer size is!
 			u32 PushBufferSize = Megabytes(10);
@@ -2415,7 +2419,7 @@ WinMain(
 					FILETIME NewDLLWriteTime = Win32GetLastWriteTime(SourceGameCodeDLLFullPath);
 					b32 ExecutableNeedsToBeReloaded =
 						(CompareFileTime(&NewDLLWriteTime, &Game.DLLLastWriteTime) != 0);
-
+#if 0
 					FILETIME NewEXETime = Win32GetLastWriteTime(Win32EXEFullPath);
 					FILETIME OldEXETime = Win32GetLastWriteTime(TempWin32EXEFullPath);
 					if (Win32TimeIsValid(NewEXETime))
@@ -2428,7 +2432,7 @@ WinMain(
 							Win32FullRestart(TempWin32EXEFullPath, Win32EXEFullPath, DeleteWin32EXEFullPath);
 						}
 					}
-
+#endif
 					GameMemory.ExecutableReloaded = false;
 
 					if (ExecutableNeedsToBeReloaded)
@@ -2533,10 +2537,19 @@ WinMain(
 						SortMemory = Win32AllocateMemory(CurrentSortMemorySize);
 					}
 
+					// TODO: Collapse this with above!
+					umm NeededClipMemorySize = RenderCommands.PushBufferElementCount * sizeof(render_entry_cliprect);
+					if (CurrentClipMemorySize < NeededClipMemorySize)
+					{
+						Win32DeallocateMemory(SortMemory);
+						CurrentClipMemorySize = NeededClipMemorySize;
+						SortMemory = Win32AllocateMemory(CurrentClipMemorySize);
+					}
+
 					win32_window_dimension Dimension = Win32GetWindowDimension(Window);
 					HDC DeviceContext = GetDC(Window);
 					Win32DisplayBufferInWindow(&HighPriorityQueue, &RenderCommands, DeviceContext,
-						Dimension.Width, Dimension.Height, SortMemory);
+						Dimension.Width, Dimension.Height, SortMemory, ClipRectMemory);
 					ReleaseDC(Window, DeviceContext);
 
 					FlipWallClock = Win32GetWallClock();

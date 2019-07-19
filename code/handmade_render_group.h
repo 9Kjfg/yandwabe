@@ -47,12 +47,20 @@ enum render_group_entry_type
 	RenderGroupEntryType_render_entry_clear,
 	RenderGroupEntryType_render_entry_bitmap,
 	RenderGroupEntryType_render_entry_rectangle,
-	RenderGroupEntryType_render_entry_cordinate_system
+	RenderGroupEntryType_render_entry_cliprect,
+	RenderGroupEntryType_render_entry_cordinate_system,
 };
 
-struct render_group_entry_header
+struct render_group_entry_header // TODO: don't store type here, sore is sort index
 {
-	render_group_entry_type Type;
+	u16 Type;
+	u16 ClipRectIndex;
+};
+
+struct render_entry_cliprect
+{
+	render_entry_cliprect *Next;
+	rectangle2i Rect;
 };
 
 struct render_entry_clear
@@ -67,6 +75,7 @@ struct render_entry_bitmap
 	v4 Color;
 	v2 P;
 	v2 Size;
+	rectangle2 ClipRect;
 };
 
 struct render_entry_rectangle
@@ -108,11 +117,11 @@ struct camera_transform
 	b32 Orthographic;
 
 	// NOTE: Camera parameters
-	real32 MetersToPixels; // NOTE: This translates meters _on the monitor_ into pixels _on the monitor_
+	r32 MetersToPixels; // NOTE: This translates meters _on the monitor_ into pixels _on the monitor_
 	v2 ScreenCenter;
 
-	real32 FocalLength;
-	real32 DistanceAboveTarget;
+	r32 FocalLength;
+	r32 DistanceAboveTarget;
 };
 
 struct render_group
@@ -126,6 +135,8 @@ struct render_group
 
 	uint32 MissingResourceCount;
 	b32 RendersInBackground;
+
+	u32 CurrentClipRectIndex;
 
 	u32 GenerationID;
 	game_render_commands *Commands;
