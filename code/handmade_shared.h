@@ -39,18 +39,28 @@ StringAreEqual(char *A, char *B)
 inline b32
 StringAreEqual(memory_index ALength, char *A, char *B)
 {
-    char *At = B;
-    for (umm Index = 0;
-        Index < ALength;
-        ++Index, ++At)
-    {
-        if ((*At == 0) || (A[Index] != *At))
-        {
-            return(false);
-        }
-    }
+	b32 Result = false;
 
-    b32 Result = (*At == 0);
+	if (B)
+	{
+ 	   char *At = B;
+		for (umm Index = 0;
+			Index < ALength;
+			++Index, ++At)
+		{
+			if ((*At == 0) || (A[Index] != *At))
+			{
+				return(false);
+			}
+		}
+		
+    	Result = (*At == 0);
+	}
+	else
+	{
+		Result = (ALength == 0);
+	}
+
     return(Result);
 }
 

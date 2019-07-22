@@ -25,8 +25,7 @@
 
 #define FREELIST_ALLOCATE(Result, FreeListPointer, AllocationCode) \
 	(Result) = (FreeListPointer); \
-	if (Result) {FreeListPointer = (Result)->NextFree;} \
-	else {Result = AllocationCode;}
+	if (Result) {FreeListPointer = (Result)->NextFree;} else {Result = AllocationCode;}
 
 #define FREELIST_DEALLOCATE(Pointer, FreeListPointer) \
 	if (Pointer) {(Pointer)->NextFree = (FreeListPointer); (FreeListPointer) = (Pointer);}
