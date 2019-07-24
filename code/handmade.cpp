@@ -248,6 +248,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	{DEBUG_DATA_BLOCK("Simulation");
 		DEBUG_B32(Global_Simulation_UseSpaceOutlines);
 	}
+
 	{DEBUG_DATA_BLOCK("Profile");
 		DEBUG_UI_ELEMENT(DebugType_FrameSlider, FrameSlider);
 		DEBUG_UI_ELEMENT(DebugType_LastFrameInfo, LastFrame);
@@ -367,6 +368,17 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 				GroundBuffer->P = NullPosition();
 			}
 		}
+	}
+
+	{DEBUG_DATA_BLOCK("Memory");
+		memory_arena *ModeArena = &GameState->ModeArena;
+		DEBUG_VALUE(ModeArena);
+
+		memory_arena *AudioArena = &GameState->ModeArena;
+		DEBUG_VALUE(AudioArena);
+
+		memory_arena *TranArena = &TranState->TranArena;
+		DEBUG_VALUE(TranArena);
 	}
 
 #if 0

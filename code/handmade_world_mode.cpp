@@ -903,6 +903,13 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 			++EntityIndex)
 		{
 			sim_entity *Entity = SimRegion->Entities + EntityIndex;
+			
+			debug_id EntityDebugID = DEBUG_POINTER_ID(WorldMode->LowEntities + Entity->StorageIndex);
+			if (DEBUG_REQUESTED(EntityDebugID))
+			{
+				DEBUG_BEGIN_DATA_BLOCK("Simulation/Entity");
+			}
+
 			if (Entity->Updatable)
 			{
 				real32 dt = Input->dtForFrame;
@@ -1199,7 +1206,13 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 					
 					case EntityType_Wall:
 					{
-						PushBitmap(RenderGroup, EntityTrasform, GetFirstBitmapFrom(TranState->Assets, Asset_Tree), 2.5f, V3(0, 0, 0));
+						bitmap_id BID = GetFirstBitmapFrom(TranState->Assets, Asset_Tree);
+						if (DEBUG_REQUESTED(EntityDebugID))
+						{
+							DEBUG_NAMED_VALUE(BID);
+						}
+
+						PushBitmap(RenderGroup, EntityTrasform, BID, 2.5f, V3(0, 0, 0));
 					} break;
 
 					case EntityType_Stairwell:
@@ -1224,6 +1237,12 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 					} break;
 					case EntityType_Familiar:
 					{
+						bitmap_id BID = HeroBitmaps.Head;
+						if (DEBUG_REQUESTED(EntityDebugID))
+						{
+							DEBUG_NAMED_VALUE(BID);
+						}
+
 						Entity->tBob += dt;
 						if (Entity->tBob > Tau32)
 						{
@@ -1231,7 +1250,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 						}
 						real32 BobSine = Sin(2.0f*Entity->tBob);
 						PushBitmap(RenderGroup, EntityTrasform, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), 2.5f, V3(0, 0, 0), V4(1, 1, 1, (0.5f*ShadowAlpha) + 0.2f*BobSine));
-						PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Head, 2.5f, V3(0, 0, 0.2f*BobSine));
+						PushBitmap(RenderGroup, EntityTrasform, BID, 2.5f, V3(0, 0, 0.2f*BobSine));
 					} break;
 					case EntityType_Monster:
 					{
@@ -1261,8 +1280,6 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 
 				if (DEBUG_UI_ENABLED)
 				{
-					debug_id EntityDebugID = DEBUG_POINTER_ID(WorldMode->LowEntities + Entity->StorageIndex);
-
 					for (uint32 VolumeIndex = 0;
 						VolumeIndex < Entity->Collision->VolumeCount;
 						++VolumeIndex)
@@ -1287,8 +1304,6 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 
 					if (DEBUG_REQUESTED(EntityDebugID))
 					{
-						DEBUG_DATA_BLOCK("Simulation/Entity");
-						// TODO: Do we want this DEBUG_VALUE(EntityDebugID);
 						DEBUG_VALUE(Entity->StorageIndex);
 						DEBUG_VALUE(Entity->Updatable);
 						DEBUG_VALUE(Entity->Type);
@@ -1299,7 +1314,6 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 						DEBUG_VALUE(Entity->tBob);
 						DEBUG_VALUE(Entity->dAbsTileZ);
 						DEBUG_VALUE(Entity->HitPointMax);
-						DEBUG_VALUE(HeroBitmaps.Torso);
 	#if 0
 						DEBUG_BEGIN_ARRAY();
 						for (u32 HitPointIndex = 0;
@@ -1313,6 +1327,8 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 	#endif
 						DEBUG_VALUE(Entity->WalkableDim);
 						DEBUG_VALUE(Entity->WalkableHeight);
+
+						DEBUG_END_DATA_BLOCK("Simulation/Entity");
 					}
 				}
 			}
