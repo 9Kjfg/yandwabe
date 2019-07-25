@@ -409,16 +409,6 @@ CanOverlap(game_mode_world *WorldMode, sim_entity *Mover, sim_entity *Region)
 	return(Result);
 }
 
-internal void
-HandleOverlap(game_mode_world *WorldMode, sim_entity *Mover, sim_entity *Region, real32 dt,
-	real32 *Ground)
-{
-	if (Region->Type == EntityType_Stairwell)
-	{
-		*Ground = GetStairGround(Region, GetEntityGroundPoint(Mover));
-	}
-}
-
 internal bool32
 SpeculativeCollide(sim_entity *Mover, sim_entity *Region, v3 TestP)
 {
@@ -471,9 +461,9 @@ EntitiesOverlapped(sim_entity *Entity, sim_entity *TestEntity, v3 Epsilon = V3(0
 internal void
 MoveEntity(game_mode_world *WorldMode, sim_region *SimRegion, sim_entity *Entity, real32 dt, move_spec *MoveSpec, v3 ddP)
 {
-	Assert(!IsSet(Entity, EntityFlag_Nonspatial));
-
 	TIMED_FUNCTION();
+
+	Assert(!IsSet(Entity, EntityFlag_Nonspatial));
 
 	world *World = SimRegion->World;
 
@@ -492,10 +482,6 @@ MoveEntity(game_mode_world *WorldMode, sim_region *SimRegion, sim_entity *Entity
 	v3 Drag = -MoveSpec->Drag * Entity->dP;
 	Drag.z = 0;
 	ddP += Drag;
-	if (!IsSet(Entity, EntityFlag_ZSupported))
-	{
-		ddP += V3(0.0f, 0.0f, -9.8f);
-	}
 
 	v3 PlayerDelta = (0.5f*ddP*Square(dt) + Entity->dP*dt);
 	Entity->dP = ddP*dt + Entity->dP;
@@ -515,7 +501,7 @@ MoveEntity(game_mode_world *WorldMode, sim_region *SimRegion, sim_entity *Entity
 		++Iteration)
 	{
 		real32 tMin = 1.0f;
-		real32 tMax = 0.0f;
+		real32 tMax = 1.0f;
 
 		real32 PlayerDeltaLength = Length(PlayerDelta);
 		// TODO: What do we whant to do for epsilon here ?
@@ -547,9 +533,7 @@ MoveEntity(game_mode_world *WorldMode, sim_region *SimRegion, sim_entity *Entity
 					// TODO: Robustness!
 					real32 OverlapEpsilon = 0.001f;
 
-					if ((IsSet(TestEntity, EntityFlag_Traversable) &&
-						EntitiesOverlapped(Entity, TestEntity, OverlapEpsilon*V3(1.0f, 1.0f, 1.0f))) ||
-						CanCollide(WorldMode, Entity, TestEntity))
+					if (CanCollide(WorldMode, Entity, TestEntity))
 					{
 						for (uint32 VolumeIndex = 0;
 							VolumeIndex < Entity->Collision->VolumeCount;
@@ -585,83 +569,45 @@ MoveEntity(game_mode_world *WorldMode, sim_region *SimRegion, sim_entity *Entity
 										{MinCorner.y, Rel.y, Rel.x, PlayerDelta.y, PlayerDelta.x, MinCorner.x, MaxCorner.x, V3(0.0f, -1.0f, 0.0f)},
 										{MaxCorner.y, Rel.y, Rel.x, PlayerDelta.y, PlayerDelta.x, MinCorner.x, MaxCorner.x, V3(0.0f, 1.0f, 0.0f)}
 									};								
-									if (IsSet(TestEntity, EntityFlag_Traversable))
+
+									real32 tMinTest = tMin;						
+									bool32 HitThis = false;
+
+									v3 TestWallNormal = {};
+									for (uint32 WallIndex = 0;
+										WallIndex < ArrayCount(Walls);
+										++WallIndex)
 									{
-										real32 tMaxTest = tMax;							
-										bool32 HitThis = false;
+										test_wall *Wall = Walls + WallIndex;
 																				
-										v3 TestWallNormal = {};
-										for (uint32 WallIndex = 0;
-											WallIndex < ArrayCount(Walls);
-											++WallIndex)
+										real32 tEpsilon = 0.001f;
+										if (Wall->DeltaX != 0.0f)
 										{
-											test_wall *Wall = Walls + WallIndex;
-																					
-											real32 tEpsilon = 0.001f;
-											if (Wall->DeltaX != 0.0f)
+											real32 tResult = (Wall->X - Wall->RelX) / Wall->DeltaX;
+											real32 Y = Wall->RelY + tResult*Wall->DeltaY;
+											if ((tResult >= 0.0f) && (tMinTest > tResult))
 											{
-												real32 tResult = (Wall->X - Wall->RelX) / Wall->DeltaX;
-												real32 Y = Wall->RelY + tResult*Wall->DeltaY;
-												if ((tResult >= 0.0f) && (tMaxTest < tResult))
+												if ((Y >= Wall->MinY) && (Y <= Wall->MaxY))
 												{
-													if ((Y >= Wall->MinY) && (Y <= Wall->MaxY))
-													{
-														tMaxTest = Maximum(0.0f, tResult - tEpsilon);
-														TestWallNormal = Wall->Normal;
-														HitThis = true;
-													}
+													tMinTest = Maximum(0.0f, tResult - tEpsilon);
+													TestWallNormal = Wall->Normal;
+													HitThis = true;
 												}
 											}
-										}
-
-										if (HitThis)
-										{
-											tMax = tMaxTest;
-											WallNormalMax = TestWallNormal;
-											HitEntityMax = TestEntity;
 										}
 									}
-									else
+								
+									// TODO: We need a concept of stepping onto vs stepping
+									// off of here so that we can prevent tou from _leavind_
+									// stairs instead of just preventing you form getting onto them
+									if (HitThis)
 									{
-										real32 tMinTest = tMin;						
-										bool32 HitThis = false;
-
-										v3 TestWallNormal = {};
-										for (uint32 WallIndex = 0;
-											WallIndex < ArrayCount(Walls);
-											++WallIndex)
+										v3 TestP = Entity->P + tMinTest*PlayerDelta;
+										if (SpeculativeCollide(Entity, TestEntity, TestP))
 										{
-											test_wall *Wall = Walls + WallIndex;
-																					
-											real32 tEpsilon = 0.001f;
-											if (Wall->DeltaX != 0.0f)
-											{
-												real32 tResult = (Wall->X - Wall->RelX) / Wall->DeltaX;
-												real32 Y = Wall->RelY + tResult*Wall->DeltaY;
-												if ((tResult >= 0.0f) && (tMinTest > tResult))
-												{
-													if ((Y >= Wall->MinY) && (Y <= Wall->MaxY))
-													{
-														tMinTest = Maximum(0.0f, tResult - tEpsilon);
-														TestWallNormal = Wall->Normal;
-														HitThis = true;
-													}
-												}
-											}
-										}
-									
-										// TODO: We need a concept of stepping onto vs stepping
-										// off of here so that we can prevent tou from _leavind_
-										// stairs instead of just preventing you form getting onto them
-										if (HitThis)
-										{
-											v3 TestP = Entity->P + tMinTest*PlayerDelta;
-											if (SpeculativeCollide(Entity, TestEntity, TestP))
-											{
-												tMin = tMinTest;
-												WallNormalMin = TestWallNormal;
-												HitEntityMin = TestEntity;
-											}
+											tMin = tMinTest;
+											WallNormalMin = TestWallNormal;
+											HitEntityMin = TestEntity;
 										}
 									}
 								}
@@ -709,39 +655,6 @@ MoveEntity(game_mode_world *WorldMode, sim_region *SimRegion, sim_entity *Entity
 		{
 			break;
 		}
-	}
-
-	real32 Ground = 0.0f;
-
-	// NOTE: Handle events based on are overlapping
-	// TODO: Handle overlapping precisely by moveng it into the collision
-	{
-		// TODO: Spation partition here
-		for (uint32 TestHighEntityIndex = 0;
-			TestHighEntityIndex < SimRegion->EntityCount;
-			++TestHighEntityIndex)
-		{
-			sim_entity *TestEntity = SimRegion->Entities + TestHighEntityIndex;
-			if (CanOverlap(WorldMode, Entity, TestEntity) && 
-				EntitiesOverlapped(Entity, TestEntity))
-			{
-				HandleOverlap(WorldMode, Entity, TestEntity, dt, &Ground);
-			}
-		}
-	}
-
-	Ground += Entity->P.z - GetEntityGroundPoint(Entity).z;
-	if ((Entity->P.z <= Ground) ||
-		(IsSet(Entity, EntityFlag_ZSupported) &&
-		(Entity->dP.z == 0.0f)))
-	{
-		Entity->P.z = Ground;
-		Entity->dP.z = 0;
-		AddFlags(Entity, EntityFlag_ZSupported);
-	}
-	else
-	{
-		ClearFlags(Entity, EntityFlag_ZSupported);
 	}
 	
 	if (Entity->DistanceLimit != 0.0f)

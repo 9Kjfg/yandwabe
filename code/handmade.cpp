@@ -302,18 +302,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
 		GameState->Music = 0;//PlaySound(&GameState->AudioState, GetFirstSoundFrom(TranState->Assets, Asset_Music));
 
-		// TODO: Pick a real number here!
-		TranState->GroundBufferCount = 64;
-		TranState->GroundBuffers = PushArray(&TranState->TranArena, TranState->GroundBufferCount, ground_buffer);
-		for (uint32 GroundBufferIndex = 0;
-			GroundBufferIndex < TranState->GroundBufferCount;
-			++GroundBufferIndex)
-		{
-			ground_buffer *GroundBuffer = TranState->GroundBuffers + GroundBufferIndex;
-			GroundBuffer->Bitmap = MakeEmptyBitmap(&TranState->TranArena, GroundBufferWidth, GroundBufferHeight);
-			GroundBuffer->P = NullPosition();
-		}
-
 		GameState->TestDiffuse = MakeEmptyBitmap(&TranState->TranArena, 256, 256, false);
 		
 		GameState->TestNormal = MakeEmptyBitmap(&TranState->TranArena, GameState->TestDiffuse.Width, GameState->TestDiffuse.Height, false);
@@ -343,6 +331,17 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		TranState->IsInitialized = true;
 	}
 
+	{DEBUG_DATA_BLOCK("Memory");
+		memory_arena *ModeArena = &GameState->ModeArena;
+		DEBUG_VALUE(ModeArena);
+
+		memory_arena *AudioArena = &GameState->ModeArena;
+		DEBUG_VALUE(AudioArena);
+
+		memory_arena *TranArena = &TranState->TranArena;
+		DEBUG_VALUE(TranArena);
+	}
+	
 	// TODO: We should probably pull the generation stuff, because
 	// if we don't use ground chunks, It's a huge waste of effort!
 	if (TranState->MainGenerationID)
@@ -354,31 +353,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	if (GameState->GameMode == GameMode_None)
 	{
 		PlayIntroCutScene(GameState, TranState);
-	}
-
-	if (Global_GroundChunks_RecomputeOnEXEChange)
-	{
-		if (Memory->ExecutableReloaded)
-		{
-			for (uint32 GroundBufferIndex = 0;
-				GroundBufferIndex < TranState->GroundBufferCount;
-				++GroundBufferIndex)
-			{
-				ground_buffer *GroundBuffer = TranState->GroundBuffers + GroundBufferIndex;
-				GroundBuffer->P = NullPosition();
-			}
-		}
-	}
-
-	{DEBUG_DATA_BLOCK("Memory");
-		memory_arena *ModeArena = &GameState->ModeArena;
-		DEBUG_VALUE(ModeArena);
-
-		memory_arena *AudioArena = &GameState->ModeArena;
-		DEBUG_VALUE(AudioArena);
-
-		memory_arena *TranArena = &TranState->TranArena;
-		DEBUG_VALUE(TranArena);
 	}
 
 #if 0
