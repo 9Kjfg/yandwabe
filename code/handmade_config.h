@@ -1,6 +1,6 @@
 global_variable b32 Global_Renderer_Camera_UseDebug = false;
 global_variable r32 Global_Renderer_Camera_DebugDistance = 25.0f;
-global_variable b32 Global_Renderer_Camera_RoomBased = false;
+global_variable b32 Global_Renderer_Camera_RoomBased = true;
 global_variable b32 Global_GroundChunks_Chekerboards = false;
 global_variable b32 Global_GroundChunks_RecomputeOnEXEChange = true;
 global_variable b32 Global_Renderer_TestWierdDrawBufferSize = false;

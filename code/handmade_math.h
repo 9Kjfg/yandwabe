@@ -421,6 +421,20 @@ Normalize(v3 A)
 }
 
 inline v3
+NOZ(v3 A)
+{
+    v3 Result = {};
+
+    r32 Length = LengthSq(A);
+    if (Length > Square(0.0001f))
+    {
+        Result = A * (1.0f / SquareRoot(Length));
+    }
+
+    return(Result);
+}
+
+inline v3
 Clamp01(v3 Value)
 {
     v3 Result;

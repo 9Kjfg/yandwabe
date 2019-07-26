@@ -1861,7 +1861,7 @@ WinMain(
 			{
 				MonitorRefreshHz = Win32RefreshRate;
 			}
-			r32 GameUpdateHz = (r32)(MonitorRefreshHz / 2);
+			r32 GameUpdateHz = (r32)(MonitorRefreshHz);
 			r32 TargetSecondPerFrame = 1.0f / GameUpdateHz;
 
 			SoundOutput.SamplesPerSecond = 48000;

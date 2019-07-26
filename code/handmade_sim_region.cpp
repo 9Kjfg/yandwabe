@@ -1,4 +1,16 @@
 
+inline sim_entity_traversable_point
+GetSimSpaceTraversable(sim_entity *Entity, u32 Index)
+{
+	Assert(Index < Entity->Collision->TraversableCount);
+	sim_entity_traversable_point Result = Entity->Collision->Traversables[Index];
+
+	// TODO: This wants to be roted eventually
+	Result.P += Entity->P;
+
+	return(Result);
+}
+
 internal sim_entity_hash *
 GetHashFromStorageIndex(sim_region *SimRegion, uint32 StorageIndex)
 {
@@ -95,6 +107,7 @@ AddEntityRaw(game_mode_world *WorldMode, sim_region *SimRegion, uint32 StorageIn
 				// TODO: This should really be a decompression step, not a copy
 				*Entity = Source->Sim;
 				LoadEntityReference(WorldMode, SimRegion, &Entity->Sword);
+				LoadEntityReference(WorldMode, SimRegion, &Entity->Head);
 
 				Assert(!IsSet(&Source->Sim, EntityFlag_Simming));
 				AddFlags(&Source->Sim, EntityFlag_Simming);
@@ -232,6 +245,7 @@ EndSim(sim_region *Region, game_mode_world *WorldMode)
 		Assert(!IsSet(&Stored->Sim, EntityFlag_Simming));
 
         StoreEntityReference(&Stored->Sim.Sword);
+		StoreEntityReference(&Stored->Sim.Head);
 
         // TODO: Save state back to the stored entity, once high entities
         // do state decompression, etc.
