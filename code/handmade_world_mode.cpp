@@ -781,11 +781,10 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 					} break;
 					case EntityType_HeroBody:
 					{
-						// TODO: Make spation queries easy for things
 						sim_entity *Head = Entity->Head.Ptr;
 						if (Head)
 						{
-							r32 ClosestDistanceDSq = Square(1000.0f);
+							r32 ClosestDistanceSq = Square(1000.0f);
 							v3 ClosestP = Entity->P;
 							sim_entity *TestEntity = SimRegion->Entities;
 							for (uint32 TestEntityIndex = 0;
@@ -802,21 +801,47 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 									v3 HeadToPoint = P.P - Head->P;
 
 									r32 TestDSq = LengthSq(HeadToPoint);
-									if (ClosestDistanceDSq > TestDSq)
+									if (ClosestDistanceSq > TestDSq)
 									{
 										ClosestP = P.P;
-										ClosestDistanceDSq = TestDSq;
+										ClosestDistanceSq = TestDSq;
 									}
 								}
 							}
-						
-							ddP = (ClosestP - Entity->P);
+							
+							v3 BodyDelta = ClosestP - Entity->P;
+							r32 BodyDistance = LengthSq(BodyDelta);
+							
+							switch (Entity->MovementMode)
+							{
+								case MovementMode_Planted:
+								{
+									if (BodyDistance > Square(0.01f))
+									{
+										Entity->tMovement = 0.0f;
+										Entity->MovementFrom = Entity->P;
+										Entity->MovementTo = ClosestP;
+										Entity->MovementMode = MovementMode_Hopping;
+									}
+								} break;
 
-							MoveSpec.UnitMaxAccelVector = true;
-							MoveSpec.Speed = 100.0f;
-							MoveSpec.Drag = 10.0f;
+								case MovementMode_Hopping:
+								{
+									Entity->tMovement += 6.0f*dt;
+									r32 t = Entity->tMovement;
+									v3 a = V3(0, -2.0f, 0);
+									v3 b = (Entity->MovementTo - Entity->MovementFrom) - a;
+									Entity->P = a*t*t + b*t + Entity->MovementFrom;
+									Entity->dP = V3(0, 0, 0);
+									if (Entity->tMovement >= 1.0f)
+									{
+										Entity->MovementMode = MovementMode_Planted;
+									}
+								} break;
+							}
 						}
 					} break;
+
 					case EntityType_Sword:
 					{
 						MoveSpec.UnitMaxAccelVector = false;
