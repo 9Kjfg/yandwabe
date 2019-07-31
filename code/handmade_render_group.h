@@ -74,8 +74,10 @@ struct render_entry_bitmap
 	
 	v4 Color;
 	v2 P;
-	v2 Size;
-	rectangle2 ClipRect;
+//	v2 Size;
+	// NOTE: X and Y axes are _already scaled_ by the half-dimension
+	v2 XAxis;
+	v2 YAxis;
 };
 
 struct render_entry_rectangle

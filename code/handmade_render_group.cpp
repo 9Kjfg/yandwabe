@@ -79,13 +79,15 @@ PushRenderElement_(render_group *Group, uint32 Size, render_group_entry_type Typ
 
 inline used_bitmap_dim
 GetBitmapDim(render_group *Group, object_transform ObjectTransform,
-	loaded_bitmap *Bitmap, real32 Height, v3 Offset, r32 CAlign)
+	loaded_bitmap *Bitmap, real32 Height, v3 Offset, r32 CAlign,
+	v2 XAxis = V2(1, 0), v2 YAxis = V2(0, 1))
 {
 	used_bitmap_dim Dim;
 
 	Dim.Size = V2(Height*Bitmap->WidthOverHeight, Height);
 	Dim.Align = CAlign*Hadamard(Bitmap->AlignPercentage, Dim.Size);
-	Dim.P = Offset - V3(Dim.Align, 0);
+	Dim.P.z = Offset.z;
+	Dim.P.xy = Offset.xy - Dim.Align.x*XAxis - Dim.Align.y*YAxis;
 	Dim.Basis = GetRenderEntityBasisP(Group->CameraTransform, ObjectTransform, Dim.P);
 
 	return(Dim);
@@ -93,7 +95,8 @@ GetBitmapDim(render_group *Group, object_transform ObjectTransform,
 
 internal inline void
 PushBitmap(render_group *Group, object_transform ObjectTransform,
-	loaded_bitmap *Bitmap, real32 Height, v3 Offset, v4 Color = V4(1, 1, 1, 1), r32 CAlign = 1.0f)
+	loaded_bitmap *Bitmap, real32 Height, v3 Offset, v4 Color = V4(1, 1, 1, 1), r32 CAlign = 1.0f,
+	v2 XAxis = V2(1, 0), v2 YAxis = V2(0, 1))
 {
 	used_bitmap_dim Dim = GetBitmapDim(Group, ObjectTransform, Bitmap, Height, Offset, CAlign);
 
@@ -105,14 +108,17 @@ PushBitmap(render_group *Group, object_transform ObjectTransform,
 			Entry->Bitmap = Bitmap;
 			Entry->P = Dim.Basis.P;
 			Entry->Color = Group->GlobalAlpha*Color;
-			Entry->Size = Dim.Basis.Scale*Dim.Size;
+			v2 Size = Dim.Basis.Scale*Dim.Size;
+			Entry->XAxis = Size.x*XAxis;
+			Entry->YAxis = Size.y*YAxis;
 		}
 	}
 }
 
 internal inline void
 PushBitmap(render_group *Group, object_transform ObjectTransform,
-	bitmap_id ID, real32 Height, v3 Offset, v4 Color = V4(1, 1, 1, 1), r32 CAlign = 1.0f)
+	bitmap_id ID, real32 Height, v3 Offset, v4 Color = V4(1, 1, 1, 1), r32 CAlign = 1.0f,
+	v2 XAxis = V2(1, 0), v2 YAxis = V2(0, 1))
 {
 	loaded_bitmap *Bitmap = GetBitmap(Group->Assets, ID, Group->GenerationID);
 
@@ -124,7 +130,7 @@ PushBitmap(render_group *Group, object_transform ObjectTransform,
 	
 	if (Bitmap && Bitmap->Memory)
 	{
-		PushBitmap(Group, ObjectTransform, Bitmap, Height, Offset, Color, CAlign);
+		PushBitmap(Group, ObjectTransform, Bitmap, Height, Offset, Color, CAlign, XAxis, YAxis);
 	}
 	else
 	{

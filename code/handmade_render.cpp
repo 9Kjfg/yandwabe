@@ -1128,8 +1128,8 @@ RenderCommandsToBitmap(game_render_commands *Commands, loaded_bitmap *OutputTarg
 					0, 0, 0, 0, NullPixelsToMeters)
 #else
 				DrawRectangleQuickly(OutputTarget, Entry->P,
-					V2(Entry->Size.x, 0),
-					V2(0, Entry->Size.y),
+					Entry->XAxis,
+					Entry->YAxis,
 					Entry->Color, Entry->Bitmap,
 					NullPixelsToMeters, ClipRect);
 #endif

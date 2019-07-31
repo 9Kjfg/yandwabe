@@ -676,18 +676,4 @@ MoveEntity(game_mode_world *WorldMode, sim_region *SimRegion, sim_entity *Entity
 		// TODO: Do we want formalize this number
 		Entity->DistanceLimit = DistanceRemaining;
 	}
-
-	// TODO: Change to using accelaration vector
-	if ((Entity->dP.x == 0.0f) && (Entity->dP.y == 0.0f))
-	{
-		// NOTE: Leave FacingDirection whatever it was
-	}
-	else
-	{
-		Entity->FacingDirection = ATan2(Entity->dP.y, Entity->dP.x);
-		if (Entity->FacingDirection < 0.0f)
-		{
-			Entity->FacingDirection += 2.0f*Pi32;
-		}
-	}
 }
