@@ -121,6 +121,8 @@ struct sim_entity
 
 	v2 XAxis;
 	v2 YAxis;
+
+	v2 FloorDisplace;
 };
 
 struct sim_entity_hash

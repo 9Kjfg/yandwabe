@@ -470,6 +470,12 @@ inline b32 WasPressed(game_button_state State)
 	return(Result);
 }
 
+inline b32 IsDown(game_button_state State)
+{
+	b32 Result = State.EndedDown;
+	return(Result);
+}
+
 typedef struct platform_file_handle
 {
 	b32 NoErrors;

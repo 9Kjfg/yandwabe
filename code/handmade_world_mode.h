@@ -13,16 +13,6 @@ struct low_entity
 	sim_entity Sim;
 };
 
-struct controlled_hero
-{
-	uint32 EntityIndex;
-
-	// NOTE: These are the controller requests for simulation
-	v2 ddP;
-	v2 dSword;
-	real32 dZ;
-};
-
 struct pairwise_collision_rule
 {
 	bool32 CanCollide;

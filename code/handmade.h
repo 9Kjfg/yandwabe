@@ -298,6 +298,17 @@ Copy(memory_index Size, void *SourceInit, void *DestInit)
 #include "handmade_asset.h"
 #include "handmade_audio.h"
 
+struct controlled_hero
+{
+	uint32 EntityIndex;
+
+	// NOTE: These are the controller requests for simulation
+	v2 ddP;
+	v2 dSword;
+	r32 dZ;
+	r32 RecenterTimer;
+};
+
 enum entity_residence
 {
 	EntityResidence_Nonexistent,
