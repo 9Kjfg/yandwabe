@@ -1,6 +1,6 @@
 #if !defined(HANDMADE_WORLD_H)
 
-introspect(category:"world") struct world_position
+struct world_position
 {
     // TODO: Puzzler! How can we get rid of abstile* here,
     // and still allow references to entities to ve able to figure
@@ -17,9 +17,12 @@ introspect(category:"world") struct world_position
 // TODO: Could make this just tile_chunk and hen allow multiple tile chunks per X\Y\Z
 struct world_entity_block
 {
-	uint32 EntityCount;
-	uint32 LowEntityIndex[16];
+	u32 EntityCount;
+	u32 LowEntityIndex[16];
 	world_entity_block *Next;
+
+	u32 EntityDataSize;
+	u8 EntityData[1 << 16];
 };
 
 struct world_chunk
@@ -38,13 +41,13 @@ struct world
 {
 	v3 ChunkDimInMeters;
 
+	world_entity_block *FirstFree;
+	
 	// TODO: WorldChunkHash should probably switch to pointers IF
 	// tile entity blocks continue to be stored en masse directly in the tile chunk!
 	// NOTE: A the moment, this must be a power of two
 
-	world_chunk ChunkHash[4096];
-
-	world_entity_block *FirstFree;
+	world_chunk *ChunkHash[4096];
 
 	memory_arena Arena;
 };

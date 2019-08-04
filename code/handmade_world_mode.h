@@ -54,19 +54,14 @@ struct game_mode_world
 	real32 TypicalFloorHeight;
 
 	// TODO: Should we allow spit-screen?
-	uint32 CameraFollowingEntityIndex;
+	entity_id CameraFollowingEntityIndex;
 	world_position CameraP;
-
-	// TODO: Change the name to "stored entity"
-	uint32 LowEntityCount;
-	low_entity LowEntities[4096];
 
 	// TODOL Must be power of to
 	pairwise_collision_rule *CollisionRuleHash[256];
 	pairwise_collision_rule *FirstFreeCollisionRule;
 
 	sim_entity_collision_volume_group *NullCollision;
-	sim_entity_collision_volume_group *SwordCollision;
 	sim_entity_collision_volume_group *StairCollision;
 	sim_entity_collision_volume_group *HeroBodyCollision;
 	sim_entity_collision_volume_group *HeroHeadCollision;
@@ -85,21 +80,12 @@ struct game_mode_world
 	u32 NextParticle;
 	particle Particles[256];
 
+	b32 CreationBufferLocked;// TODO: Remove this eventually, just for catching bugs
+	low_entity CreationBuffer;
+	u32 LastUsedEntityStorageIndex; // TODO: Worry about this wrapping - free list for IDs?
+
 	particle_cel ParticleCels[PARTICLE_CEL_DIM][PARTICLE_CEL_DIM];
 };
-
-inline low_entity *
-GetLowEntity(game_mode_world *WorldMode, uint32 Index)
-{
-	low_entity *Result = 0;
-	
-	if ((Index > 0) && (Index < WorldMode->LowEntityCount))
-	{
-		Result = WorldMode->LowEntities + Index;
-	}
-
-	return(Result);	
-}
 
 struct game_state;
 internal void PlayWorld(game_state *GameState, transient_state *TranState);
