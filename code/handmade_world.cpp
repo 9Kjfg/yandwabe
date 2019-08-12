@@ -79,9 +79,8 @@ ClearWorldEntityBlock(world_entity_block *Block)
 	Block->EntityDataSize = 0;
 }
 
-inline world_chunk *
-GetWorldChunk(world *World, int32 ChunkX, int32 ChunkY, int32 ChunkZ,
-	memory_arena *Arena = 0)
+inline world_chunk **
+GetWorldChunkInternal(world *World, int32 ChunkX, int32 ChunkY, int32 ChunkZ)
 {
 	TIMED_FUNCTION();
 
@@ -97,32 +96,49 @@ GetWorldChunk(world *World, int32 ChunkX, int32 ChunkY, int32 ChunkZ,
 	uint32 HashSlot = HashValue & (ArrayCount(World->ChunkHash) - 1);
 	Assert(HashSlot < ArrayCount(World->ChunkHash));
 
-	world_chunk *Chunk = World->ChunkHash[HashSlot];
 	
-	world_chunk *Result = 0;
-	for (world_chunk *Chunk = World->ChunkHash[HashSlot];
-		Chunk;
-		Chunk = Chunk->NextInHash)
+	world_chunk **Chunk = &World->ChunkHash[HashSlot];
+	while (*Chunk &&
+		!((ChunkX == (*Chunk)->ChunkX) &&
+		(ChunkY == (*Chunk)->ChunkY) &&
+		(ChunkZ == (*Chunk)->ChunkZ)))
 	{
-		if ((ChunkX == Chunk->ChunkX) &&
-			(ChunkY == Chunk->ChunkY) &&
-			(ChunkZ == Chunk->ChunkZ))
-		{
-			Result = Chunk;
-			break;
-		}
+		Chunk = &(*Chunk)->NextInHash;
 	}
 
+	return(Chunk);
+}
+
+inline world_chunk *
+GetWorldChunk(world *World, int32 ChunkX, int32 ChunkY, int32 ChunkZ,
+	memory_arena *Arena = 0)
+{
+	world_chunk **ChunkPtr = GetWorldChunkInternal(World, ChunkX, ChunkY, ChunkZ);
+	world_chunk *Result = *ChunkPtr;
 	if (!Result && Arena)
 	{
 		Result = PushStruct(Arena, world_chunk, NoClear());
-		ClearWorldEntityBlock(&Result->FirstBlock);
+		Result->FirstBlock = 0;
 		Result->ChunkX = ChunkX;
 		Result->ChunkY = ChunkY;
 		Result->ChunkZ = ChunkZ;
 
-		Result->NextInHash = World->ChunkHash[HashSlot];
-		World->ChunkHash[HashSlot] = Result;
+		Result->NextInHash = *ChunkPtr;
+		*ChunkPtr =  Result;
+	}
+
+	return(Result);
+}
+
+internal world_chunk *
+RemoveWorldChunk(world *World, int32 ChunkX, int32 ChunkY, int32 ChunkZ,
+	memory_arena *Arena = 0)
+{
+	world_chunk **ChunkPtr = GetWorldChunkInternal(World, ChunkX, ChunkY, ChunkZ);
+	world_chunk *Result = *ChunkPtr;
+	if (Result)
+	{
+		*ChunkPtr = Result->NextInHash;
 	}
 
 	return(Result);
@@ -196,97 +212,6 @@ CenteredChunkPoint(uint32 ChunkX, uint32 ChunkY, uint32 ChunkZ)
 	return(Result);
 }
 
-inline void
-ChangeEntityLocationRaw(memory_arena *Arena, world *World, uint32 LowEntityIndex,
-	world_position *OldP, world_position *NewP)
-{
-	TIMED_FUNCTION();
-
-	// TODO: if this moves an entity  into the camera bounds, should it automatically
-	// go into the high set immediately
-	// If it moves _out_ of the camera  bounds. should it be removes from the high set
-	// immediately
-
-	Assert(!OldP || IsValid(*OldP));
-	Assert(!NewP || IsValid(*NewP));
-
-	if (OldP && NewP && AreInSameChunk(World, OldP, NewP))
-	{
-		// NOTE: Leave entity where it is
-	}
-	else
-	{
-		if (OldP)
-		{
-			// NOTE: Pull the entity out of its old entity block
-			world_chunk *Chunk = GetWorldChunk(World, OldP->ChunkX, OldP->ChunkY, OldP->ChunkZ);
-			Assert(Chunk);
-			if (Chunk)
-			{
-				bool32 NotFound = true;
-				world_entity_block *FirstBlock = &Chunk->FirstBlock;
-				for (world_entity_block *Block = FirstBlock;
-					Block && NotFound;
-					Block = Block->Next)
-				{
-					for (uint32 Index = 0;
-						(Index < Block->EntityCount) && NotFound;
-						++Index)
-					{
-						if (Block->LowEntityIndex[Index] == LowEntityIndex)
-						{
-							Assert(FirstBlock->EntityCount > 0);
-							Block->LowEntityIndex[Index] = 
-									FirstBlock->LowEntityIndex[--FirstBlock->EntityCount];
-							if (FirstBlock->EntityCount == 0)
-							{
-								if (FirstBlock->Next)
-								{
-									world_entity_block *NextBlock = FirstBlock->Next;
-									*FirstBlock = *NextBlock;
-
-									NextBlock->Next = World->FirstFree;
-									World->FirstFree = NextBlock;
-								}
-							}
-
-							NotFound = false;
-						}
-					}
-				}
-			}
-		}
-
-		if (NewP)
-		{
-			// NOTE: Insert the entity into its new entity block
-			world_chunk *Chunk = GetWorldChunk(World, NewP->ChunkX, NewP->ChunkY, NewP->ChunkZ, Arena);
-			Assert(Chunk);
-
-			world_entity_block *Block = &Chunk->FirstBlock;
-			if (Block->EntityCount == ArrayCount(Block->LowEntityIndex))
-			{
-				// We're out of room, get a new block
-				world_entity_block *OldBlock = World->FirstFree;
-				if (OldBlock)
-				{
-					World->FirstFree = OldBlock->Next;
-				}
-				else
-				{
-					OldBlock = PushStruct(Arena, world_entity_block);
-				}
-				*OldBlock = *Block;
-				Block->Next = OldBlock;
-				Block->EntityCount = 0;
-			}
-
-			Assert(Block->EntityCount < ArrayCount(Block->LowEntityIndex));
-			Block->LowEntityIndex[Block->EntityCount++] = LowEntityIndex;
-		}
-	}
-}
-
 inline world_position
 CenteredChunkPoint(world_chunk *Chunk)
 {
@@ -294,32 +219,59 @@ CenteredChunkPoint(world_chunk *Chunk)
 	return(Result);
 }
 
-internal void
-ChangeEntityLocation(memory_arena *Arena, world *World, uint32 LowEntityIndex,
-	low_entity *LowEntity, world_position NewPInit)
+inline b32
+HasRoomFor(world_entity_block *Block, u32 Size)
 {
-	world_position *OldP = 0;
-	world_position *NewP = 0;
-
-	if (!IsSet(&LowEntity->Sim, EntityFlag_Nonspatial) && IsValid(LowEntity->P))
-	{
-		OldP = &LowEntity->P;
-	}
-
-	if (IsValid(NewPInit))
-	{
-		NewP = &NewPInit;
-	}
-
-	ChangeEntityLocationRaw(Arena, World, LowEntityIndex, OldP, NewP);
-	if (NewP)
-	{
-		LowEntity->P = *NewP;
-		ClearFlags(&LowEntity->Sim, EntityFlag_Nonspatial);
-	}
-	else
-	{
-		LowEntity->P = NullPosition();
-		AddFlags(&LowEntity->Sim, EntityFlag_Nonspatial);
-	}
+	b32 Result = ((Block->EntityDataSize + Size) <= sizeof(Block->EntityData));
+	return(Result);
 }
+
+internal void
+PackEntityIntoChunk(world *World, entity *Source, world_chunk *Chunk)
+{
+	u32 PackSize = sizeof(Source);
+
+	if (!Chunk->FirstBlock || !HasRoomFor(Chunk->FirstBlock, PackSize))
+	{
+		if (!World->FirstFreeBlock)
+		{
+			World->FirstFreeBlock = PushStruct(&World->Arena, world_entity_block);
+			World->FirstFreeBlock->Next = 0;
+		}
+
+		Chunk->FirstBlock = World->FirstFreeBlock;
+		World->FirstFreeBlock = Chunk->FirstBlock->Next;
+
+		ClearWorldEntityBlock(Chunk->FirstBlock);
+	}
+
+	world_entity_block *Block = Chunk->FirstBlock;
+
+	Assert(HasRoomFor(Block, PackSize));
+	u8 *Dest = (Block->EntityData + Block->EntityDataSize);
+	Block->EntityDataSize += PackSize;
+
+	*(entity *)Dest = *Source;
+}
+
+internal void
+PackEntityIntoWorld(world *World, entity *Source, world_position At)
+{
+	world_chunk *Chunk = GetWorldChunk(World, At.ChunkX, At.ChunkY, At.ChunkZ, &World->Arena);
+	PackEntityIntoChunk(World, Source, Chunk);
+}
+
+inline void
+AddBlockToFreeList(world *World, world_entity_block *Old)
+{
+	Old->Next = World->FirstFreeBlock;
+	World->FirstFreeBlock = Old;
+}
+
+inline void
+AddChunkToFreeList(world *World, world_chunk *Old)
+{
+	Old->NextInHash = World->FirstFreeChunk;
+	World->FirstFreeChunk = Old;
+}
+

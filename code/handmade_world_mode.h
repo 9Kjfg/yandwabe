@@ -2,17 +2,6 @@
 
 struct game_mode_world;
 
-struct low_entity
-{
-	// TODO: It seems like we have to store ChunkX/Y/Z with each
-	// entity because even though the sim region gather doesn't need it 
-	// at first, and we could get by without it, entity references pull
-	// in etities WITHOUT going through their world_chunk, and thus
-	// still need to know the ChunkX/Y/Z
-	world_position P;
-	sim_entity Sim;
-};
-
 struct pairwise_collision_rule
 {
 	bool32 CanCollide;
@@ -61,14 +50,14 @@ struct game_mode_world
 	pairwise_collision_rule *CollisionRuleHash[256];
 	pairwise_collision_rule *FirstFreeCollisionRule;
 
-	sim_entity_collision_volume_group *NullCollision;
-	sim_entity_collision_volume_group *StairCollision;
-	sim_entity_collision_volume_group *HeroBodyCollision;
-	sim_entity_collision_volume_group *HeroHeadCollision;
-	sim_entity_collision_volume_group *MonsterCollision;
-	sim_entity_collision_volume_group *FamiliarCollision;
-	sim_entity_collision_volume_group *WallCollision;
-	sim_entity_collision_volume_group *FloorCollision;
+	entity_collision_volume_group *NullCollision;
+	entity_collision_volume_group *StairCollision;
+	entity_collision_volume_group *HeroBodyCollision;
+	entity_collision_volume_group *HeroHeadCollision;
+	entity_collision_volume_group *MonsterCollision;
+	entity_collision_volume_group *FamiliarCollision;
+	entity_collision_volume_group *WallCollision;
+	entity_collision_volume_group *FloorCollision;
 
 	real32 Time;
 
@@ -80,8 +69,8 @@ struct game_mode_world
 	u32 NextParticle;
 	particle Particles[256];
 
-	b32 CreationBufferLocked;// TODO: Remove this eventually, just for catching bugs
-	low_entity CreationBuffer;
+	u32 CreationBufferIndex;
+	entity CreationBuffer[4];
 	u32 LastUsedEntityStorageIndex; // TODO: Worry about this wrapping - free list for IDs?
 
 	particle_cel ParticleCels[PARTICLE_CEL_DIM][PARTICLE_CEL_DIM];

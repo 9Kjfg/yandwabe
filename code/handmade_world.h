@@ -32,7 +32,7 @@ struct world_chunk
 	int32 ChunkZ;
 
 	// TODO: Profile this and determine if a pointer would be better here!
-	world_entity_block FirstBlock;
+	world_entity_block *FirstBlock;
 
 	world_chunk *NextInHash;
 };
@@ -50,6 +50,9 @@ struct world
 	world_chunk *ChunkHash[4096];
 
 	memory_arena Arena;
+
+	world_chunk *FirstFreeChunk;
+	world_entity_block *FirstFreeBlock;
 };
 
 #define HANDMADE_WORLD_H

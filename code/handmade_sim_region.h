@@ -35,14 +35,15 @@ struct entity_id
 	u32 Value;
 };
 
-struct sim_entity;
+struct entity;
+
 union entity_reference
 {
-    sim_entity *Ptr;
+    entity *Ptr;
     entity_id Index;
 };
 
-enum sim_entity_flags
+enum entity_flags
 {
 	// TODO: Collides and ZSupported probably can be for _non_ colliding entities 
 	EntityFlag_Collides = (1 << 0),
@@ -52,30 +53,30 @@ enum sim_entity_flags
 	EntityFlag_Simming = (1 << 30)
 };
 
-struct sim_entity_collision_volume 
+struct entity_collision_volume 
 {
 	v3 OffsetP;
 	v3 Dim;
 };
 
-struct sim_entity_traversable_point
+struct entity_traversable_point
 {
 	v3 P;
 };
 
-struct sim_entity_collision_volume_group
+struct entity_collision_volume_group
 {
-	sim_entity_collision_volume TotalVolume;
+	entity_collision_volume TotalVolume;
 
 	// TODO: Volume is always expected to be greated than 0 if the entity
 	// has any volume... in the future, this could be compressed of necessary to say
 	// that the VolumeCount can be 0 if the TotalVolume should be used as the only
 	// collision volume for the entity
 	u32 VolumeCount;
-	sim_entity_collision_volume *Volumes;
+	entity_collision_volume *Volumes;
 
 	u32 TraversableCount;
-	sim_entity_traversable_point *Traversables;
+	entity_traversable_point *Traversables;
 };
 
 enum sim_movement_mode
@@ -84,10 +85,11 @@ enum sim_movement_mode
 	MovementMode_Hopping,
 };
 
-struct sim_entity
+struct entity
 {
 	// NOTE: These are only for the sim region
 	world_chunk *OldChunk;
+	world_position ChunkP;
 	entity_id StorageIndex;
 	u32 Updatable;
 	//
@@ -100,7 +102,7 @@ struct sim_entity
 
 	r32 DistanceLimit;
 
-	sim_entity_collision_volume_group *Collision;
+	entity_collision_volume_group *Collision;
 
 	r32 FacingDirection;
 	r32 tBob;
@@ -129,9 +131,9 @@ struct sim_entity
 	v2 FloorDisplace;
 };
 
-struct sim_entity_hash
+struct entity_hash
 {
-    sim_entity *Ptr;
+    entity *Ptr;
     entity_id Index;
 };
 
@@ -150,10 +152,10 @@ struct sim_region
 
     u32 MaxEntityCount;
     u32 EntityCount;
-    sim_entity *Entities;
+    entity *Entities;
 
     // NOTE: Must be a power of two
-    sim_entity_hash Hash[4096];
+    entity_hash Hash[4096];
 };
 
 #define HANDMADE_SIMULATION_REGION_H
