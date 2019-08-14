@@ -229,7 +229,7 @@ HasRoomFor(world_entity_block *Block, u32 Size)
 internal void
 PackEntityIntoChunk(world *World, entity *Source, world_chunk *Chunk)
 {
-	u32 PackSize = sizeof(Source);
+	u32 PackSize = sizeof(*Source);
 
 	if (!Chunk->FirstBlock || !HasRoomFor(Chunk->FirstBlock, PackSize))
 	{
@@ -250,6 +250,7 @@ PackEntityIntoChunk(world *World, entity *Source, world_chunk *Chunk)
 	Assert(HasRoomFor(Block, PackSize));
 	u8 *Dest = (Block->EntityData + Block->EntityDataSize);
 	Block->EntityDataSize += PackSize;
+	++Block->EntityCount;
 
 	*(entity *)Dest = *Source;
 }
@@ -258,6 +259,7 @@ internal void
 PackEntityIntoWorld(world *World, entity *Source, world_position At)
 {
 	world_chunk *Chunk = GetWorldChunk(World, At.ChunkX, At.ChunkY, At.ChunkZ, &World->Arena);
+	Assert(Chunk);
 	PackEntityIntoChunk(World, Source, Chunk);
 }
 

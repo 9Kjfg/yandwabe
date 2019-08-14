@@ -5,14 +5,14 @@ struct game_mode_world;
 struct pairwise_collision_rule
 {
 	bool32 CanCollide;
-	uint32 StorageIndexA;
-	uint32 StorageIndexB;
+	uint32 IDA;
+	uint32 IDB;
 
 	pairwise_collision_rule *NextInHash;
 };
 
-internal void AddCollisionRule(game_mode_world *WorldMode, uint32 StorageIndexA, uint32 StorageIndexB, bool32 ShouldCollide);
-internal void ClearCollisionRulesFor(game_mode_world *WorldMode, uint32 StorageIndex);
+internal void AddCollisionRule(game_mode_world *WorldMode, uint32 IDA, uint32 IDB, bool32 ShouldCollide);
+internal void ClearCollisionRulesFor(game_mode_world *WorldMode, uint32 ID);
 
 struct ground_buffer
 {
@@ -71,7 +71,7 @@ struct game_mode_world
 
 	u32 CreationBufferIndex;
 	entity CreationBuffer[4];
-	u32 LastUsedEntityStorageIndex; // TODO: Worry about this wrapping - free list for IDs?
+	u32 LastUsedEntityID; // TODO: Worry about this wrapping - free list for IDs?
 
 	particle_cel ParticleCels[PARTICLE_CEL_DIM][PARTICLE_CEL_DIM];
 };
