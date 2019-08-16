@@ -231,23 +231,49 @@ EndSim(sim_region *Region, game_mode_world *WorldMode)
 				
 				NewCameraP.ChunkZ = EntityP.ChunkZ;
 
+				v3 RoomDelta = {21.0f, 12.5f, 0.0f};
+				v3 hRoomDelta = 0.5f * RoomDelta;
+				r32 ApronSize = 0.7f;
+				r32 BounceHeight = 1.0f;
+				v3 hRoomApron = {hRoomDelta.x - ApronSize, hRoomDelta.y - ApronSize, 0.0f};
+
 				if (Global_Renderer_Camera_RoomBased)
 				{
-					if (Entity->P.x > 9.0f)
+					WorldMode->CameraOffset = V3(0, 0, 0);
+
+					v3 AppliedDelta = {};
+					if (Entity->P.x > hRoomDelta.x)
 					{
-						NewCameraP = MapIntoChunkSpace(World, NewCameraP, V3(18.0f, 0, 0));
+						AppliedDelta = V3(RoomDelta.x, 0, 0);
+						NewCameraP = MapIntoChunkSpace(World, NewCameraP, AppliedDelta);
 					}
-					if (Entity->P.x < -9.0f)
+					if (Entity->P.x < -hRoomDelta.x)
 					{
-						NewCameraP = MapIntoChunkSpace(World, NewCameraP, V3(-18.0f, 0, 0));
+						AppliedDelta = V3(-RoomDelta.x, 0, 0);
+						NewCameraP = MapIntoChunkSpace(World, NewCameraP, AppliedDelta);
 					}
-					if (Entity->P.y > 5.0f)
+					if (Entity->P.y > hRoomDelta.y)
 					{
-						NewCameraP = MapIntoChunkSpace(World, NewCameraP, V3(0, 10.0f, 0));
+						AppliedDelta = V3(0, RoomDelta.y, 0);
+						NewCameraP = MapIntoChunkSpace(World, NewCameraP, AppliedDelta);
 					}
-					if (Entity->P.y < -5.0f)
+					if (Entity->P.y < -hRoomDelta.y)
 					{
-						NewCameraP = MapIntoChunkSpace(World, NewCameraP, V3(0, -10.0f, 0));
+						AppliedDelta = V3(0, -RoomDelta.y, 0);
+						NewCameraP = MapIntoChunkSpace(World, NewCameraP, AppliedDelta);
+					}
+					
+					v3 EntityP = Entity->P - AppliedDelta;
+
+					if (EntityP.y > hRoomApron.y)
+					{
+						r32 t = Clamp01MapToRange(hRoomApron.y, EntityP.y, hRoomDelta.y);
+						WorldMode->CameraOffset = V3(0, t*hRoomDelta.y, (-(t*t)+2.0f*t)*BounceHeight);
+					}
+					if (EntityP.y < -hRoomApron.y)
+					{
+						r32 t = Clamp01MapToRange(-hRoomApron.y, EntityP.y, -hRoomDelta.y);
+						WorldMode->CameraOffset = V3(0, -t*hRoomDelta.y, (-(t*t)+2.0f*t)*BounceHeight);
 					}
 				}
 				else

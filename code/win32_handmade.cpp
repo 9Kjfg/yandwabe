@@ -1911,7 +1911,7 @@ WinMain(
 			LPVOID BaseAddress = 0;
 #endif
 			game_memory GameMemory = {};
-			GameMemory.PermanentStorageSize = Megabytes(15);
+			GameMemory.PermanentStorageSize = Megabytes(25);
 			GameMemory.TransientStorageSize = Megabytes(256);
 			GameMemory.DebugStorageSize = Megabytes(256);
 #if HANDMADE_INTERNAL

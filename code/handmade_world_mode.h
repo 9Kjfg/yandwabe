@@ -45,6 +45,7 @@ struct game_mode_world
 	// TODO: Should we allow spit-screen?
 	entity_id CameraFollowingEntityIndex;
 	world_position CameraP;
+	v3 CameraOffset;
 
 	// TODOL Must be power of to
 	pairwise_collision_rule *CollisionRuleHash[256];
