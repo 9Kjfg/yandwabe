@@ -52,7 +52,8 @@ ChunkPositionFromTilePosition(world *World, int32 AbsTileX, int32 AbsTileY, int3
 }
 
 internal void
-AddStandartRoom(game_mode_world *WorldMode, u32 AbsTileX, u32 AbsTileY, u32 AbsTileZ)
+AddStandartRoom(game_mode_world *WorldMode, u32 AbsTileX, u32 AbsTileY, u32 AbsTileZ,
+	random_series *Series)
 {
 	for (s32 OffsetY = -4;
 		OffsetY <= 4;
@@ -64,6 +65,7 @@ AddStandartRoom(game_mode_world *WorldMode, u32 AbsTileX, u32 AbsTileY, u32 AbsT
 		{
 			world_position P = ChunkPositionFromTilePosition(
 				WorldMode->World, AbsTileX + OffsetX, AbsTileY + OffsetY, AbsTileZ);
+			P.Offset_.z = 0.25f*(r32)(OffsetX + OffsetY);
 			entity *Entity = BeginGroundedEntity(WorldMode, EntityType_Floor,
 				WorldMode->FloorCollision);
 			EndEntity(WorldMode, Entity, P);
@@ -338,6 +340,8 @@ GetClosestTraversable(sim_region *SimRegion, v3 FromP, v3 *Result)
 			entity_traversable_point P = GetSimSpaceTraversable(TestEntity, PIndex);
 
 			v3 HeadToPoint = P.P - FromP;
+			// TODO: What should this value be??
+			HeadToPoint.z = ClampAboveZero(AbsoluteValue(HeadToPoint.z) - 1.0f);
 
 			r32 TestDSq = LengthSq(HeadToPoint);
 			if (ClosestDistanceSq > TestDSq)
@@ -445,7 +449,7 @@ PlayWorld(game_state *GameState, transient_state *TranState)
 		AddStandartRoom(WorldMode,
 			ScreenX*TilesPerWidth + TilesPerWidth/2,
 			ScreenY*TilesPerHeight + TilesPerHeight/2,
-			AbsTileZ);
+			AbsTileZ, &Series);
 
 		for (uint32 TileY = 0;
 			TileY < TilesPerHeight;
@@ -715,7 +719,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 
 	// TODO: How big do we actually want to expand here?
 	// TODO: Do we want to simulate upper floors, ets.?
-	v3 SimBoundsExpansion = {15.0f, 15.0f, 0.0f};
+	v3 SimBoundsExpansion = {15.0f, 15.0f, 15.0f};
 	rectangle3 SimBounds = AddRadiusTo(CameraBoundsInMeters, SimBoundsExpansion);
 	temporary_memory SimMemory = BeginTemporaryMemory(&TranState->TranArena);
 	world_position SimCenterP = WorldMode->CameraP;

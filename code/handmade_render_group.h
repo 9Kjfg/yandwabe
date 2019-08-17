@@ -61,6 +61,7 @@ struct render_entry_cliprect
 {
 	render_entry_cliprect *Next;
 	rectangle2i Rect;
+	u32 RenderTarget;
 };
 
 struct render_entry_clear

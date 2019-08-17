@@ -228,41 +228,35 @@ EndSim(sim_region *Region, game_mode_world *WorldMode)
 			if (Entity->ID.Value == WorldMode->CameraFollowingEntityIndex.Value)
 			{
 				world_position NewCameraP = WorldMode->CameraP;
-				
-				NewCameraP.ChunkZ = EntityP.ChunkZ;
 
-				v3 RoomDelta = {21.0f, 12.5f, 0.0f};
+				v3 RoomDelta = {21.0f, 12.5f, WorldMode->TypicalFloorHeight};
 				v3 hRoomDelta = 0.5f * RoomDelta;
 				r32 ApronSize = 0.7f;
 				r32 BounceHeight = 1.0f;
-				v3 hRoomApron = {hRoomDelta.x - ApronSize, hRoomDelta.y - ApronSize, 0.0f};
+				v3 hRoomApron = {hRoomDelta.x - ApronSize, hRoomDelta.y - ApronSize, hRoomDelta.z - ApronSize};
 
 				if (Global_Renderer_Camera_RoomBased)
 				{
 					WorldMode->CameraOffset = V3(0, 0, 0);
 
 					v3 AppliedDelta = {};
-					if (Entity->P.x > hRoomDelta.x)
+
+					for (u32 E = 0;
+						E < 3;
+						++E)
 					{
-						AppliedDelta = V3(RoomDelta.x, 0, 0);
-						NewCameraP = MapIntoChunkSpace(World, NewCameraP, AppliedDelta);
+						if (Entity->P.E[E] > hRoomDelta.E[E])
+						{
+							AppliedDelta.E[E] = RoomDelta.E[E];
+							NewCameraP = MapIntoChunkSpace(World, NewCameraP, AppliedDelta);
+						}
+						if (Entity->P.E[E] < -hRoomDelta.E[E])
+						{
+							AppliedDelta.E[E] = -RoomDelta.E[E];
+							NewCameraP = MapIntoChunkSpace(World, NewCameraP, AppliedDelta);
+						}	
 					}
-					if (Entity->P.x < -hRoomDelta.x)
-					{
-						AppliedDelta = V3(-RoomDelta.x, 0, 0);
-						NewCameraP = MapIntoChunkSpace(World, NewCameraP, AppliedDelta);
-					}
-					if (Entity->P.y > hRoomDelta.y)
-					{
-						AppliedDelta = V3(0, RoomDelta.y, 0);
-						NewCameraP = MapIntoChunkSpace(World, NewCameraP, AppliedDelta);
-					}
-					if (Entity->P.y < -hRoomDelta.y)
-					{
-						AppliedDelta = V3(0, -RoomDelta.y, 0);
-						NewCameraP = MapIntoChunkSpace(World, NewCameraP, AppliedDelta);
-					}
-					
+
 					v3 EntityP = Entity->P - AppliedDelta;
 
 					if (EntityP.y > hRoomApron.y)
@@ -274,6 +268,26 @@ EndSim(sim_region *Region, game_mode_world *WorldMode)
 					{
 						r32 t = Clamp01MapToRange(-hRoomApron.y, EntityP.y, -hRoomDelta.y);
 						WorldMode->CameraOffset = V3(0, -t*hRoomDelta.y, (-(t*t)+2.0f*t)*BounceHeight);
+					}
+					if (EntityP.x > hRoomApron.x)
+					{
+						r32 t = Clamp01MapToRange(hRoomApron.x, EntityP.x, hRoomDelta.x);
+						WorldMode->CameraOffset = V3(-t*hRoomDelta.x, 0, (-(t*t)+2.0f*t)*BounceHeight);
+					}
+					if (EntityP.x < -hRoomApron.x)
+					{
+						r32 t = Clamp01MapToRange(-hRoomApron.x, EntityP.x, -hRoomDelta.x);
+						WorldMode->CameraOffset = V3(-t*hRoomDelta.x, 0, (-(t*t)+2.0f*t)*BounceHeight);
+					}
+					if (EntityP.z > hRoomApron.z)
+					{
+						r32 t = Clamp01MapToRange(hRoomApron.z, EntityP.z, hRoomDelta.z);
+						WorldMode->CameraOffset = V3(0, 0, t*hRoomDelta.z);
+					}
+					if (EntityP.z < -hRoomApron.z)
+					{
+						r32 t = Clamp01MapToRange(-hRoomApron.z, EntityP.z, -hRoomDelta.z);
+						WorldMode->CameraOffset = V3(0, 0, t*hRoomDelta.z);
 					}
 				}
 				else
