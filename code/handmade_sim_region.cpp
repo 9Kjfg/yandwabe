@@ -11,6 +11,13 @@ GetSimSpaceTraversable(entity *Entity, u32 Index)
 	return(Result);
 }
 
+inline entity_traversable_point
+GetSimSpaceTraversable(traversable_reference Ref)
+{
+	entity_traversable_point Result = GetSimSpaceTraversable(Ref.Entity.Ptr, Ref.Index);
+	return(Result);
+}
+
 internal entity_hash *
 GetHashFromID(sim_region *SimRegion, entity_id ID)
 {
@@ -55,12 +62,9 @@ LoadEntityReference(sim_region *SimRegion, entity_reference *Ref)
 }
 
 inline void
-StoreEntityReference(entity_reference *Ref)
+LoadTraversableReference(sim_region *SimRegion, traversable_reference *Ref)
 {
-    if (Ref->Ptr != 0)
-    {
-        Ref->Index = Ref->Ptr->ID;
-    }
+	LoadEntityReference(SimRegion, &Ref->Entity);
 }
 
 inline bool32
@@ -94,8 +98,6 @@ AddEntity(game_mode_world *WorldMode, sim_region *SimRegion, entity *Source, v3 
 		
 		Dest->ID = ID;
 		Dest->P += ChunkDelta;
-		Dest->MovementFrom += ChunkDelta;
-		Dest->MovementTo += ChunkDelta;
 
 		Dest->Updatable = EntityOverlapsRectangle(Dest->P, Dest->Collision->TotalVolume, SimRegion->UpdatableBounds);
 	}
@@ -114,6 +116,8 @@ ConnectEntityPointers(sim_region *SimRegion)
 	{
 		entity *Entity = SimRegion->Entities + EntityIndex;
 		LoadEntityReference(SimRegion, &Entity->Head);
+		LoadTraversableReference(SimRegion, &Entity->StandingOn);
+		LoadTraversableReference(SimRegion, &Entity->MovingTo);
 	}
 }
 
@@ -301,9 +305,6 @@ EndSim(sim_region *Region, game_mode_world *WorldMode)
 			}
 
 			Entity->P += ChunkDelta;
-			Entity->MovementFrom += ChunkDelta;
-			Entity->MovementTo += ChunkDelta;
-			StoreEntityReference(&Entity->Head);
 			PackEntityIntoWorld(World, Entity, EntityP);
         }
     }
@@ -663,4 +664,47 @@ MoveEntity(game_mode_world *WorldMode, sim_region *SimRegion, entity *Entity, re
 		// TODO: Do we want formalize this number
 		Entity->DistanceLimit = DistanceRemaining;
 	}
+}
+
+internal b32
+GetClosestTraversable(sim_region *SimRegion, v3 FromP, traversable_reference *Result)
+{
+	b32 Found = false;
+
+	r32 ClosestDistanceSq = Square(1000.0f);
+	entity *TestEntity = SimRegion->Entities;
+	for (uint32 TestEntityIndex = 0;
+		TestEntityIndex < SimRegion->EntityCount;
+		++TestEntityIndex, ++TestEntity)
+	{
+		entity_collision_volume_group *VolGroup = TestEntity->Collision;
+		for (u32 PIndex = 0;
+			PIndex < VolGroup->TraversableCount;
+			++PIndex)
+		{
+			entity_traversable_point P = GetSimSpaceTraversable(TestEntity, PIndex);
+
+			v3 HeadToPoint = P.P - FromP;
+			// TODO: What should this value be??
+			HeadToPoint.z = ClampAboveZero(AbsoluteValue(HeadToPoint.z) - 1.0f);
+
+			r32 TestDSq = LengthSq(HeadToPoint);
+			if (ClosestDistanceSq > TestDSq)
+			{
+				// P.P;
+				Result->Entity.Ptr = TestEntity;
+				Result->Index = PIndex;
+				ClosestDistanceSq = TestDSq;
+				Found = true;
+			}
+		}
+	}
+
+	if (!Found)
+	{
+		Result->Entity.Ptr = 0;
+		Result->Index = 0;
+	}
+
+	return(Found);
 }
