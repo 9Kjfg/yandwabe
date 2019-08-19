@@ -180,6 +180,7 @@ MapIntoChunkSpace(world *World, world_position BasePos, v3 Offest)
 	world_position Result = BasePos;
 
 	Result.Offset_ += Offest;
+
 	RecanonicalizeCoord(World->ChunkDimInMeters.x, &Result.ChunkX, &Result.Offset_.x);
 	RecanonicalizeCoord(World->ChunkDimInMeters.y, &Result.ChunkY, &Result.Offset_.y);
 	RecanonicalizeCoord(World->ChunkDimInMeters.z, &Result.ChunkZ, &Result.Offset_.z);

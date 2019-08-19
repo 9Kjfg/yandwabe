@@ -44,6 +44,14 @@ struct traversable_reference
 	u32 Index;
 };
 
+inline b32 IsEqual(traversable_reference A, traversable_reference B)
+{
+	b32 Result = (A.Entity.Ptr == B.Entity.Ptr) &&
+		(A.Entity.Index.Value == B.Entity.Index.Value) &&
+		(A.Index == B.Index);
+	
+	return(Result);
+}
 
 enum entity_flags
 {

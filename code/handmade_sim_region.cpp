@@ -224,7 +224,7 @@ EndSim(sim_region *Region, game_mode_world *WorldMode)
 			world_position ChunkP = EntityP;
 			ChunkP.Offset_ = V3(0, 0, 0);
 
-			v3 ChunkDelta = -Subtract(Region->World, &ChunkP, &Region->Origin);
+			v3 ChunkDelta = EntityP.Offset_ - Entity->P;
 
 			// TODO: Save state back to the stored entity, once high entities
 			// do state decompression, etc.
@@ -684,11 +684,11 @@ GetClosestTraversable(sim_region *SimRegion, v3 FromP, traversable_reference *Re
 		{
 			entity_traversable_point P = GetSimSpaceTraversable(TestEntity, PIndex);
 
-			v3 HeadToPoint = P.P - FromP;
+			v3 ToPoint = P.P - FromP;
 			// TODO: What should this value be??
-			HeadToPoint.z = ClampAboveZero(AbsoluteValue(HeadToPoint.z) - 1.0f);
+			ToPoint.z = ClampAboveZero(AbsoluteValue(ToPoint.z) - 1.0f);
 
-			r32 TestDSq = LengthSq(HeadToPoint);
+			r32 TestDSq = LengthSq(ToPoint);
 			if (ClosestDistanceSq > TestDSq)
 			{
 				// P.P;
