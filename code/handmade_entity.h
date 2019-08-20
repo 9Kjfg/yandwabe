@@ -66,11 +66,6 @@ struct entity_collision_volume
 	v3 Dim;
 };
 
-struct entity_traversable_point
-{
-	v3 P;
-};
-
 struct entity_collision_volume_group
 {
 	entity_collision_volume TotalVolume;
@@ -81,9 +76,12 @@ struct entity_collision_volume_group
 	// collision volume for the entity
 	u32 VolumeCount;
 	entity_collision_volume *Volumes;
+};
 
-	u32 TraversableCount;
-	entity_traversable_point *Traversables;
+struct entity_traversable_point
+{
+	v3 P;
+	entity *Occupier;
 };
 
 enum entity_movement_mode
@@ -126,13 +124,16 @@ struct entity
 
 	entity_movement_mode MovementMode;
 	r32 tMovement;
-	traversable_reference StandingOn;
-	traversable_reference MovingTo;
+	traversable_reference Occupying;
+	traversable_reference CameFrom;
 
 	v2 XAxis;
 	v2 YAxis;
 
 	v2 FloorDisplace;
+
+	u32 TraversableCount;
+	entity_traversable_point Traversables[16];
 };
 
 inline bool32

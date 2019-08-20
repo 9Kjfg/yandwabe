@@ -270,8 +270,8 @@ PackEntityIntoChunk(world *World, entity *Source, world_chunk *Chunk)
 
 	entity *DestE = (entity *)Dest;
 	*DestE = *Source;
-	PackTraversableReference(&DestE->StandingOn);
-	PackTraversableReference(&DestE->MovingTo);
+	PackTraversableReference(&DestE->Occupying);
+	PackTraversableReference(&DestE->CameFrom);
 	PackEntityReference(&DestE->Head);
 }
 

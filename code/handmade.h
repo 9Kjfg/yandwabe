@@ -308,6 +308,7 @@ struct controlled_hero
 	r32 dZ;
 	r32 RecenterTimer;
 	b32 Exited;
+	b32 DebugSpawn;
 };
 
 enum entity_residence

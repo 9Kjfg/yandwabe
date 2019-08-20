@@ -1,12 +1,36 @@
 
+inline entity_traversable_point *
+GetTraversable(entity *Entity, u32 Index)
+{
+	entity_traversable_point *Result = 0;
+	if (Entity)
+	{
+		Assert(Index < Entity->TraversableCount);
+		Result = Entity->Traversables + Index;
+	}
+	return(Result);
+}
+
+inline entity_traversable_point *
+GetTraversable(traversable_reference Reference)
+{
+	entity_traversable_point *Result = GetTraversable(Reference.Entity.Ptr, Reference.Index);
+	return(Result);
+}
+
 inline entity_traversable_point
 GetSimSpaceTraversable(entity *Entity, u32 Index)
 {
-	Assert(Index < Entity->Collision->TraversableCount);
-	entity_traversable_point Result = Entity->Collision->Traversables[Index];
+	entity_traversable_point Result = {};
+	Result.P = Entity->P;
 
-	// TODO: This wants to be roted eventually
-	Result.P += Entity->P;
+	entity_traversable_point *Point = GetTraversable(Entity, Index);
+	if (Point)
+	{
+		// TODO: This wants to be roted eventually
+		Result.P += Point->P;
+		Result.Occupier = Point->Occupier;
+	}
 
 	return(Result);
 }
@@ -116,8 +140,13 @@ ConnectEntityPointers(sim_region *SimRegion)
 	{
 		entity *Entity = SimRegion->Entities + EntityIndex;
 		LoadEntityReference(SimRegion, &Entity->Head);
-		LoadTraversableReference(SimRegion, &Entity->StandingOn);
-		LoadTraversableReference(SimRegion, &Entity->MovingTo);
+
+		LoadTraversableReference(SimRegion, &Entity->Occupying);
+		if (Entity->Occupying.Entity.Ptr)
+		{
+			Entity->Occupying.Entity.Ptr->Traversables[Entity->Occupying.Index].Occupier = Entity;
+		}
+		LoadTraversableReference(SimRegion, &Entity->CameFrom);
 	}
 }
 
@@ -435,7 +464,7 @@ SpeculativeCollide(entity *Mover, entity *Region, v3 TestP)
 	}
 
 	return(Result);
-}
+}	
 
 internal bool32
 EntitiesOverlapped(entity *Entity, entity *TestEntity, v3 Epsilon = V3(0, 0, 0))
@@ -460,6 +489,27 @@ EntitiesOverlapped(entity *Entity, entity *TestEntity, v3 Epsilon = V3(0, 0, 0))
 			rectangle3 TestEntityRect = RectCenterDim(TestEntity->P + TestVolume->OffsetP, TestVolume->Dim);
 			Result = RectanglesIntersect(EntityRect, TestEntityRect);
 		}
+	}
+
+	return(Result);
+}
+
+internal b32
+TransactionOccupy(entity *Entity, traversable_reference *DestRef, traversable_reference DesiredRef)
+{
+	b32 Result = false;
+
+	entity_traversable_point *Desired = GetTraversable(DesiredRef);
+	if (!Desired->Occupier)
+	{
+		entity_traversable_point *Dest = GetTraversable(*DestRef);
+		if (Dest)
+		{
+			Dest->Occupier = 0;
+		}
+		*DestRef = DesiredRef;
+		Desired->Occupier = Entity;
+		Result = true;
 	}
 
 	return(Result);
@@ -666,8 +716,14 @@ MoveEntity(game_mode_world *WorldMode, sim_region *SimRegion, entity *Entity, re
 	}
 }
 
+enum traversable_search_flag
+{
+	TraversableSearch_Unoccupied = 0x1,
+};
+
 internal b32
-GetClosestTraversable(sim_region *SimRegion, v3 FromP, traversable_reference *Result)
+GetClosestTraversable(sim_region *SimRegion, v3 FromP, traversable_reference *Result,
+	u32 Flags = 0)
 {
 	b32 Found = false;
 
@@ -677,25 +733,26 @@ GetClosestTraversable(sim_region *SimRegion, v3 FromP, traversable_reference *Re
 		TestEntityIndex < SimRegion->EntityCount;
 		++TestEntityIndex, ++TestEntity)
 	{
-		entity_collision_volume_group *VolGroup = TestEntity->Collision;
 		for (u32 PIndex = 0;
-			PIndex < VolGroup->TraversableCount;
+			PIndex < TestEntity->TraversableCount;
 			++PIndex)
 		{
 			entity_traversable_point P = GetSimSpaceTraversable(TestEntity, PIndex);
-
-			v3 ToPoint = P.P - FromP;
-			// TODO: What should this value be??
-			ToPoint.z = ClampAboveZero(AbsoluteValue(ToPoint.z) - 1.0f);
-
-			r32 TestDSq = LengthSq(ToPoint);
-			if (ClosestDistanceSq > TestDSq)
+			if (!(Flags & TraversableSearch_Unoccupied) || (P.Occupier == 0))
 			{
-				// P.P;
-				Result->Entity.Ptr = TestEntity;
-				Result->Index = PIndex;
-				ClosestDistanceSq = TestDSq;
-				Found = true;
+				v3 ToPoint = P.P - FromP;
+				// TODO: What should this value be??
+				ToPoint.z = ClampAboveZero(AbsoluteValue(ToPoint.z) - 1.0f);
+
+				r32 TestDSq = LengthSq(ToPoint);
+				if (ClosestDistanceSq > TestDSq)
+				{
+					// P.P;
+					Result->Entity.Ptr = TestEntity;
+					Result->Index = PIndex;
+					ClosestDistanceSq = TestDSq;
+					Found = true;
+				}
 			}
 		}
 	}
