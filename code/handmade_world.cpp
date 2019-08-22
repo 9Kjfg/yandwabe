@@ -228,24 +228,41 @@ HasRoomFor(world_entity_block *Block, u32 Size)
 }
 
 inline void
-PackEntityReference(entity_reference *Ref)
+PackEntityReferenceArray(u32 Count, entity_reference *Source, stored_entity_reference *Dest)
 {
-    if (Ref->Ptr != 0)
-    {
-        Ref->Index = Ref->Ptr->ID;
-    }
+	for (u32 Index = 0;
+		Index < Count;
+		++Index)
+	{
+		Dest->Index.Value = 0;
+		Dest->Relationship = Relationship_None;
+		
+		if (Source->Ptr == 0)
+		{
+			// TODO: Need the hash table to check if we should keep this!
+		}
+		else
+		{
+			Dest->Index = Source->Ptr->ID;
+			Dest->Relationship = Source->Stored.Relationship;
+		}
+
+		++Dest;
+		++Source;
+	}
 }
 
 inline void
 PackTraversableReference(traversable_reference *Ref)
 {
-	PackEntityReference(&Ref->Entity);
+	// TODO: Need to pack this!
+	//PackEntityReference(&Ref->Entity);
 }
 
 internal void
 PackEntityIntoChunk(world *World, entity *Source, world_chunk *Chunk)
 {
-	u32 PackSize = sizeof(*Source);
+	u32 PackSize = sizeof(*Source) + Source->PairedEntityCount*sizeof(stored_entity_reference);
 
 	if (!Chunk->FirstBlock || !HasRoomFor(Chunk->FirstBlock, PackSize))
 	{
@@ -272,7 +289,8 @@ PackEntityIntoChunk(world *World, entity *Source, world_chunk *Chunk)
 	*DestE = *Source;
 	PackTraversableReference(&DestE->Occupying);
 	PackTraversableReference(&DestE->CameFrom);
-	PackEntityReference(&DestE->Head);
+	PackEntityReferenceArray(Source->PairedEntityCount, Source->PairedEntities,
+		(stored_entity_reference *)(Source + 1));
 }
 
 internal void

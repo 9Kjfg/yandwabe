@@ -145,8 +145,17 @@ AddPlayer(game_mode_world *WorldMode, sim_region *SimRegion, traversable_referen
 	// guaranteeing now overlapping occupation.
 	Body->Occupying = StandingOn;
 
-	Head->Head.Ptr = Body;	
-	Body->Head.Ptr = Head; 
+	entity_reference BodyRefs[1] = {};
+	entity_reference HeadRefs[1] = {};
+
+	BodyRefs[0].Ptr = Head;
+	HeadRefs[0].Ptr = Body;
+
+	Body->PairedEntityCount = 1;
+	Body->PairedEntities = BodyRefs;
+
+	Head->PairedEntityCount = 1;
+	Head->PairedEntities = HeadRefs;
 
 	if (WorldMode->CameraFollowingEntityIndex.Value == 0)
 	{
@@ -836,8 +845,9 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 						
 						ConHero->RecenterTimer = ClampAboveZero(ConHero->RecenterTimer - dt);
 
+						// TODO: REENABLE!
 						entity *Head = Entity;
-						entity *Body = Head->Head.Ptr;
+						entity *Body = 0;//Head->Head.Ptr;
 
 						if (ConHero->dZ != 0.0f)
 						{	
@@ -917,7 +927,8 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 					{
 						DEBUG_VALUE(Entity->P);
 						
-						entity *Head = Entity->Head.Ptr;
+						// TODO: REENABLE!
+						entity *Head = 0;//Entity->Head.Ptr;
 						entity *Body = Entity;
 
 						Entity->dP = V3(0, 0, 0);
@@ -934,70 +945,15 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 						}
 						Body->FloorDisplace = (0.1f*HeadDelta).xy;
 						Body->YAxis = V2(0, 1) + 0.5f*HeadDelta.xy;
-		
-						r32 ddtBob = 0.0f;
-						switch (Entity->MovementMode)
-						{
-							case MovementMode_Planted:
-							{
-								if (Head)
-								{
-									r32 HeadDistance = Length(Head->P - Body->P);
-									r32 MaxHeadDistance = 0.5f;
-									r32 tHeadDistance = Clamp01MapToRange(0.0f, HeadDistance, MaxHeadDistance);
-									ddtBob = -20.0f*tHeadDistance;
-								}
-							} break;
-
-							case MovementMode_Hopping:
-							{
-								v3 MovementTo = GetSimSpaceTraversable(Entity->Occupying).P;
-								v3 MovementFrom = GetSimSpaceTraversable(Entity->CameFrom).P;
-
-								r32 tJump = 0.1f;
-								r32 tThrust = 0.2f;
-								r32 tLand = 0.9f;
-
-								if (Entity->tMovement < tThrust)
-								{
-									ddtBob = 30.0f;
-								}
-
-								if (Entity->tMovement < tLand)
-								{
-									r32 t = Clamp01MapToRange(tJump, Entity->tMovement, tLand);
-									v3 a = V3(0, -2.0f, 0);
-									v3 b = (MovementTo - MovementFrom) - a;
-									Entity->P = a*t*t + b*t + MovementFrom;
-								}
-
-								if (Entity->tMovement >= 1.0f)
-								{
-									Entity->P = MovementTo;
-									Entity->CameFrom = Entity->Occupying;
-									Entity->MovementMode = MovementMode_Planted;
-									Entity->dtBob = -2.0f;
-								}
-
-								Entity->tMovement += 5.0f*dt;
-								if (Entity->tMovement > 1.0f)
-								{
-									Entity->tMovement = 1.0f;
-								}
-							} break;
-						}
 					
-						r32 Cp = 100.0f;
-						r32 Cv = 10.0f;
-						ddtBob += Cp*(0.0f - Entity->tBob) + Cv*(0.0f - Entity->dtBob);
-						Entity->tBob += ddtBob*dt*dt + Entity->dtBob*dt;
-						Entity->dtBob += ddtBob*dt;
 					} break;
 
 					case EntityType_FloatyThingForNow:
 					{
-						Entity->P.z += 0.01f*Sin(Entity->tBob);
-						Entity->tBob += dt;
+						// TODO: Think about what this stuff actually  should mean
+						// or does mean, or will mean
+						//Entity->P.z += 0.01f*Sin(Entity->tBob);
+						//Entity->tBob += dt;
 					} break;
 
 					case EntityType_Familiar:
@@ -1037,6 +993,76 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 						MoveSpec.Drag = 8.0f;
 					} break;
 				}
+
+				//
+				// NOTE: Handle the entity's movement mode
+				//
+				r32 ddtBob = 0.0f;
+				switch (Entity->MovementMode)
+				{
+					case MovementMode_Planted:
+					{
+						r32 HeadDistance = 0.0f;
+						for (u32 PairedEntityIndex = 0;
+							PairedEntityIndex < Entity->PairedEntityCount;
+							++PairedEntityIndex)
+						{
+							entity *Pair = Entity->PairedEntities[PairedEntityIndex].Ptr;
+							if (Pair)
+							{
+								HeadDistance += LengthSq(Pair->P - Entity->P);
+							}
+						}
+						HeadDistance = SquareRoot(HeadDistance);
+
+						r32 MaxHeadDistance = 0.5f;
+						r32 tHeadDistance = Clamp01MapToRange(0.0f, HeadDistance, MaxHeadDistance);
+						ddtBob = -20.0f*tHeadDistance;
+					} break;
+
+					case MovementMode_Hopping:
+					{
+						v3 MovementTo = GetSimSpaceTraversable(Entity->Occupying).P;
+						v3 MovementFrom = GetSimSpaceTraversable(Entity->CameFrom).P;
+
+						r32 tJump = 0.1f;
+						r32 tThrust = 0.2f;
+						r32 tLand = 0.9f;
+
+						if (Entity->tMovement < tThrust)
+						{
+							ddtBob = 30.0f;
+						}
+
+						if (Entity->tMovement < tLand)
+						{
+							r32 t = Clamp01MapToRange(tJump, Entity->tMovement, tLand);
+							v3 a = V3(0, -2.0f, 0);
+							v3 b = (MovementTo - MovementFrom) - a;
+							Entity->P = a*t*t + b*t + MovementFrom;
+						}
+
+						if (Entity->tMovement >= 1.0f)
+						{
+							Entity->P = MovementTo;
+							Entity->CameFrom = Entity->Occupying;
+							Entity->MovementMode = MovementMode_Planted;
+							Entity->dtBob = -2.0f;
+						}
+
+						Entity->tMovement += 5.0f*dt;
+						if (Entity->tMovement > 1.0f)
+						{
+							Entity->tMovement = 1.0f;
+						}
+					} break;
+				}
+
+				r32 Cp = 100.0f;
+				r32 Cv = 10.0f;
+				ddtBob += Cp*(0.0f - Entity->tBob) + Cv*(0.0f - Entity->dtBob);
+				Entity->tBob += ddtBob*dt*dt + Entity->dtBob*dt;
+				Entity->dtBob += ddtBob*dt;
 
 				if (IsSet(Entity, EntityFlag_Moveable))
 				{

@@ -78,11 +78,14 @@ GetEntityByID(sim_region *SimRegion, entity_id ID)
 inline void
 LoadEntityReference(sim_region *SimRegion, entity_reference *Ref)
 {
+	// TODO: Load these!
+#if 0
     if (Ref->Index.Value)
     {
         entity_hash *Entry = GetHashFromID(SimRegion, Ref->Index);
         Ref->Ptr = Entry ? Entry->Ptr : 0;
     }
+#endif
 }
 
 inline void
@@ -134,6 +137,8 @@ AddEntity(game_mode_world *WorldMode, sim_region *SimRegion, entity *Source, v3 
 internal void
 ConnectEntityPointers(sim_region *SimRegion)
 {
+	// TODO: Reenable this!
+#if 0
 	for (u32 EntityIndex = 0;
 		EntityIndex < SimRegion->EntityCount;
 		++EntityIndex)
@@ -148,6 +153,7 @@ ConnectEntityPointers(sim_region *SimRegion)
 		}
 		LoadTraversableReference(SimRegion, &Entity->CameFrom);
 	}
+#endif
 }
 
 internal sim_region *
