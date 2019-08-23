@@ -38,29 +38,16 @@ enum entity_relationship
 	Relationship_Paired,
 };
 
-struct stored_entity_reference
-{
-	entity_id Index;
-	entity_relationship Relationship;
-};
-
 struct entity_reference
 {
     entity *Ptr;
-	stored_entity_reference Stored;
+	entity_id Index;
 };
-
-inline b32 ReferenceIsValid(entity_reference A)
-{
-	b32 Result = (A.Stored.Index.Value != 0);
-	return(Result);
-}
 
 inline b32 ReferenceAreEqual(entity_reference A, entity_reference B)
 {
 	b32 Result = ((A.Ptr == B.Ptr) &&
- 		(A.Stored.Index.Value == B.Stored.Index.Value) &&
-		(A.Stored.Relationship == B.Stored.Relationship));
+ 		(A.Index.Value == B.Index.Value));
 	return(Result);
 }
 
@@ -107,6 +94,24 @@ struct entity_traversable_point
 	entity *Occupier;
 };
 
+enum brain_type
+{
+	Brain_Hero,
+	Brain_Snake,
+
+	Brain_Count,
+};
+
+struct brain_slot
+{
+	u32 Index;
+};
+
+struct brain_id
+{
+	u32 Value;
+};
+
 enum entity_movement_mode
 {
 	MovementMode_Planted,
@@ -122,8 +127,9 @@ struct entity
     // NOTE:
 	//
 
-	u32 PairedEntityCount;
-	entity_reference *PairedEntities;
+	brain_type BrainType;
+	brain_slot BrainSlot;
+	brain_id BrainID;
 
 	//
 	//	NOTE: Everything bellow here is NOT out yet
@@ -170,6 +176,12 @@ inline bool32
 IsSet(entity *Entity, uint32 Flag)
 {
 	bool32 Result = Entity->Flags & Flag;
+	return(Result);
+}
+
+inline b32 IsDeleted(entity *E)
+{
+	b32 Result = IsSet(E, EntityFlag_Deleted);
 	return(Result);
 }
 

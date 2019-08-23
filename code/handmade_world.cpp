@@ -199,7 +199,7 @@ Subtract(world *World, world_position *A, world_position *B)
 	v3 Result = Hadamard(World->ChunkDimInMeters, dTile) + (A->Offset_ - B->Offset_);
 
 	return(Result);
-}
+}	
 
 inline world_position
 CenteredChunkPoint(uint32 ChunkX, uint32 ChunkY, uint32 ChunkZ)
@@ -228,41 +228,39 @@ HasRoomFor(world_entity_block *Block, u32 Size)
 }
 
 inline void
-PackEntityReferenceArray(u32 Count, entity_reference *Source, stored_entity_reference *Dest)
+PackEntityReference(sim_region *SimRegion, entity_reference *Ref)
 {
-	for (u32 Index = 0;
-		Index < Count;
-		++Index)
+	if (Ref->Ptr)
 	{
-		Dest->Index.Value = 0;
-		Dest->Relationship = Relationship_None;
-		
-		if (Source->Ptr == 0)
+		if (IsDeleted(Ref->Ptr))
 		{
-			// TODO: Need the hash table to check if we should keep this!
+			Ref->Index.Value = 0;
 		}
 		else
 		{
-			Dest->Index = Source->Ptr->ID;
-			Dest->Relationship = Source->Stored.Relationship;
+			Ref->Index = Ref->Ptr->ID;
 		}
-
-		++Dest;
-		++Source;
+	}
+	else if (Ref->Index.Value)
+	{
+		if (!SimRegion || GetHashFromID(SimRegion, Ref->Index))
+		{
+			Ref->Index.Value = 0;
+		}
 	}
 }
 
 inline void
-PackTraversableReference(traversable_reference *Ref)
+PackTraversableReference(sim_region *SimRegion, traversable_reference *Ref)
 {
 	// TODO: Need to pack this!
-	//PackEntityReference(&Ref->Entity);
+	PackEntityReference(SimRegion, &Ref->Entity);
 }
 
 internal void
-PackEntityIntoChunk(world *World, entity *Source, world_chunk *Chunk)
+PackEntityIntoChunk(world *World, sim_region *SimRegion, entity *Source, world_chunk *Chunk)
 {
-	u32 PackSize = sizeof(*Source) + Source->PairedEntityCount*sizeof(stored_entity_reference);
+	u32 PackSize = sizeof(*Source);
 
 	if (!Chunk->FirstBlock || !HasRoomFor(Chunk->FirstBlock, PackSize))
 	{
@@ -287,18 +285,16 @@ PackEntityIntoChunk(world *World, entity *Source, world_chunk *Chunk)
 
 	entity *DestE = (entity *)Dest;
 	*DestE = *Source;
-	PackTraversableReference(&DestE->Occupying);
-	PackTraversableReference(&DestE->CameFrom);
-	PackEntityReferenceArray(Source->PairedEntityCount, Source->PairedEntities,
-		(stored_entity_reference *)(Source + 1));
+	PackTraversableReference(SimRegion, &DestE->Occupying);
+	PackTraversableReference(SimRegion, &DestE->CameFrom);
 }
 
 internal void
-PackEntityIntoWorld(world *World, entity *Source, world_position At)
+PackEntityIntoWorld(world *World, sim_region *SimRegion, entity *Source, world_position At)
 {
 	world_chunk *Chunk = GetWorldChunk(World, At.ChunkX, At.ChunkY, At.ChunkZ, &World->Arena);
 	Assert(Chunk);
-	PackEntityIntoChunk(World, Source, Chunk);
+	PackEntityIntoChunk(World, SimRegion, Source, Chunk);
 }
 
 inline void

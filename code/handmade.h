@@ -300,7 +300,7 @@ Copy(memory_index Size, void *SourceInit, void *DestInit)
 
 struct controlled_hero
 {
-	entity_id EntityIndex;
+	brain_id BrainID;
 
 	// NOTE: These are the controller requests for simulation
 	v2 ddP;

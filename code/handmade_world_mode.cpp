@@ -1,4 +1,11 @@
 
+internal brain_id
+AddBrain(game_mode_world *WorldMode)
+{
+	brain_id ID = {++WorldMode->LastUsedEntityID};
+	return(ID);
+}
+
 internal entity *
 BeginLowEntity(game_mode_world *WorldMode, entity_type Type)
 {
@@ -20,7 +27,7 @@ EndEntity(game_mode_world *WorldMode, entity *EntityLow, world_position P)
 	--WorldMode->CreationBufferIndex;
 	Assert(EntityLow == (WorldMode->CreationBuffer + WorldMode->CreationBufferIndex));
 	EntityLow->P = P.Offset_;
-	PackEntityIntoWorld(WorldMode->World, EntityLow, P);
+	PackEntityIntoWorld(WorldMode->World, 0, EntityLow, P);
 }
 
 internal entity *
@@ -125,7 +132,7 @@ InitHitPoints(entity *EntityLow, uint32 HitPointCount)
 	}
 }
 
-internal entity_id
+internal brain_id
 AddPlayer(game_mode_world *WorldMode, sim_region *SimRegion, traversable_reference StandingOn)
 {
 	world_position P = MapIntoChunkSpace(SimRegion->World, SimRegion->Origin,
@@ -145,17 +152,13 @@ AddPlayer(game_mode_world *WorldMode, sim_region *SimRegion, traversable_referen
 	// guaranteeing now overlapping occupation.
 	Body->Occupying = StandingOn;
 
-	entity_reference BodyRefs[1] = {};
-	entity_reference HeadRefs[1] = {};
-
-	BodyRefs[0].Ptr = Head;
-	HeadRefs[0].Ptr = Body;
-
-	Body->PairedEntityCount = 1;
-	Body->PairedEntities = BodyRefs;
-
-	Head->PairedEntityCount = 1;
-	Head->PairedEntities = HeadRefs;
+	brain_id BrainID = AddBrain(WorldMode);
+	Body->BrainType = Brain_Hero;
+	Body->BrainSlot.Index = 0;
+	Body->BrainID = BrainID;
+	Head->BrainType = Brain_Hero;
+	Head->BrainSlot.Index = 1;
+	Head->BrainID = BrainID;
 
 	if (WorldMode->CameraFollowingEntityIndex.Value == 0)
 	{
@@ -167,7 +170,7 @@ AddPlayer(game_mode_world *WorldMode, sim_region *SimRegion, traversable_referen
 	EndEntity(WorldMode, Head, P);
 	EndEntity(WorldMode, Body, P);
 
-	return(Result);
+	return(BrainID);
 }
 
 internal void
@@ -606,13 +609,159 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 
 	b32 HeroesExist = false;
 	b32 QuitRequested = false;
+	r32 dt = Input->dtForFrame;
+
+	for (u32 BrainIndex = 0;
+		BrainIndex < SimRegion->BrainCount;
+		++BrainIndex)
+	{
+		brain *Brain = SimRegion->Brains + BrainIndex;
+		switch (Brain->Type)
+		{
+			case Brain_Hero:
+			{
+				controlled_hero ConHero_ = {};
+				ConHero_.ddP.x = 1.0f;
+
+				// TODO: Fill these in from the brain!
+				// TODO: Check that they're not deleted when we do
+				entity *Head = 0;
+				entity *Body = 0;
+
+				controlled_hero *ConHero = &ConHero_;
+				for (uint32 ControllIndex = 0;
+					ControllIndex < ArrayCount(GameState->ControlledHeroes);
+					++ControllIndex)
+				{
+					controlled_hero *TestHero = GameState->ControlledHeroes + ControllIndex;
+					
+					if (Brain->ID.Value == TestHero->BrainID.Value)
+					{
+						ConHero = TestHero;
+
+						if (ConHero->DebugSpawn && Head)
+						{
+							traversable_reference Traversable;
+							if (GetClosestTraversable(SimRegion, Head->P, &Traversable,
+									TraversableSearch_Unoccupied))
+							{
+								AddPlayer(WorldMode, SimRegion, Traversable);
+							}
+							else
+							{
+								// TODO: GameUI that tells you there's no sae place...
+								// maybe keep trying on subsequent frames
+							}
+
+							ConHero->DebugSpawn = false;
+						}
+					}
+				}
+				
+				ConHero->RecenterTimer = ClampAboveZero(ConHero->RecenterTimer - dt);
+				if (Head)
+				{
+					if (ConHero->dZ != 0.0f)
+					{	
+						Head->dP.z = ConHero->dZ;
+					}
+				
+					// TODO: Change to using accelaration vector
+					if ((ConHero->dSword.x == 0.0f) && (ConHero->dSword.y == 0.0f))
+					{
+						// NOTE: Leave FacingDirection whatever it was
+					}
+					else
+					{
+						Head->FacingDirection = ATan2(ConHero->dSword.y, ConHero->dSword.x);
+					}
+				}
+			
+				v3 ddP = V3(ConHero->ddP, 0);
+
+				traversable_reference Traversable;
+				if (Head && GetClosestTraversable(SimRegion, Head->P, &Traversable))
+				{
+					if (Body)
+					{
+						if (Body->MovementMode == MovementMode_Planted)
+						{
+							if (!IsEqual(Traversable, Body->Occupying))
+							{
+								Body->CameFrom = Body->Occupying;
+								if (TransactionOccupy(Body, &Body->Occupying, Traversable))
+								{
+									Body->tMovement = 0.0f;
+									Body->MovementMode = MovementMode_Hopping;
+								}
+							}
+						}
+					}
+
+					v3 ClosestP = GetSimSpaceTraversable(Traversable).P;
+					b32 TimerIsUp = (ConHero->RecenterTimer == 0.0f);
+					b32 NoPush = (LengthSq(ddP) < 0.1f);
+					r32 Cp = NoPush ? 300.0f : 25.0f;
+					v3 ddP2 = {};
+					for (u32 E = 0;
+						E < 3;
+						++E)
+					{
+#if 1
+						if (NoPush || (TimerIsUp && (Square(ddP.E[E]) < 0.1f)))
+#else
+						if (NoPush)
+#endif
+						{
+							ddP2.E[E] = Cp*(ClosestP.E[E] - Head->P.E[E]) - 30.0f*Head->dP.E[E];
+						}
+					}
+					Head->dP += dt*ddP2;
+				}
+
+				if (Body)
+				{
+					Body->FacingDirection = Head->FacingDirection;
+					Body->dP = V3(0, 0, 0);
+			
+					if (Body->MovementMode == MovementMode_Planted)
+					{	
+						Body->P = GetSimSpaceTraversable(Body->Occupying).P;
+					}
+					
+					v3 HeadDelta = {};
+					if (Head)
+					{
+						HeadDelta = Head->P - Body->P;
+					}
+					Body->FloorDisplace = (0.1f*HeadDelta).xy;
+					Body->YAxis = V2(0, 1) + 0.5f*HeadDelta.xy;
+				}
+
+				if (ConHero->Exited)
+				{
+					ConHero->Exited = false;
+					DeleteEntity(SimRegion, Head);
+					DeleteEntity(SimRegion, Body);
+					ConHero->BrainID.Value = 0;
+				}
+			} break;
+
+			case Brain_Snake:
+			{
+			} break;
+
+			InvalidDefaultCase;
+		}
+	}
+
 	for (int ControllerIndex = 0;
 		ControllerIndex < ArrayCount(Input->Controllers);
 		++ControllerIndex)
 	{
 		game_controller_input *Controller = GetController(Input, ControllerIndex);
 		controlled_hero *ConHero = GameState->ControlledHeroes + ControllerIndex;
-		if (ConHero->EntityIndex.Value == 0)
+		if (ConHero->BrainID.Value == 0)
 		{
 			if (WasPressed(Controller->Back))
 			{
@@ -625,7 +774,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 				if (GetClosestTraversable(SimRegion, CameraP, &Traversable))
 				{
 					HeroesExist = true;
-					ConHero->EntityIndex = AddPlayer(WorldMode, SimRegion, Traversable);
+					ConHero->BrainID = AddPlayer(WorldMode, SimRegion, Traversable);
 				}
 				else
 				{
@@ -766,8 +915,6 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 
 			if (Entity->Updatable)
 			{
-				real32 dt = Input->dtForFrame;
-
 				// TODO: This is incorrect, should be computed after update!!!
 				real32 ShadowAlpha = 1.0f - 0.5f*Entity->P.z;
 				if (ShadowAlpha < 0.0f)
@@ -805,147 +952,11 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 				HeroBitmaps.Torso = GetBestMatchBitmapFrom(TranState->Assets, Asset_Torso, &MatchVector, &WeightVector);
 				switch (Entity->Type)
 				{
-					case EntityType_HeroHead:
+					case EntityType_HeroBody:
 					{
-						DEBUG_VALUE(Entity->P);
-						// TODO: Now that we gave some real usage examples, let's solidify
-						// the positioning system
-
-						controlled_hero ConHero_ = {};
-						ConHero_.ddP.x = 1.0f;
-						controlled_hero *ConHero = &ConHero_;
-						for (uint32 ControllIndex = 0;
-							ControllIndex < ArrayCount(GameState->ControlledHeroes);
-							++ControllIndex)
-						{
-							controlled_hero *TestHero = GameState->ControlledHeroes + ControllIndex;
-							
-							if (Entity->ID.Value == TestHero->EntityIndex.Value)
-							{
-								ConHero = TestHero;
-
-								if (ConHero->DebugSpawn)
-								{
-									traversable_reference Traversable;
-									if (GetClosestTraversable(SimRegion, Entity->P, &Traversable,
-											TraversableSearch_Unoccupied))
-									{
-										AddPlayer(WorldMode, SimRegion, Traversable);
-									}
-									else
-									{
-										// TODO: GameUI that tells you there's no sae place...
-										// maybe keep trying on subsequent frames
-									}
-
-									ConHero->DebugSpawn = false;
-								}
-							}
-						}
-						
-						ConHero->RecenterTimer = ClampAboveZero(ConHero->RecenterTimer - dt);
-
-						// TODO: REENABLE!
-						entity *Head = Entity;
-						entity *Body = 0;//Head->Head.Ptr;
-
-						if (ConHero->dZ != 0.0f)
-						{	
-							Entity->dP.z = ConHero->dZ;
-						}
-					
 						MoveSpec.UnitMaxAccelVector = true;
 						MoveSpec.Speed = 30.0f;
 						MoveSpec.Drag = 8.0f;
-
-						ddP = V3(ConHero->ddP, 0);
-
-						// TODO: Change to using accelaration vector
-						if ((ConHero->dSword.x == 0.0f) && (ConHero->dSword.y == 0.0f))
-						{
-							// NOTE: Leave FacingDirection whatever it was
-						}
-						else
-						{
-							Entity->FacingDirection = ATan2(ConHero->dSword.y, ConHero->dSword.x);
-						}
-
-						traversable_reference Traversable;
-						if (GetClosestTraversable(SimRegion, Entity->P, &Traversable))
-						{
-							if (Body)
-							{
-								if (Body->MovementMode == MovementMode_Planted)
-								{
-									if (!IsEqual(Traversable, Body->Occupying))
-									{
-										Body->CameFrom = Body->Occupying;
-										if (TransactionOccupy(Body, &Body->Occupying, Traversable))
-										{
-											Body->tMovement = 0.0f;
-											Body->MovementMode = MovementMode_Hopping;
-										}
-									}
-								}
-							}
-
-							v3 ClosestP = GetSimSpaceTraversable(Traversable).P;
-							b32 TimerIsUp = (ConHero->RecenterTimer == 0.0f);
-							b32 NoPush = (LengthSq(ddP) < 0.1f);
-							r32 Cp = NoPush ? 300.0f : 25.0f;
-							v3 ddP2 = {};
-							for (u32 E = 0;
-								E < 3;
-								++E)
-							{
-#if 1
-								if (NoPush || (TimerIsUp && (Square(ddP.E[E]) < 0.1f)))
-#else
-								if (NoPush)
-#endif
-								{
-									ddP2.E[E] = Cp*(ClosestP.E[E] - Entity->P.E[E]) - 30.0f*Entity->dP.E[E];
-								}
-							}
-							Entity->dP += dt*ddP2;
-						}
-
-						if (Body)
-						{
-							Body->FacingDirection = Head->FacingDirection;
-						}
-
-						if (ConHero->Exited)
-						{
-							ConHero->Exited = false;
-							DeleteEntity(SimRegion, Entity);
-							ConHero->EntityIndex.Value = 0;
-						}
-					} break;
-
-					case EntityType_HeroBody:
-					{
-						DEBUG_VALUE(Entity->P);
-						
-						// TODO: REENABLE!
-						entity *Head = 0;//Entity->Head.Ptr;
-						entity *Body = Entity;
-
-						Entity->dP = V3(0, 0, 0);
-				
-						if (Entity->MovementMode == MovementMode_Planted)
-						{	
-							Entity->P = GetSimSpaceTraversable(Entity->Occupying).P;
-						}
-						
-						v3 HeadDelta = {};
-						if (Head)
-						{
-							HeadDelta = Head->P - Body->P;
-						}
-						Body->FloorDisplace = (0.1f*HeadDelta).xy;
-						Body->YAxis = V2(0, 1) + 0.5f*HeadDelta.xy;
-					
 					} break;
 
 					case EntityType_FloatyThingForNow:
@@ -994,6 +1005,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 					} break;
 				}
 
+#if 0
 				//
 				// NOTE: Handle the entity's movement mode
 				//
@@ -1063,7 +1075,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 				ddtBob += Cp*(0.0f - Entity->tBob) + Cv*(0.0f - Entity->dtBob);
 				Entity->tBob += ddtBob*dt*dt + Entity->dtBob*dt;
 				Entity->dtBob += ddtBob*dt;
-
+#endif
 				if (IsSet(Entity, EntityFlag_Moveable))
 				{
 					MoveEntity(WorldMode, SimRegion, Entity, Input->dtForFrame, &MoveSpec, ddP);
