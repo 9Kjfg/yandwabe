@@ -72,7 +72,7 @@ struct game_mode_world
 
 	u32 CreationBufferIndex;
 	entity CreationBuffer[4];
-	u32 LastUsedEntityID; // TODO: Worry about this wrapping - free list for IDs?
+	u32 LastUsedEntityStorageIndex; // TODO: Worry about this wrapping - free list for IDs?
 
 	particle_cel ParticleCels[PARTICLE_CEL_DIM][PARTICLE_CEL_DIM];
 };

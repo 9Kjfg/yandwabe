@@ -49,15 +49,40 @@ GetHashFromID(sim_region *SimRegion, entity_id ID)
 
     entity_hash *Result = 0;
 
-    uint32 HashValue = ID.Value;
-    for (uint32 Offset = 0;
+    u32 HashValue = ID.Value;
+    for (u32 Offset = 0;
         Offset < ArrayCount(SimRegion->EntityHash);
         ++Offset)
     {
-		uint32 HashMask = (ArrayCount(SimRegion->EntityHash) - 1);
-		uint32 HashIndex = ((HashValue + Offset) & HashMask);
+		u32 HashMask = (ArrayCount(SimRegion->EntityHash) - 1);
+		u32 HashIndex = ((HashValue + Offset) & HashMask);
         entity_hash *Entry = SimRegion->EntityHash + HashIndex;
         if ((Entry->Index.Value == 0) || (Entry->Index.Value == ID.Value))
+        {
+            Result = Entry;
+            break;
+        }
+    }
+
+    return(Result);
+}
+
+internal brain_hash *
+GetHashFromID(sim_region *SimRegion, brain_id ID)
+{
+    Assert(ID.Value);
+
+    brain_hash *Result = 0;
+
+    u32 HashValue = ID.Value;
+    for (u32 Offset = 0;
+        Offset < ArrayCount(SimRegion->BrainHash);
+        ++Offset)
+    {
+		u32 HashMask = (ArrayCount(SimRegion->BrainHash) - 1);
+		u32 HashIndex = ((HashValue + Offset) & HashMask);
+        brain_hash *Entry = SimRegion->BrainHash + HashIndex;
+        if ((Entry->ID.Value == 0) || (Entry->ID.Value == ID.Value))
         {
             Result = Entry;
             break;
@@ -98,49 +123,35 @@ EntityOverlapsRectangle(v3 P, entity_collision_volume Volume, rectangle3 Rect)
 	return(Result);
 }
 
-internal void
-AddEntity(game_mode_world *WorldMode, sim_region *SimRegion, entity *Source, v3 ChunkDelta)
+internal brain *
+GetOrAddBrain(sim_region *SimRegion, brain_id ID, brain_type Type)
 {
-	entity_id ID = Source->ID;
+	brain *Result = 0;
 
-    entity_hash *Entry = GetHashFromID(SimRegion, ID);
-	Assert(Entry->Ptr == 0);
+	brain_hash *Hash = GetHashFromID(SimRegion, ID);
+	Result = Hash->Ptr;
 
-	if (SimRegion->EntityCount < SimRegion->MaxEntityCount)
+	if (!Result)
 	{
-		entity *Dest = SimRegion->Entities + SimRegion->EntityCount++;
+		Assert(SimRegion->BrainCount < SimRegion->MaxBrainCount)
+		Result = SimRegion->Brains + SimRegion->BrainCount++;
+		Result->ID = ID;
+		Result->Type = Type;
 
-		Entry->Index = ID;
-		Entry->Ptr = Dest;
-
-		if (Source)
-		{
-			// TODO: This should really be a decompression step, not a copy
-			*Dest = *Source;
-		}
-		
-		Dest->ID = ID;
-		Dest->P += ChunkDelta;
-
-		Dest->Updatable = EntityOverlapsRectangle(Dest->P, Dest->Collision->TotalVolume, SimRegion->UpdatableBounds);
+		Hash->Ptr = Result;
 	}
-	else
-	{
-		InvalidCodePath;
-	}
+
+	return(Result);
 }
 
 internal void
 ConnectEntityPointers(sim_region *SimRegion)
 {
-	// TODO: Reenable this!
-#if 0
 	for (u32 EntityIndex = 0;
 		EntityIndex < SimRegion->EntityCount;
 		++EntityIndex)
 	{
 		entity *Entity = SimRegion->Entities + EntityIndex;
-		LoadEntityReference(SimRegion, &Entity->Head);
 
 		LoadTraversableReference(SimRegion, &Entity->Occupying);
 		if (Entity->Occupying.Entity.Ptr)
@@ -149,7 +160,6 @@ ConnectEntityPointers(sim_region *SimRegion)
 		}
 		LoadTraversableReference(SimRegion, &Entity->CameFrom);
 	}
-#endif
 }
 
 internal sim_region *
@@ -178,6 +188,10 @@ BeginSim(memory_arena *SimArena, game_mode_world *WorldMode, world *World, world
     SimRegion->EntityCount = 0;
     SimRegion->Entities = PushArray(SimArena, SimRegion->MaxEntityCount, entity);
 
+	SimRegion->MaxBrainCount = 4096;
+    SimRegion->BrainCount = 0;
+    SimRegion->Brains = PushArray(SimArena, SimRegion->MaxBrainCount, brain);
+
     world_position MinChunkP = MapIntoChunkSpace(World, SimRegion->Origin, GetMinCorner(SimRegion->Bounds));
 	world_position MaxChunkP = MapIntoChunkSpace(World, SimRegion->Origin, GetMaxCorner(SimRegion->Bounds));
 	
@@ -205,11 +219,44 @@ BeginSim(memory_arena *SimArena, game_mode_world *WorldMode, world *World, world
 							EntityIndex < Block->EntityCount;
 							++EntityIndex)
 						{
-							entity *Low = (entity *)Block->EntityData + EntityIndex;
-							v3 SimSpaceP = Low->P + ChunkDelta;
-							if (EntityOverlapsRectangle(SimSpaceP, Low->Collision->TotalVolume, SimRegion->Bounds))
+							entity *Source = (entity *)Block->EntityData + EntityIndex;
+							v3 SimSpaceP = Source->P + ChunkDelta;
+							if (EntityOverlapsRectangle(SimSpaceP, Source->Collision->TotalVolume, SimRegion->Bounds))
 							{
-								AddEntity(WorldMode, SimRegion, Low, ChunkDelta);
+								entity_id ID = Source->ID;
+
+								entity_hash *Entry = GetHashFromID(SimRegion, ID);
+								Assert(Entry->Ptr == 0);
+
+								if (SimRegion->EntityCount < SimRegion->MaxEntityCount)
+								{
+									entity *Dest = SimRegion->Entities + SimRegion->EntityCount++;
+
+									Entry->Index = ID;
+									Entry->Ptr = Dest;
+
+									if (Source)
+									{
+										// TODO: This should really be a decompression step, not a copy
+										*Dest = *Source;
+									}
+									
+									Dest->ID = ID;
+									Dest->P += ChunkDelta;
+
+									Dest->Updatable = EntityOverlapsRectangle(Dest->P, Dest->Collision->TotalVolume, SimRegion->UpdatableBounds);
+					
+									if (Dest->BrainID.Value)
+									{
+										brain *Brain = GetOrAddBrain(SimRegion, Dest->BrainID, Dest->BrainType);
+										Assert(Dest->BrainSlot.Index < ArrayCount(Brain->Array));
+										Brain->Array[Dest->BrainSlot.Index] = Dest;
+									}
+								}
+								else
+								{
+									InvalidCodePath;
+								}
 							}
 						}
 

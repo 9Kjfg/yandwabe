@@ -139,6 +139,7 @@ struct entity
 
     v3 P;
 	v3 dP;
+	v3 ddP; // TODO: Do not pack this
 
 	r32 DistanceLimit;
 
@@ -170,6 +171,40 @@ struct entity
 
 	u32 TraversableCount;
 	entity_traversable_point Traversables[16];
+};
+
+struct brain_hero_parts
+{
+	entity *Head;
+	entity *Body;
+};
+
+#define BrainSlotFor(type, Member) BrainSlotFor_(&(((type *)0)->Member) - (entity **)0)
+inline brain_slot
+BrainSlotFor_(u32 PackValue)
+{
+	brain_slot Result = {PackValue};
+	return(Result);
+}
+
+struct brain
+{
+    brain_id ID;
+    brain_type Type;
+
+	union
+	{
+		brain_hero_parts Hero;
+		entity *Array[16];
+	};
+};
+
+enum reserved_brain_id
+{
+	ReservedBrainID_FirstHero = 1,
+	ReservedBrainID_LastHero = (ReservedBrainID_FirstHero + MAX_CONTROLLER_COUNT - 1),
+
+	ReservedBrainID_FirstFree,
 };
 
 inline bool32

@@ -13,12 +13,6 @@ struct entity_hash
     entity_id Index; // TODO: whe are we storing these in the hash??
 };
 
-struct brain
-{
-    brain_id ID;
-    brain_type Type;
-};
-
 struct brain_hash
 {
     brain *Ptr;
@@ -48,7 +42,7 @@ struct sim_region
 
     // NOTE: Must be a power of two
     entity_hash EntityHash[4096];
-    brain_hash Hash[256];
+    brain_hash BrainHash[256];
 };
 
 internal entity_hash *GetHashFromID(sim_region *SimRegion, entity_id ID);

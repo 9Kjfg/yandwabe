@@ -13,7 +13,7 @@ IsEndOfLine(char C)
 inline b32
 IsWhitespace(char C)
 {
-    b32 Result = ((C == ' ') || (C == '\t') || (C == '\v') || (C == '\f') ||IsEndOfLine(C));
+    b32 Result = ((C == ' ') || (C == '\t') || (C == '\v') || (C == '\f') || IsEndOfLine(C));
     return(Result);
 }
 
