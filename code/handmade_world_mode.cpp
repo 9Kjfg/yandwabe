@@ -97,11 +97,24 @@ AddStandartRoom(game_mode_world *WorldMode, u32 AbsTileX, u32 AbsTileY, u32 AbsT
 }
 
 internal void
+AddPiece(entity *Entity, asset_type_id AssetType, r32 Height, v4 Color)
+{
+	Assert(Entity->PieceCount < ArrayCount(Entity->Pieces));
+	entity_visible_piece *Piece = Entity->Pieces + Entity->PieceCount++;
+	Piece->AssetType = AssetType;
+	Piece->Height = Height;
+	Piece->Color = Color;
+}
+
+internal void
 AddWall(game_mode_world *WorldMode, uint32 AbsTileX, uint32 AbsTileY, uint32 AbsTileZ)
 {
 	world_position P = ChunkPositionFromTilePosition(WorldMode->World, AbsTileX, AbsTileY, AbsTileZ);
 	entity *Entity = BeginGroundedEntity(WorldMode, EntityType_Wall, WorldMode->WallCollision);
 	AddFlags(Entity, EntityFlag_Collides);
+
+	AddPiece(Entity, Asset_Tree, 2.5f, V4(1, RandomUnilateral(&WorldMode->EffectsEntropy), 1, 1));
+
 	EndEntity(WorldMode, Entity, P);
 }
 
@@ -154,10 +167,10 @@ AddPlayer(game_mode_world *WorldMode, sim_region *SimRegion, traversable_referen
 	Body->Occupying = StandingOn;
 
 	Body->BrainType = Brain_Hero;
-	Body->BrainSlot.Index = BrainSlotFor(brain_hero_parts, Body);
+	Body->BrainSlot = BrainSlotFor(brain_hero_parts, Body);
 	Body->BrainID = BrainID;
 	Head->BrainType = Brain_Hero;
-	Head->BrainSlot.Index = BrainSlotFor(brain_hero_parts, Head);
+	Head->BrainSlot = BrainSlotFor(brain_hero_parts, Head);
 	Head->BrainID = BrainID;
 
 	if (WorldMode->CameraFollowingEntityIndex.Value == 0)
@@ -607,8 +620,6 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 	PushRectOutline(RenderGroup, WorldTransform, V3(0.0f, 0.0f, 0.0f), GetDim(SimBounds).xy, V4(0.0f, 1.0f, 1.0f, 1.0f));
 	PushRectOutline(RenderGroup, WorldTransform, V3(0.0f, 0.0f, 0.0f), GetDim(SimRegion->Bounds).xy, V4(1.0f, 0.0f, 1.0f, 1.0f));
 
-	b32 HeroesExist = false;
-	b32 QuitRequested = false;
 	r32 dt = Input->dtForFrame;
 
 	//
@@ -623,17 +634,12 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 		controlled_hero *ConHero = GameState->ControlledHeroes + ControllerIndex;
 		if (ConHero->BrainID.Value == 0)
 		{
-			if (WasPressed(Controller->Back))
-			{
-				QuitRequested = true;
-			}
-			else if (WasPressed(Controller->Start))
+			if (WasPressed(Controller->Start))
 			{
 				*ConHero = {};
 				traversable_reference Traversable;
 				if (GetClosestTraversable(SimRegion, CameraP, &Traversable))
 				{
-					HeroesExist = true;
 					ConHero->BrainID.Value = (ReservedBrainID_FirstHero + ControllerIndex);
 					AddPlayer(WorldMode, SimRegion, Traversable, ConHero->BrainID);
 				}
@@ -646,587 +652,296 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 		}
 	}
 
-	//
 	// NOTE: Run all brains
-	//
-
 	for (u32 BrainIndex = 0;
 		BrainIndex < SimRegion->BrainCount;
 		++BrainIndex)
 	{
 		brain *Brain = SimRegion->Brains + BrainIndex;
-		switch (Brain->Type)
-		{
-			case Brain_Hero:
-			{
-				// TODO: Check that they're not deleted when we do
-				entity *Head = Brain->Hero.Head;
-				entity *Body = Brain->Hero.Body;
-
-				u32 ControllerIndex = Brain->ID.Value - ReservedBrainID_FirstHero;
-				game_controller_input *Controller = GetController(Input, ControllerIndex);
-				controlled_hero *ConHero = GameState->ControlledHeroes + ControllerIndex;
-
-				HeroesExist = true;
-
-				v2 dSword = {};
-				r32 dZ = 0.0f;
-				b32 Exited = false;
-				b32 DebugSpawn = false;
-				v2 ddP = {};
-
-				if (Controller->IsAnalog)
-				{
-					ddP = V2(Controller->StickAverageX, Controller->StickAverageY);
-				}
-				else
-				{
-					//NOTE: Use digital movement tuning
-
-					r32 Recenter = 0.5f;
-					if (WasPressed(Controller->MoveUp))
-					{
-						ddP.x = 0.0f;
-						ddP.y = 1.0f;
-						ConHero->RecenterTimer = Recenter;
-					}
-					if (WasPressed(Controller->MoveDown))
-					{
-						ddP.x = 0.0f;
-						ddP.y = -1.0f;
-						ConHero->RecenterTimer = Recenter;
-					}
-					if (WasPressed(Controller->MoveLeft))
-					{
-						ddP.x = -1.0f;
-						ddP.y = 0.0f;
-						ConHero->RecenterTimer = Recenter;
-					}
-					if (WasPressed(Controller->MoveRight))
-					{
-						ddP.x = 1.0f;
-						ddP.y = 0.0f;
-						ConHero->RecenterTimer = Recenter;
-					}
-
-					if (!IsDown(Controller->MoveLeft) &&
-						!IsDown(Controller->MoveRight))
-					{
-						ddP.x = 0.0f;
-						if (IsDown(Controller->MoveUp))
-						{
-							ddP.y = 1.0f;
-						}
-						if (IsDown(Controller->MoveDown))
-						{
-							ddP.y = -1.0f;
-						}
-					}
-					
-					if (!IsDown(Controller->MoveUp) &&
-						!IsDown(Controller->MoveDown))
-					{
-						ddP.y = 0.0f;
-						if (IsDown(Controller->MoveLeft))
-						{
-							ddP.x = -1.0f;
-						}
-						if (IsDown(Controller->MoveRight))
-						{
-							ddP.x = 1.0f;
-						}
-					}
-
-					if (WasPressed(Controller->Start))
-					{
-						DebugSpawn = true;
-					}
-				}
-
-	#if 0
-				if (Controller->Start.EndedDown)
-				{
-					ConHero->dZ += 3.0f;
-				}
-	#endif
-				dSword = {};
-				if (Controller->ActionUp.EndedDown)
-				{
-					ChangeVolume(&GameState->AudioState, GameState->Music, 10.0f, V2(1.0f, 1.0f));
-					dSword = V2(0.0f, 1.0f);
-				}
-				if (Controller->ActionDown.EndedDown)
-				{
-					ChangeVolume(&GameState->AudioState, GameState->Music, 10.0f, V2(0.0f, 0.0f));
-					dSword = V2(0.0f, -1.0f);
-				}
-				if (Controller->ActionLeft.EndedDown)
-				{
-					ChangeVolume(&GameState->AudioState, GameState->Music, 5.0f, V2(0.0f, 0.0f));
-					dSword = V2(-1.0f, 0.0f);
-				}
-				if (Controller->ActionRight.EndedDown)
-				{
-					ChangeVolume(&GameState->AudioState, GameState->Music, 5.0f, V2(0.0f, 0.0f));
-					dSword = V2(1.0f, 0.0f);
-				}
-
-				if (WasPressed(Controller->Back))
-				{
-					Exited = true;
-				}
-
-#if 0
-				if (ConHero->DebugSpawn && Head)
-				{
-					traversable_reference Traversable;
-					if (GetClosestTraversable(SimRegion, Head->P, &Traversable,
-							TraversableSearch_Unoccupied))
-					{
-						AddPlayer(WorldMode, SimRegion, Traversable);
-					}
-					else
-					{
-						// TODO: GameUI that tells you there's no sae place...
-						// maybe keep trying on subsequent frames
-					}
-
-					ConHero->DebugSpawn = false;
-				}
-#endif			
-				ConHero->RecenterTimer = ClampAboveZero(ConHero->RecenterTimer - dt);
-				
-				if (Head)
-				{
-					// TODO: Change to using accelaration vector
-					if ((dSword.x == 0.0f) && (dSword.y == 0.0f))
-					{
-						// NOTE: Leave FacingDirection whatever it was
-					}
-					else
-					{
-						Head->FacingDirection = ATan2(dSword.y, dSword.x);
-					}
-				}
-
-				traversable_reference Traversable;
-				if (Head && GetClosestTraversable(SimRegion, Head->P, &Traversable))
-				{
-					if (Body)
-					{
-						if (Body->MovementMode == MovementMode_Planted)
-						{
-							if (!IsEqual(Traversable, Body->Occupying))
-							{
-								Body->CameFrom = Body->Occupying;
-								if (TransactionOccupy(Body, &Body->Occupying, Traversable))
-								{
-									Body->tMovement = 0.0f;
-									Body->MovementMode = MovementMode_Hopping;
-								}
-							}
-						}
-					}
-
-					v3 ClosestP = GetSimSpaceTraversable(Traversable).P;
-					b32 TimerIsUp = (ConHero->RecenterTimer == 0.0f);
-					b32 NoPush = (LengthSq(ddP) < 0.1f);
-					r32 Cp = NoPush ? 300.0f : 25.0f;
-					v3 ddP2 = {};
-					for (u32 E = 0;
-						E < 3;
-						++E)
-					{
-#if 1
-						if (NoPush || (TimerIsUp && (Square(ddP.E[E]) < 0.1f)))
-#else
-						if (NoPush)
-#endif
-						{
-							ddP2.E[E] = Cp*(ClosestP.E[E] - Head->P.E[E]) - 30.0f*Head->dP.E[E];
-						}
-					}
-					Head->dP += dt*ddP2;
-				}
-
-				if (Body)
-				{
-					Body->FacingDirection = Head->FacingDirection;
-					Body->dP = V3(0, 0, 0);
-			
-					if (Body->MovementMode == MovementMode_Planted)
-					{	
-						Body->P = GetSimSpaceTraversable(Body->Occupying).P;
-					}
-					
-					v3 HeadDelta = {};
-					if (Head)
-					{
-						HeadDelta = Head->P - Body->P;
-					}
-					Body->FloorDisplace = (0.1f*HeadDelta).xy;
-					Body->YAxis = V2(0, 1) + 0.5f*HeadDelta.xy;
-				}
-
-				if (Exited)
-				{
-					Exited = false;
-					DeleteEntity(SimRegion, Head);
-					DeleteEntity(SimRegion, Body);
-					ConHero->BrainID.Value = 0;
-				}
-			} break;
-
-			case Brain_Snake:
-			{
-			} break;
-
-			InvalidDefaultCase;
-		}
+		ExecuteBrain(GameState, Input, SimRegion, Brain, dt);
 	}
 
-	// TODO: Move this out into handmade_entity.cpp
+	// NOTE: Simulate all entities
+	for (uint32 EntityIndex = 1;
+		EntityIndex < SimRegion->EntityCount;
+		++EntityIndex)
 	{
-		TIMED_BLOCK("EntityRender");
-		for (uint32 EntityIndex = 1;
-			EntityIndex < SimRegion->EntityCount;
-			++EntityIndex)
+		entity *Entity = SimRegion->Entities + EntityIndex;
+		
+		// TODO: Set this at construction
+		Entity->XAxis = V2(1, 0);
+		Entity->YAxis = V2(0, 1);
+		
+		// TODO: We don't really have a way to unique-ify these :(
+		debug_id EntityDebugID = DEBUG_POINTER_ID((void *)Entity->ID.Value);
+		if (DEBUG_REQUESTED(EntityDebugID))
 		{
-			entity *Entity = SimRegion->Entities + EntityIndex;
-			
-			// TODO: Set this at construction
-			Entity->XAxis = V2(1, 0);
-			Entity->YAxis = V2(0, 1);
-			
-			// TODO: We don't really have a way to unique-ify these :(
-			debug_id EntityDebugID = DEBUG_POINTER_ID((void *)Entity->ID.Value);
-			if (DEBUG_REQUESTED(EntityDebugID))
+			DEBUG_BEGIN_DATA_BLOCK("Simulation/Entity");
+		}
+
+		if (Entity->Updatable)
+		{
+			// TODO: This is incorrect, should be computed after update!!!
+			real32 ShadowAlpha = 1.0f - 0.5f*Entity->P.z;
+			if (ShadowAlpha < 0.0f)
 			{
-				DEBUG_BEGIN_DATA_BLOCK("Simulation/Entity");
+				ShadowAlpha = 0.0f;
+			}
+			
+			// TODO: Probably indicates we want to separate update and render
+			// for entities sometime soom
+			v3 CameraRelativeGroundP = GetEntityGroundPoint(Entity) - CameraP;
+
+			RenderGroup->GlobalAlpha = 1.0f;
+			if (CameraRelativeGroundP.z > FadeTopStartZ)
+			{
+				RenderGroup->GlobalAlpha = Clamp01MapToRange(FadeTopEndZ, CameraRelativeGroundP.z, FadeTopStartZ);
+			}
+			else if (CameraRelativeGroundP.z < FadeBottomStartZ)
+			{
+				RenderGroup->GlobalAlpha = Clamp01MapToRange(FadeBottomEndZ, CameraRelativeGroundP.z, FadeBottomStartZ);
 			}
 
-			if (Entity->Updatable)
+			//
+			// NOTE: Handle the entity's movement mode
+			//
+			switch (Entity->MovementMode)
 			{
-				// TODO: This is incorrect, should be computed after update!!!
-				real32 ShadowAlpha = 1.0f - 0.5f*Entity->P.z;
-				if (ShadowAlpha < 0.0f)
+				case MovementMode_Planted:
 				{
-					ShadowAlpha = 0.0f;
-				}
+
+				} break;
+
+				case MovementMode_Hopping:
+				{
+					v3 MovementTo = GetSimSpaceTraversable(Entity->Occupying).P;
+					v3 MovementFrom = GetSimSpaceTraversable(Entity->CameFrom).P;
+
+					r32 tJump = 0.1f;
+					r32 tThrust = 0.2f;
+					r32 tLand = 0.9f;
+
+					if (Entity->tMovement < tThrust)
+					{
+						Entity->ddtBob = 30.0f;
+					}
+
+					if (Entity->tMovement < tLand)
+					{
+						r32 t = Clamp01MapToRange(tJump, Entity->tMovement, tLand);
+						v3 a = V3(0, -2.0f, 0);
+						v3 b = (MovementTo - MovementFrom) - a;
+						Entity->P = a*t*t + b*t + MovementFrom;
+					}
+
+					if (Entity->tMovement >= 1.0f)
+					{
+						Entity->P = MovementTo;
+						Entity->CameFrom = Entity->Occupying;
+						Entity->MovementMode = MovementMode_Planted;
+						Entity->dtBob = -2.0f;
+					}
+
+					Entity->tMovement += 5.0f*dt;
+					if (Entity->tMovement > 1.0f)
+					{
+						Entity->tMovement = 1.0f;
+					}
+				} break;
+			}
+
+			r32 Cp = 100.0f;
+			r32 Cv = 10.0f;
+			Entity->ddtBob += Cp*(0.0f - Entity->tBob) + Cv*(0.0f - Entity->dtBob);
+			Entity->tBob += Entity->ddtBob*dt*dt + Entity->dtBob*dt;
+			Entity->dtBob += Entity->ddtBob*dt;
+
+			if (IsSet(Entity, EntityFlag_Moveable))
+			{
+				MoveEntity(WorldMode, SimRegion, Entity, Input->dtForFrame, &Entity->MoveSpec, Entity->ddP);
+			}
+
+			object_transform EntityTrasform = DefaultUprightTransform();
+			EntityTrasform.OffsetP = GetEntityGroundPoint(Entity) - CameraP;
+			
+			//
+			//NOTE: Rendering
+			//
+			//
+			//NOTE: Pre-physics entity work an entity
+			//
+			hero_bitmap_id HeroBitmaps = {};
+			asset_vector MatchVector = {};
+			MatchVector.E[Tag_FacingDirection] = Entity->FacingDirection;
+			asset_vector WeightVector = {};
+			WeightVector.E[Tag_FacingDirection] = 1.0f;
+			HeroBitmaps.Head = GetBestMatchBitmapFrom(TranState->Assets, Asset_Head, &MatchVector, &WeightVector);
+			HeroBitmaps.Cape = GetBestMatchBitmapFrom(TranState->Assets, Asset_Cape, &MatchVector, &WeightVector);
+			HeroBitmaps.Torso = GetBestMatchBitmapFrom(TranState->Assets, Asset_Torso, &MatchVector, &WeightVector);
+
+			r32 HeroSizeC = 3.0f;
+			switch (Entity->Type)
+			{
+				case EntityType_HeroBody:
+				{
+					v4 Color = V4(1, 1, 1, 1);
+					v2 XAxis = Entity->XAxis;
+					v2 YAxis = Entity->YAxis;
+					v3 Offset = V3(Entity->FloorDisplace, 0.0f);
+					PushBitmap(RenderGroup, EntityTrasform, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), HeroSizeC*1.0f, V3(0, 0, 0), V4(1, 1, 1, ShadowAlpha));
+					PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Torso, HeroSizeC*1.2f, V3(0, 0, -0.002f), Color, 1.0f, XAxis, YAxis);
+					PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Cape, HeroSizeC*1.2f, Offset + V3(0, Entity->tBob, -0.001f), Color, 1.0f, XAxis, YAxis);
+					DrawHitpoints(Entity, RenderGroup, EntityTrasform);
+				} break;
+
+				case EntityType_HeroHead:
+				{
+					// TODO: Z!!!
+					r32 HeroSizeC = 2.5f;
+					PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Head, HeroSizeC*1.2f, V3(0, 0, 0));
+				} break;
 				
-				move_spec MoveSpec = DefaultMoveSpec();
-				v3 ddP = {};
-
-				// TODO: Probably indicates we want to separate update and render
-				// for entities sometime soom
-				v3 CameraRelativeGroundP = GetEntityGroundPoint(Entity) - CameraP;
-
-				RenderGroup->GlobalAlpha = 1.0f;
-				if (CameraRelativeGroundP.z > FadeTopStartZ)
+				case EntityType_Familiar:
 				{
-					RenderGroup->GlobalAlpha = Clamp01MapToRange(FadeTopEndZ, CameraRelativeGroundP.z, FadeTopStartZ);
-				}
-				else if (CameraRelativeGroundP.z < FadeBottomStartZ)
+					bitmap_id BID = HeroBitmaps.Head;
+
+					Entity->tBob += dt;
+					if (Entity->tBob > Tau32)
+					{
+						Entity->tBob -= Tau32;
+					}
+					real32 BobSine = Sin(2.0f*Entity->tBob);
+					PushBitmap(RenderGroup, EntityTrasform, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), 2.5f, V3(0, 0, 0), V4(1, 1, 1, (0.5f*ShadowAlpha) + 0.2f*BobSine));
+					PushBitmap(RenderGroup, EntityTrasform, BID, 2.5f, V3(0, 0, 0.2f*BobSine));
+				} break;
+				case EntityType_Monster:
 				{
-					RenderGroup->GlobalAlpha = Clamp01MapToRange(FadeBottomEndZ, CameraRelativeGroundP.z, FadeBottomStartZ);
-				}
+					PushBitmap(RenderGroup, EntityTrasform, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), 4.5f, V3(0, 0, 0), V4(1, 1, 1, ShadowAlpha));
+					PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Torso, 4.5f, V3(0, 0, 0));
+				} break;
 
-				//
-				//NOTE: Pre-physics entity work an entity
-				//
-				hero_bitmap_id HeroBitmaps = {};
-				asset_vector MatchVector = {};
-				MatchVector.E[Tag_FacingDirection] = Entity->FacingDirection;
-				asset_vector WeightVector = {};
-				WeightVector.E[Tag_FacingDirection] = 1.0f;
-				HeroBitmaps.Head = GetBestMatchBitmapFrom(TranState->Assets, Asset_Head, &MatchVector, &WeightVector);
-				HeroBitmaps.Cape = GetBestMatchBitmapFrom(TranState->Assets, Asset_Cape, &MatchVector, &WeightVector);
-				HeroBitmaps.Torso = GetBestMatchBitmapFrom(TranState->Assets, Asset_Torso, &MatchVector, &WeightVector);
-				switch (Entity->Type)
+				default:
 				{
-					case EntityType_HeroBody:
-					{
-						MoveSpec.UnitMaxAccelVector = true;
-						MoveSpec.Speed = 30.0f;
-						MoveSpec.Drag = 8.0f;
-					} break;
+					// InvalidCodePath;
+				} break;
+			}
 
-					case EntityType_FloatyThingForNow:
-					{
-						// TODO: Think about what this stuff actually  should mean
-						// or does mean, or will mean
-						//Entity->P.z += 0.01f*Sin(Entity->tBob);
-						//Entity->tBob += dt;
-					} break;
+			for (u32 PieceIndex = 0;
+				PieceIndex < Entity->PieceCount;
+				++PieceIndex)
+			{
+				entity_visible_piece *Piece = Entity->Pieces + PieceIndex;
+				bitmap_id BitmapID = GetBestMatchBitmapFrom(TranState->Assets,
+					Piece->AssetType, &MatchVector, &WeightVector);
+				PushBitmap(RenderGroup, EntityTrasform, BitmapID, Piece->Height, V3(0, 0, 0),
+					Piece->Color);
+			}
 
-					case EntityType_Familiar:
-					{
-						entity *ClosestHero = 0;
-						real32 ClosestHeroDSq = Square(10.0f); // NOTE: Ten meter maximum search
-						if (Global_AI_Familiar_FollowsHero)
-						{
-							// TODO: Make spation queries easy for things
-							entity *TestEntity = SimRegion->Entities;
-							for (uint32 TestEntityIndex = 0;
-								TestEntityIndex < SimRegion->EntityCount;
-								++TestEntityIndex, ++TestEntity)
-							{	
-								if (TestEntity->Type == EntityType_HeroBody)
-								{
-									real32 TestDSq = LengthSq(TestEntity->P - Entity->P);
+			DrawHitpoints(Entity, RenderGroup, EntityTrasform);
 
-									if (ClosestHeroDSq > TestDSq)
-									{
-										ClosestHero = TestEntity;
-										ClosestHeroDSq = TestDSq;
-									}
-								}
-							}
-						}
+			for (uint32 VolumeIndex = 0;
+				VolumeIndex < Entity->Collision->VolumeCount;
+				++VolumeIndex)
+			{
+				entity_collision_volume *Volume = Entity->Collision->Volumes + VolumeIndex;
+				PushRectOutline(RenderGroup, EntityTrasform, Volume->OffsetP - V3(0, 0, 0.5f*Volume->Dim.z), Volume->Dim.xy, V4(0.0f, 0.5f, 1.0f, 1.0f));
+			}
 
-						if (ClosestHero && (ClosestHeroDSq > Square(3.0f)))
-						{
-							real32 Acceleration = 0.5f;
-							real32 OneOverLength = Acceleration / SquareRoot(ClosestHeroDSq);
-							ddP = OneOverLength*(ClosestHero->P - Entity->P);
-						}
+			for (uint32 TraversableIndex = 0;
+				TraversableIndex < Entity->TraversableCount;
+				++TraversableIndex)
+			{
+				entity_traversable_point *Traversable = Entity->Traversables + TraversableIndex;
+				PushRect(RenderGroup, EntityTrasform, Traversable->P, V2(0.1f, 0.1f),
+					Traversable->Occupier ? V4(0.0f, 0.5f, 1.0f, 1) : V4(1.0f, 0.5f, 0.0f, 1.0f));
+			}
 
-						MoveSpec.UnitMaxAccelVector = true;
-						MoveSpec.Speed = 50.0f;
-						MoveSpec.Drag = 8.0f;
-					} break;
-				}
-
-				//
-				// NOTE: Handle the entity's movement mode
-				//
-				r32 ddtBob = 0.0f;
-				switch (Entity->MovementMode)
+			if (DEBUG_UI_ENABLED)
+			{
+				for (uint32 VolumeIndex = 0;
+					VolumeIndex < Entity->Collision->VolumeCount;
+					++VolumeIndex)
 				{
-					case MovementMode_Planted:
-					{
-#if 0
-						r32 HeadDistance = 0.0f;
-						for (u32 PairedEntityIndex = 0;
-							PairedEntityIndex < Entity->PairedEntityCount;
-							++PairedEntityIndex)
-						{
-							entity *Pair = Entity->PairedEntities[PairedEntityIndex].Ptr;
-							if (Pair)
-							{
-								HeadDistance += LengthSq(Pair->P - Entity->P);
-							}
-						}
-						HeadDistance = SquareRoot(HeadDistance);
-
-						r32 MaxHeadDistance = 0.5f;
-						r32 tHeadDistance = Clamp01MapToRange(0.0f, HeadDistance, MaxHeadDistance);
-						ddtBob = -20.0f*tHeadDistance;
-#endif
-					} break;
-
-					case MovementMode_Hopping:
-					{
-						v3 MovementTo = GetSimSpaceTraversable(Entity->Occupying).P;
-						v3 MovementFrom = GetSimSpaceTraversable(Entity->CameFrom).P;
-
-						r32 tJump = 0.1f;
-						r32 tThrust = 0.2f;
-						r32 tLand = 0.9f;
-
-						if (Entity->tMovement < tThrust)
-						{
-							ddtBob = 30.0f;
-						}
-
-						if (Entity->tMovement < tLand)
-						{
-							r32 t = Clamp01MapToRange(tJump, Entity->tMovement, tLand);
-							v3 a = V3(0, -2.0f, 0);
-							v3 b = (MovementTo - MovementFrom) - a;
-							Entity->P = a*t*t + b*t + MovementFrom;
-						}
-
-						if (Entity->tMovement >= 1.0f)
-						{
-							Entity->P = MovementTo;
-							Entity->CameFrom = Entity->Occupying;
-							Entity->MovementMode = MovementMode_Planted;
-							Entity->dtBob = -2.0f;
-						}
-
-						Entity->tMovement += 5.0f*dt;
-						if (Entity->tMovement > 1.0f)
-						{
-							Entity->tMovement = 1.0f;
-						}
-					} break;
-				}
-
-				r32 Cp = 100.0f;
-				r32 Cv = 10.0f;
-				ddtBob += Cp*(0.0f - Entity->tBob) + Cv*(0.0f - Entity->dtBob);
-				Entity->tBob += ddtBob*dt*dt + Entity->dtBob*dt;
-				Entity->dtBob += ddtBob*dt;
-
-				if (IsSet(Entity, EntityFlag_Moveable))
-				{
-					MoveEntity(WorldMode, SimRegion, Entity, Input->dtForFrame, &MoveSpec, ddP);
-				}
-
-				object_transform EntityTrasform = DefaultUprightTransform();
-				EntityTrasform.OffsetP = GetEntityGroundPoint(Entity) - CameraP;
-				
-				//
-				//NOTE: Post-physics entity work
-				//
-				r32 HeroSizeC = 3.0f;
-				switch (Entity->Type)
-				{
-					case EntityType_HeroBody:
-					{
-						v4 Color = V4(1, 1, 1, 1);
-						v2 XAxis = Entity->XAxis;
-						v2 YAxis = Entity->YAxis;
-						v3 Offset = V3(Entity->FloorDisplace, 0.0f);
-						PushBitmap(RenderGroup, EntityTrasform, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), HeroSizeC*1.0f, V3(0, 0, 0), V4(1, 1, 1, ShadowAlpha));
-						PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Torso, HeroSizeC*1.2f, V3(0, 0, -0.002f), Color, 1.0f, XAxis, YAxis);
-						PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Cape, HeroSizeC*1.2f, Offset + V3(0, Entity->tBob, -0.001f), Color, 1.0f, XAxis, YAxis);
-						DrawHitpoints(Entity, RenderGroup, EntityTrasform);
-					} break;
-
-					case EntityType_HeroHead:
-					{
-						// TODO: Z!!!
-						r32 HeroSizeC = 2.5f;
-						PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Head, HeroSizeC*1.2f, V3(0, 0, 0));
-					} break;
+					entity_collision_volume *Volume = Entity->Collision->Volumes + VolumeIndex;
 					
-					case EntityType_Wall:
-					{
-						bitmap_id BID = GetFirstBitmapFrom(TranState->Assets, Asset_Tree);
-						if (DEBUG_REQUESTED(EntityDebugID))
-						{
-							DEBUG_NAMED_VALUE(BID);
-						}
+					v3 LocalMouseP = Unproject(RenderGroup, EntityTrasform, MouseP);
 
-						PushBitmap(RenderGroup, EntityTrasform, BID, 2.5f, V3(0, 0, 0));
-					} break;
-
-					case EntityType_Stairwell:
+					if ((LocalMouseP.x > -0.5f*Volume->Dim.x) && (LocalMouseP.x < 0.5f*Volume->Dim.x) &&
+						(LocalMouseP.y > -0.5f*Volume->Dim.y) && (LocalMouseP.y < 0.5f*Volume->Dim.y))
 					{
-						PushRect(RenderGroup, EntityTrasform, V3(0, 0, 0), Entity->WalkableDim, V4(1.0f, 0.5f, 0, 1.0f));
-						PushRect(RenderGroup, EntityTrasform, V3(0, 0, Entity->WalkableHeight), Entity->WalkableDim, V4(1.0f, 1.0f, 0, 1.0f));
-					} break;
+						DEBUG_HIT(EntityDebugID, LocalMouseP.z);
+					}
 					
-					case EntityType_Familiar:
+					v4 OutlineColor;
+					if (DEBUG_HIGHLIGHTED(EntityDebugID, &OutlineColor))
 					{
-						bitmap_id BID = HeroBitmaps.Head;
-						if (DEBUG_REQUESTED(EntityDebugID))
-						{
-							DEBUG_NAMED_VALUE(BID);
-						}
-
-						Entity->tBob += dt;
-						if (Entity->tBob > Tau32)
-						{
-							Entity->tBob -= Tau32;
-						}
-						real32 BobSine = Sin(2.0f*Entity->tBob);
-						PushBitmap(RenderGroup, EntityTrasform, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), 2.5f, V3(0, 0, 0), V4(1, 1, 1, (0.5f*ShadowAlpha) + 0.2f*BobSine));
-						PushBitmap(RenderGroup, EntityTrasform, BID, 2.5f, V3(0, 0, 0.2f*BobSine));
-					} break;
-					case EntityType_Monster:
-					{
-						PushBitmap(RenderGroup, EntityTrasform, GetFirstBitmapFrom(TranState->Assets, Asset_Shadow), 4.5f, V3(0, 0, 0), V4(1, 1, 1, ShadowAlpha));
-						PushBitmap(RenderGroup, EntityTrasform, HeroBitmaps.Torso, 4.5f, V3(0, 0, 0));
-
-						DrawHitpoints(Entity, RenderGroup, EntityTrasform);
-					} break;
-					case EntityType_Floor:
-					case EntityType_FloatyThingForNow:
-					{
-						for (uint32 VolumeIndex = 0;
-							VolumeIndex < Entity->Collision->VolumeCount;
-							++VolumeIndex)
-						{
-							entity_collision_volume *Volume = Entity->Collision->Volumes + VolumeIndex;
-							PushRectOutline(RenderGroup, EntityTrasform, Volume->OffsetP - V3(0, 0, 0.5f*Volume->Dim.z), Volume->Dim.xy, V4(0.0f, 0.5f, 1.0f, 1.0f));
-						}
-
-						for (uint32 TraversableIndex = 0;
-							TraversableIndex < Entity->TraversableCount;
-							++TraversableIndex)
-						{
-							entity_traversable_point *Traversable = Entity->Traversables + TraversableIndex;
-							PushRect(RenderGroup, EntityTrasform, Traversable->P, V2(0.1f, 0.1f),
-								Traversable->Occupier ? V4(0.0f, 0.5f, 1.0f, 1) : V4(1.0f, 0.5f, 0.0f, 1.0f));
-						}
-					} break;
-					default:
-					{
-						// InvalidCodePath;
-					} break;
-				}
-
-				if (DEBUG_UI_ENABLED)
-				{
-					for (uint32 VolumeIndex = 0;
-						VolumeIndex < Entity->Collision->VolumeCount;
-						++VolumeIndex)
-					{
-						entity_collision_volume *Volume = Entity->Collision->Volumes + VolumeIndex;
-						
-						v3 LocalMouseP = Unproject(RenderGroup, EntityTrasform, MouseP);
-
-						if ((LocalMouseP.x > -0.5f*Volume->Dim.x) && (LocalMouseP.x < 0.5f*Volume->Dim.x) &&
-							(LocalMouseP.y > -0.5f*Volume->Dim.y) && (LocalMouseP.y < 0.5f*Volume->Dim.y))
-						{
-							DEBUG_HIT(EntityDebugID, LocalMouseP.z);
-						}
-						
-						v4 OutlineColor;
-						if (DEBUG_HIGHLIGHTED(EntityDebugID, &OutlineColor))
-						{
-							PushRectOutline(RenderGroup, EntityTrasform, Volume->OffsetP - V3(0, 0, 0.5f*Volume->Dim.z),
-								Volume->Dim.xy, OutlineColor, 0.05f);
-						}
+						PushRectOutline(RenderGroup, EntityTrasform, Volume->OffsetP - V3(0, 0, 0.5f*Volume->Dim.z),
+							Volume->Dim.xy, OutlineColor, 0.05f);
 					}
 				}
+			}
 
-				if (DEBUG_REQUESTED(EntityDebugID))
-				{
-					DEBUG_VALUE(Entity->ID.Value);
-					DEBUG_VALUE(Entity->Updatable);
-					DEBUG_VALUE(Entity->Type);
-					DEBUG_VALUE(Entity->P);
-					DEBUG_VALUE(Entity->dP);
-					DEBUG_VALUE(Entity->DistanceLimit);
-					DEBUG_VALUE(Entity->FacingDirection);
-					DEBUG_VALUE(Entity->tBob);
-					DEBUG_VALUE(Entity->dAbsTileZ);
-					DEBUG_VALUE(Entity->HitPointMax);
+			if (DEBUG_REQUESTED(EntityDebugID))
+			{
+				DEBUG_VALUE(Entity->ID.Value);
+				DEBUG_VALUE(Entity->Updatable);
+				DEBUG_VALUE(Entity->Type);
+				DEBUG_VALUE(Entity->P);
+				DEBUG_VALUE(Entity->dP);
+				DEBUG_VALUE(Entity->DistanceLimit);
+				DEBUG_VALUE(Entity->FacingDirection);
+				DEBUG_VALUE(Entity->tBob);
+				DEBUG_VALUE(Entity->dAbsTileZ);
+				DEBUG_VALUE(Entity->HitPointMax);
 #if 0
-					DEBUG_BEGIN_ARRAY();
-					for (u32 HitPointIndex = 0;
-						HitPointIndex < Entity->HitPointMax;
-						++HitPointIndex)
-					{
-						DEBUG_VALUE(Entity->HitPoint[HitPointIndex]);
-					}
-					DEBUG_END_ARRAY();
-					DEBUG_VALUE(Entity->Sword);
-#endif
-					DEBUG_VALUE(Entity->WalkableDim);
-					DEBUG_VALUE(Entity->WalkableHeight);
-
-					DEBUG_END_DATA_BLOCK("Simulation/Entity");
+				DEBUG_BEGIN_ARRAY();
+				for (u32 HitPointIndex = 0;
+					HitPointIndex < Entity->HitPointMax;
+					++HitPointIndex)
+				{
+					DEBUG_VALUE(Entity->HitPoint[HitPointIndex]);
 				}
+				DEBUG_END_ARRAY();
+				DEBUG_VALUE(Entity->Sword);
+#endif
+				DEBUG_VALUE(Entity->WalkableDim);
+				DEBUG_VALUE(Entity->WalkableHeight);
+
+				DEBUG_END_DATA_BLOCK("Simulation/Entity");
 			}
 		}
 	}
 
 	RenderGroup->GlobalAlpha = 1.0f;
+
+	Orthographic(RenderGroup, DrawBuffer->Width, DrawBuffer->Height, 1.0f);
+
+	PushRectOutline(RenderGroup, DefaultFlatTransform(), V3(MouseP, 0.0f), V2(2.0f, 2.0f));
+
+	// TODO: Make sure we hoist the camera update out to a place where the renderer
+	// can know about the the location of the camera at the end of the frame os there isn't
+	// a frane of lag in camera updating compared to the hero.
+	EndSim(SimRegion, WorldMode);
+	EndTemporaryMemory(SimMemory);
+
+	b32 HeroesExist = false;
+	for (u32 ConHeroIndex = 0;
+		ConHeroIndex < ArrayCount(GameState->ControlledHeroes);
+		++ConHeroIndex)
+	{
+		if (GameState->ControlledHeroes[ConHeroIndex].BrainID.Value)
+		{
+			HeroesExist = true;
+			break;
+		}
+	}
+	if (!HeroesExist)
+	{
+		PlayTitleScreen(GameState, TranState);
+	}
+
+	return(Result);
+}
 
 #if 0
 	v2 Origin = ScreenCenter;
@@ -1312,24 +1027,6 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
 		MapP += YAxis + V2(0.0f, 6.0f);
 	}
 #endif
-
-	Orthographic(RenderGroup, DrawBuffer->Width, DrawBuffer->Height, 1.0f);
-
-	PushRectOutline(RenderGroup, DefaultFlatTransform(), V3(MouseP, 0.0f), V2(2.0f, 2.0f));
-
-	// TODO: Make sure we hoist the camera update out to a place where the renderer
-	// can know about the the location of the camera at the end of the frame os there isn't
-	// a frane of lag in camera updating compared to the hero.
-	EndSim(SimRegion, WorldMode);
-	EndTemporaryMemory(SimMemory);
-
-	if (!HeroesExist)
-	{
-		PlayTitleScreen(GameState, TranState);
-	}
-
-	return(Result);
-}
 
 #if 0
 	if (Global_Particles_Test)

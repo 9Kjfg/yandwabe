@@ -94,28 +94,24 @@ struct entity_traversable_point
 	entity *Occupier;
 };
 
-enum brain_type
+struct move_spec
 {
-	Brain_Hero,
-	Brain_Snake,
-
-	Brain_Count,
-};
-
-struct brain_slot
-{
-	u32 Index;
-};
-
-struct brain_id
-{
-	u32 Value;
+	bool32 UnitMaxAccelVector;
+	real32 Speed;
+	real32 Drag;
 };
 
 enum entity_movement_mode
 {
 	MovementMode_Planted,
 	MovementMode_Hopping,
+};
+
+struct entity_visible_piece
+{
+	v4 Color;
+	asset_type_id AssetType;
+	r32 Height;
 };
 
 struct entity
@@ -148,6 +144,7 @@ struct entity
 	r32 FacingDirection;
 	r32 tBob;
 	r32 dtBob;
+	r32 ddtBob; // TODO: Do not pack this
 
 	s32 dAbsTileZ;
 
@@ -160,6 +157,7 @@ struct entity
 	r32 WalkableHeight;
 
 	entity_movement_mode MovementMode;
+	move_spec MoveSpec; // TODO: Do not pack this
 	r32 tMovement;
 	traversable_reference Occupying;
 	traversable_reference CameFrom;
@@ -171,40 +169,9 @@ struct entity
 
 	u32 TraversableCount;
 	entity_traversable_point Traversables[16];
-};
 
-struct brain_hero_parts
-{
-	entity *Head;
-	entity *Body;
-};
-
-#define BrainSlotFor(type, Member) BrainSlotFor_(&(((type *)0)->Member) - (entity **)0)
-inline brain_slot
-BrainSlotFor_(u32 PackValue)
-{
-	brain_slot Result = {PackValue};
-	return(Result);
-}
-
-struct brain
-{
-    brain_id ID;
-    brain_type Type;
-
-	union
-	{
-		brain_hero_parts Hero;
-		entity *Array[16];
-	};
-};
-
-enum reserved_brain_id
-{
-	ReservedBrainID_FirstHero = 1,
-	ReservedBrainID_LastHero = (ReservedBrainID_FirstHero + MAX_CONTROLLER_COUNT - 1),
-
-	ReservedBrainID_FirstFree,
+	u32 PieceCount;
+	entity_visible_piece Pieces[4];
 };
 
 inline bool32
