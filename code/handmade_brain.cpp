@@ -4,10 +4,10 @@ ExecuteBrain(game_state *GameState, game_input *Input,
 {
     switch (Brain->Type)
     {
-        case Brain_Hero:
+        case Type_brain_hero:
         {
             // TODO: Check that they're not deleted when we do
-            brain_hero_parts *Parts = &Brain->Hero;
+            brain_hero *Parts = &Brain->Hero;
             entity *Head = Parts->Head;
             entity *Body = Parts->Body;
 
@@ -173,6 +173,7 @@ ExecuteBrain(game_state *GameState, game_input *Input,
                 }
 
                 v3 ClosestP = GetSimSpaceTraversable(Traversable).P;
+
                 b32 TimerIsUp = (ConHero->RecenterTimer == 0.0f);
                 b32 NoPush = (LengthSq(ConHero->ddP) < 0.1f);
                 r32 Cp = NoPush ? 300.0f : 25.0f;
@@ -182,7 +183,7 @@ ExecuteBrain(game_state *GameState, game_input *Input,
                     ++E)
                 {
 #if 1
-                    if (NoPush || (TimerIsUp && (Square(ConHero->ddP.E[E]) < 0.1f)))
+                    if (NoPush || (TimerIsUp && (Square(ddP2.E[E]) < 0.1f)))
 #else
                     if (NoPush)
 #endif
@@ -234,13 +235,15 @@ ExecuteBrain(game_state *GameState, game_input *Input,
             }
         } break;
 
-        case Brain_Snake:
+        case Type_brain_snake:
         {
         } break;
 
-        case Brain_Familiar:
+        case Type_brain_familiar:
         {
-#if 0
+            brain_familiar *Parts = &Brain->Familiar;
+            entity *Head = Parts->Head;
+
             entity *ClosestHero = 0;
             real32 ClosestHeroDSq = Square(10.0f); // NOTE: Ten meter maximum search
             if (Global_AI_Familiar_FollowsHero)
@@ -251,10 +254,9 @@ ExecuteBrain(game_state *GameState, game_input *Input,
                     TestEntityIndex < SimRegion->EntityCount;
                     ++TestEntityIndex, ++TestEntity)
                 {	
-                    if (TestEntity->Type == EntityType_HeroBody)
+                    if (TestEntity->BrainSlot.Type == Type_brain_hero)
                     {
-                        real32 TestDSq = LengthSq(TestEntity->P - Entity->P);
-
+                        real32 TestDSq = LengthSq(TestEntity->P - Head->P);
                         if (ClosestHeroDSq > TestDSq)
                         {
                             ClosestHero = TestEntity;
@@ -268,16 +270,15 @@ ExecuteBrain(game_state *GameState, game_input *Input,
             {
                 real32 Acceleration = 0.5f;
                 real32 OneOverLength = Acceleration / SquareRoot(ClosestHeroDSq);
-                Entity->ddP = OneOverLength*(ClosestHero->P - Entity->P);
+                Head->ddP = OneOverLength*(ClosestHero->P - Head->P);
             }
 
-            Entity->MoveSpec.UnitMaxAccelVector = true;
-            Entity->MoveSpec.Speed = 50.0f;
-            Entity->MoveSpec.Drag = 8.0f;
-#endif
+            Head->MoveSpec.UnitMaxAccelVector = true;
+            Head->MoveSpec.Speed = 50.0f;
+            Head->MoveSpec.Drag = 8.0f;
         } break;
 
-        case Brain_FloatyThingForNow:
+        case Type_brain_floaty_thing_for_now:
         {
             // TODO: Think about what this stuff actually  should mean
             // or does mean, or will mean
@@ -285,7 +286,7 @@ ExecuteBrain(game_state *GameState, game_input *Input,
             //Entity->tBob += dt;
         } break;
 
-        case Brain_Monstar:
+        case Type_brain_monstar:
         {
         } break;
 

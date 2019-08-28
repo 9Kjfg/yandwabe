@@ -107,30 +107,38 @@ enum entity_movement_mode
 	MovementMode_Hopping,
 };
 
+enum entity_visible_piece_flag
+{
+	PieceMove_AxesDeform = 0x1,
+	PieceMove_BobOffset = 0x2,
+};
+
 struct entity_visible_piece
 {
 	v4 Color;
+	v3 Offset;
 	asset_type_id AssetType;
 	r32 Height;
+	u32 Flags;
 };
 
 struct entity
-{
-	entity_id ID;
-	u32 Updatable;
-	
+{	
 	//
-    // NOTE:
+    // NOTE: Things we've thought about
 	//
 
-	brain_type BrainType;
+	entity_id ID;
+
 	brain_slot BrainSlot;
 	brain_id BrainID;
 
 	//
 	//	NOTE: Everything bellow here is NOT out yet
 	//
-    entity_type Type;
+	u32 Updatable;
+	
+	//entity_type Type;
 	u32 Flags;
 
     v3 P;
@@ -223,8 +231,6 @@ GetEntityGroundPoint(entity *Entity)
 inline real32
 GetStairGround(entity *Entity, v3 AtGroundPoint)
 {
-	Assert(Entity->Type == EntityType_Stairwell);
-
 	rectangle2 RegionRect = RectCenterDim(Entity->P.xy, Entity->WalkableDim);
 	v2 Bary = Clamp01(GetBarycentric(RegionRect, AtGroundPoint.xy));
 	real32 Result = Entity->P.z + Bary.y*Entity->WalkableHeight;

@@ -220,43 +220,39 @@ BeginSim(memory_arena *SimArena, game_mode_world *WorldMode, world *World, world
 							++EntityIndex)
 						{
 							entity *Source = (entity *)Block->EntityData + EntityIndex;
-							v3 SimSpaceP = Source->P + ChunkDelta;
-							if (EntityOverlapsRectangle(SimSpaceP, Source->Collision->TotalVolume, SimRegion->Bounds))
+							entity_id ID = Source->ID;
+
+							entity_hash *Entry = GetHashFromID(SimRegion, ID);
+							Assert(Entry->Ptr == 0);
+
+							if (SimRegion->EntityCount < SimRegion->MaxEntityCount)
 							{
-								entity_id ID = Source->ID;
+								entity *Dest = SimRegion->Entities + SimRegion->EntityCount++;
 
-								entity_hash *Entry = GetHashFromID(SimRegion, ID);
-								Assert(Entry->Ptr == 0);
+								Entry->Index = ID;
+								Entry->Ptr = Dest;
 
-								if (SimRegion->EntityCount < SimRegion->MaxEntityCount)
+								if (Source)
 								{
-									entity *Dest = SimRegion->Entities + SimRegion->EntityCount++;
-
-									Entry->Index = ID;
-									Entry->Ptr = Dest;
-
-									if (Source)
-									{
-										// TODO: This should really be a decompression step, not a copy
-										*Dest = *Source;
-									}
-									
-									Dest->ID = ID;
-									Dest->P += ChunkDelta;
-
-									Dest->Updatable = EntityOverlapsRectangle(Dest->P, Dest->Collision->TotalVolume, SimRegion->UpdatableBounds);
-					
-									if (Dest->BrainID.Value)
-									{
-										brain *Brain = GetOrAddBrain(SimRegion, Dest->BrainID, Dest->BrainType);
-										Assert(Dest->BrainSlot.Index < ArrayCount(Brain->Array));
-										Brain->Array[Dest->BrainSlot.Index] = Dest;
-									}
+									// TODO: This should really be a decompression step, not a copy
+									*Dest = *Source;
 								}
-								else
+								
+								Dest->ID = ID;
+								Dest->P += ChunkDelta;
+
+								Dest->Updatable = EntityOverlapsRectangle(Dest->P, Dest->Collision->TotalVolume, SimRegion->UpdatableBounds);
+				
+								if (Dest->BrainID.Value)
 								{
-									InvalidCodePath;
+									brain *Brain = GetOrAddBrain(SimRegion, Dest->BrainID, (brain_type)Dest->BrainSlot.Type);
+									Assert(Dest->BrainSlot.Index < ArrayCount(Brain->Array));
+									Brain->Array[Dest->BrainSlot.Index] = Dest;
 								}
+							}
+							else
+							{
+								InvalidCodePath;
 							}
 						}
 
@@ -470,13 +466,14 @@ HandleCollision(game_mode_world *WorldMode, entity *A, entity *B)
 {
 	bool32 StopsOnCollision = true;
 
+#if 0	
 	if (A->Type > B->Type)
 	{
 		entity *Temp = A;
 		A = B;
 		B = Temp;
 	}
-	
+#endif	
 	
 	return(StopsOnCollision);
 }
@@ -488,10 +485,12 @@ CanOverlap(game_mode_world *WorldMode, entity *Mover, entity *Region)
 
 	if (Mover != Region)
 	{
+#if 0
 		if (Region->Type == EntityType_Stairwell)
 		{
 			Result = true;
 		}
+#endif
 	}
 
 	return(Result);
@@ -502,6 +501,7 @@ SpeculativeCollide(entity *Mover, entity *Region, v3 TestP)
 {
 	bool32 Result = true;
 
+#if 0
 	if (Region->Type == EntityType_Stairwell)
 	{
 		
@@ -514,6 +514,7 @@ SpeculativeCollide(entity *Mover, entity *Region, v3 TestP)
 		real32 Ground = GetStairGround(Region, MoverGroundPoint);
 		Result = (AbsoluteValue(MoverGroundPoint.z - Ground) > StepHeight);
 	}
+#endif
 
 	return(Result);
 }	
