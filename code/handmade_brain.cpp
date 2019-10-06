@@ -87,12 +87,37 @@ ExecuteBrain(game_state *GameState, game_input *Input,
                 }
             }
 
-#if 0
-            if (Controller->Start.EndedDown)
+            if (Head && WasPressed(Controller->Start))
             {
-                ConHero->dZ += 3.0f;
+                entity *ClosestHero = 0;
+                r32 ClosestHeroDSq = Square(10.0f); // NOTE: Ten meter maximum search
+                entity *TestEntity = SimRegion->Entities;
+                for (uint32 TestEntityIndex = 0;
+                    TestEntityIndex < SimRegion->EntityCount;
+                    ++TestEntityIndex, ++TestEntity)
+                {	
+                    if ((TestEntity->BrainID.Value != Head->BrainID.Value) && (TestEntity->BrainID.Value))
+                    {
+                        real32 TestDSq = LengthSq(TestEntity->P - Head->P);
+                        if (ClosestHeroDSq > TestDSq)
+                        {
+                            ClosestHero = TestEntity;
+                            ClosestHeroDSq = TestDSq;
+                        }
+                    }
+                }
+
+                if (ClosestHero)
+                {
+                    brain_id OldBrainID = Head->BrainID;
+                    brain_slot OldBrainSlot = Head->BrainSlot;
+                    Head->BrainID = ClosestHero->BrainID;
+                    Head->BrainSlot = ClosestHero->BrainSlot;
+                    ClosestHero->BrainID = OldBrainID;
+                    ClosestHero->BrainSlot = OldBrainSlot;
+                }
             }
-#endif
+
             dSword = {};
             if (Controller->ActionUp.EndedDown)
             {
@@ -248,22 +273,7 @@ ExecuteBrain(game_state *GameState, game_input *Input,
             real32 ClosestHeroDSq = Square(10.0f); // NOTE: Ten meter maximum search
             if (Global_AI_Familiar_FollowsHero)
             {
-                // TODO: Make spation queries easy for things
-                entity *TestEntity = SimRegion->Entities;
-                for (uint32 TestEntityIndex = 0;
-                    TestEntityIndex < SimRegion->EntityCount;
-                    ++TestEntityIndex, ++TestEntity)
-                {	
-                    if (TestEntity->BrainSlot.Type == Type_brain_hero)
-                    {
-                        real32 TestDSq = LengthSq(TestEntity->P - Head->P);
-                        if (ClosestHeroDSq > TestDSq)
-                        {
-                            ClosestHero = TestEntity;
-                            ClosestHeroDSq = TestDSq;
-                        }
-                    }
-                }
+            
             }
 
             if (ClosestHero && (ClosestHeroDSq > Square(3.0f)))

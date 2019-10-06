@@ -200,6 +200,9 @@ AddMonstar(game_mode_world *WorldMode, uint32 AbsTileX, uint32 AbsTileY, uint32 
 	entity *Entity = BeginGroundedEntity(WorldMode, WorldMode->MonsterCollision);
 	AddFlags(Entity, EntityFlag_Collides|EntityFlag_Moveable);
 
+	Entity->BrainSlot = BrainSlotFor(brain_monstar, Body);
+	Entity->BrainID = AddBrain(WorldMode);
+
 	InitHitPoints(Entity, 3);
 
 	AddPiece(Entity, Asset_Shadow, 4.5f, V3(0, 0, 0), V4(1, 1, 1, 0.5f));
@@ -410,10 +413,10 @@ PlayWorld(game_state *GameState, transient_state *TranState)
 	WorldMode->StairCollision = MakeSimpleGroundedCollision(WorldMode,
 		TileSideInMeters, 2.0f*TileSideInMeters,
 		1.1f*TileDepthInMeters);
-	WorldMode->HeroHeadCollision = MakeSimpleGroundedCollision(WorldMode, 1.0f, 0.5f, 0.5f, 0.7);
-	WorldMode->HeroBodyCollision = MakeSimpleGroundedCollision(WorldMode, 1.0f, 0.5f, 0.6f);
- 	WorldMode->MonsterCollision = MakeSimpleGroundedCollision(WorldMode, 1.0f, 0.5f, 0.5f);
-	WorldMode->FamiliarCollision = MakeSimpleGroundedCollision(WorldMode, 1.0f, 0.5f, 0.5f);
+	WorldMode->HeroHeadCollision = WorldMode->NullCollision;//MakeSimpleGroundedCollision(WorldMode, 1.0f, 0.5f, 0.5f, 0.7);
+	WorldMode->HeroBodyCollision = WorldMode->NullCollision;//MakeSimpleGroundedCollision(WorldMode, 1.0f, 0.5f, 0.6f);
+ 	WorldMode->MonsterCollision = WorldMode->NullCollision;//MakeSimpleGroundedCollision(WorldMode, 1.0f, 0.5f, 0.5f);
+	WorldMode->FamiliarCollision = WorldMode->NullCollision;//MakeSimpleGroundedCollision(WorldMode, 1.0f, 0.5f, 0.5f);
 	WorldMode->WallCollision = MakeSimpleGroundedCollision(WorldMode,
 		TileSideInMeters,
 		TileSideInMeters,

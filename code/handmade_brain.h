@@ -54,6 +54,7 @@ struct brain_id
 {
 	u32 Value;
 };
+inline brain_id NoBrain(void) {brain_id Result = {}; return(Result);}
 
 struct brain
 {
